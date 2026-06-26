@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/bengobox/library-service/internal/ent"
@@ -37,12 +39,43 @@ func (h *BranchHandler) List(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
+	// Never block the select-branch gate: auto-provision a default HQ branch when the tenant
+	// has none (get-or-create), then return it so the UI can default to it.
+	if len(rows) == 0 {
+		EnsureDefaultBranch(r.Context(), h.db, tenantID)
+		rows, _ = h.db.Branch.Query().Where(branch.TenantID(tenantID)).All(r.Context())
+	}
 	// is_hq lets the UI's select-outlet gate show all branches for privileged users.
 	isHQ := false
 	if claims, ok := ClaimsFrom(r); ok && claims != nil {
 		isHQ = claims.IsSuperuser() || claims.IsPlatformOwner || claims.IsAdmin() || claims.CanAccessAllOutlets()
 	}
 	respondJSON(w, http.StatusOK, map[string]any{"data": rows, "total": len(rows), "is_hq": isHQ})
+}
+
+// EnsureDefaultBranch get-or-creates the tenant's default HQ branch ("Main Library", code
+// HQ, is_default). Idempotent — the unique (tenant_id, code) index makes a concurrent second
+// create fail harmlessly. Other handlers (members, copies, stocktake) can call this to
+// resolve a home/branch default so a tenant is never blocked on "no branches".
+func EnsureDefaultBranch(ctx context.Context, db *ent.Client, tenantID uuid.UUID) *ent.Branch {
+	if existing, err := db.Branch.Query().
+		Where(branch.TenantID(tenantID), branch.IsDefault(true)).First(ctx); err == nil {
+		return existing
+	}
+	if existing, err := db.Branch.Query().Where(branch.TenantID(tenantID)).First(ctx); err == nil {
+		return existing
+	}
+	created, err := db.Branch.Create().
+		SetTenantID(tenantID).SetName("Main Library").SetCode("HQ").
+		SetIsDefault(true).SetIsActive(true).Save(ctx)
+	if err != nil {
+		// Lost a race — another request created it; return whatever exists now.
+		if existing, qerr := db.Branch.Query().Where(branch.TenantID(tenantID)).First(ctx); qerr == nil {
+			return existing
+		}
+		return nil
+	}
+	return created
 }
 
 // Create godoc

@@ -53,8 +53,8 @@ func (h *CatalogHandler) CreateCopy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req copyRequest
-	if err := Decode(r, &req); err != nil || req.Barcode == "" || req.BibRecordID == "" || req.BranchID == "" {
-		respondError(w, http.StatusBadRequest, "bib_record_id, branch_id and barcode are required", "invalid_request")
+	if err := Decode(r, &req); err != nil || req.Barcode == "" || req.BibRecordID == "" {
+		respondError(w, http.StatusBadRequest, "bib_record_id and barcode are required", "invalid_request")
 		return
 	}
 	bibID, err := uuid.Parse(req.BibRecordID)
@@ -62,9 +62,17 @@ func (h *CatalogHandler) CreateCopy(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "bad bib_record_id", "invalid_request")
 		return
 	}
-	branchID, err := uuid.Parse(req.BranchID)
-	if err != nil {
-		respondError(w, http.StatusBadRequest, "bad branch_id", "invalid_request")
+	// Default to the tenant's HQ branch (get-or-create) when none is supplied.
+	var branchID uuid.UUID
+	if req.BranchID != "" {
+		if branchID, err = uuid.Parse(req.BranchID); err != nil {
+			respondError(w, http.StatusBadRequest, "bad branch_id", "invalid_request")
+			return
+		}
+	} else if def := EnsureDefaultBranch(r.Context(), h.db, tenantID); def != nil {
+		branchID = def.ID
+	} else {
+		respondError(w, http.StatusInternalServerError, "could not resolve a branch", "no_branch")
 		return
 	}
 
