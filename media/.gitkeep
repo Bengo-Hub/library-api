@@ -1,0 +1,1 @@
+# Per-tenant media (cover images) + e-book files are written under MEDIA_ROOT/EBOOK_ROOT at runtime.

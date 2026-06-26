@@ -1,0 +1,507 @@
+basePath: /api/v1
+definitions:
+  bibrecord.Format:
+    enum:
+    - PHYSICAL
+    - PHYSICAL
+    - EBOOK
+    - AUDIOBOOK
+    - PERIODICAL
+    type: string
+    x-enum-varnames:
+    - DefaultFormat
+    - FormatPHYSICAL
+    - FormatEBOOK
+    - FormatAUDIOBOOK
+    - FormatPERIODICAL
+  bibrecord.RecordStatus:
+    enum:
+    - ACTIVE
+    - DRAFT
+    - ACTIVE
+    - ARCHIVED
+    - WITHDRAWN
+    type: string
+    x-enum-varnames:
+    - DefaultRecordStatus
+    - RecordStatusDRAFT
+    - RecordStatusACTIVE
+    - RecordStatusARCHIVED
+    - RecordStatusWITHDRAWN
+  ent.BibRecord:
+    properties:
+      authors:
+        description: Author display names (ordered)
+        items:
+          type: string
+        type: array
+      collection_id:
+        description: CollectionID holds the value of the "collection_id" field.
+        type: string
+      cover_image_url:
+        description: Relative media path, resolved at read
+        type: string
+      created_at:
+        description: CreatedAt holds the value of the "created_at" field.
+        type: string
+      ddc_classification:
+        description: Dewey Decimal
+        type: string
+      default_loan_policy_id:
+        description: DefaultLoanPolicyID holds the value of the "default_loan_policy_id"
+          field.
+        type: string
+      dublin_core:
+        additionalProperties: true
+        description: DublinCore holds the value of the "dublin_core" field.
+        type: object
+      edition:
+        description: Edition holds the value of the "edition" field.
+        type: string
+      format:
+        allOf:
+        - $ref: '#/definitions/bibrecord.Format'
+        description: Format holds the value of the "format" field.
+      id:
+        description: ID of the ent.
+        type: string
+      isbn10:
+        description: Isbn10 holds the value of the "isbn10" field.
+        type: string
+      isbn13:
+        description: Isbn13 holds the value of the "isbn13" field.
+        type: string
+      issn:
+        description: Issn holds the value of the "issn" field.
+        type: string
+      language:
+        description: Language holds the value of the "language" field.
+        type: string
+      lc_call_number:
+        description: Library of Congress call number
+        type: string
+      lccn:
+        description: Lccn holds the value of the "lccn" field.
+        type: string
+      marc:
+        additionalProperties: true
+        description: MARC-lite leader/008/tags
+        type: object
+      page_count:
+        description: PageCount holds the value of the "page_count" field.
+        type: integer
+      primary_subject_id:
+        description: PrimarySubjectID holds the value of the "primary_subject_id"
+          field.
+        type: string
+      publication_year:
+        description: PublicationYear holds the value of the "publication_year" field.
+        type: integer
+      publisher_id:
+        description: PublisherID holds the value of the "publisher_id" field.
+        type: string
+      publisher_name:
+        description: Denormalized for display; publisher_id is the ref
+        type: string
+      record_status:
+        allOf:
+        - $ref: '#/definitions/bibrecord.RecordStatus'
+        description: RecordStatus holds the value of the "record_status" field.
+      subtitle:
+        description: Subtitle holds the value of the "subtitle" field.
+        type: string
+      summary:
+        description: Summary holds the value of the "summary" field.
+        type: string
+      tenant_id:
+        description: TenantID holds the value of the "tenant_id" field.
+        type: string
+      title:
+        description: Title holds the value of the "title" field.
+        type: string
+      updated_at:
+        description: UpdatedAt holds the value of the "updated_at" field.
+        type: string
+    type: object
+  handlers.listEnvelope:
+    properties:
+      data: {}
+      total:
+        type: integer
+    type: object
+info:
+  contact: {}
+  description: HTTP API for the Codevertex library management service. Catalog, circulation,
+    members, fines and e-books.
+  title: Library Service API
+  version: 0.1.0
+paths:
+  /{tenant}/library/auth/me:
+    get:
+      responses: {}
+      summary: Service identity + effective permissions (JWT ∪ local RBAC)
+      tags:
+      - Auth
+  /{tenant}/library/auth/pin:
+    post:
+      responses: {}
+      summary: PIN login — validate a staff PIN and return a short-lived terminal
+        JWT
+      tags:
+      - Auth
+  /{tenant}/library/auth/pin/profiles:
+    get:
+      responses: {}
+      summary: List staff with PINs for the keypad picker (public; no PINs returned)
+      tags:
+      - Auth
+  /{tenant}/library/auth/pin/set:
+    post:
+      responses: {}
+      summary: Set/replace a staff member's desk PIN (SSO-authed; manager action)
+      tags:
+      - Auth
+  /{tenant}/library/branches:
+    get:
+      responses: {}
+    post:
+      responses: {}
+  /{tenant}/library/branches/{id}:
+    put:
+      responses: {}
+  /{tenant}/library/catalog/bibs:
+    get:
+      parameters:
+      - description: Title search
+        in: query
+        name: q
+        type: string
+      - description: PHYSICAL|EBOOK|AUDIOBOOK|PERIODICAL
+        in: query
+        name: format
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handlers.listEnvelope'
+      summary: List bibliographic records
+      tags:
+      - Catalog
+    post:
+      consumes:
+      - application/json
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/ent.BibRecord'
+      summary: Create a bibliographic record
+      tags:
+      - Catalog
+  /{tenant}/library/catalog/bibs/{id}:
+    delete:
+      responses: {}
+    get:
+      responses: {}
+    put:
+      responses: {}
+  /{tenant}/library/catalog/bibs/{id}/copies:
+    get:
+      responses: {}
+  /{tenant}/library/catalog/bibs/{id}/marc.json:
+    get:
+      responses: {}
+      summary: Export a bibliographic record as MARC-in-JSON
+      tags:
+      - Catalog
+  /{tenant}/library/catalog/bibs/{id}/marc.xml:
+    get:
+      produces:
+      - application/xml
+      responses: {}
+      summary: Export a bibliographic record as MARCXML
+      tags:
+      - Catalog
+  /{tenant}/library/catalog/bibs/{id}/recommendations:
+    get:
+      responses: {}
+      summary: '"Members who borrowed this also borrowed…" for a bib record (co-loan
+        counts)'
+      tags:
+      - Catalog
+  /{tenant}/library/catalog/copies:
+    post:
+      responses: {}
+  /{tenant}/library/catalog/copies/{id}:
+    put:
+      responses: {}
+  /{tenant}/library/catalog/copies/{id}/label.pdf:
+    get:
+      produces:
+      - application/pdf
+      responses: {}
+      summary: Render a printable spine/barcode label (PDF) for a copy
+      tags:
+      - Catalog
+  /{tenant}/library/catalog/copies/by-barcode/{barcode}:
+    get:
+      responses: {}
+  /{tenant}/library/catalog/facets:
+    get:
+      responses: {}
+      summary: Facet values for the OPAC filter UI (formats + collections + subjects
+        + languages)
+      tags:
+      - Catalog
+  /{tenant}/library/catalog/import/marc:
+    post:
+      responses: {}
+      summary: Import a bibliographic record from a MARC-lite JSON payload
+      tags:
+      - Catalog
+  /{tenant}/library/catalog/isbn/{isbn}:
+    get:
+      responses: {}
+      summary: Look up bibliographic metadata by ISBN (local first, then OpenLibrary)
+      tags:
+      - Catalog
+  /{tenant}/library/catalog/search:
+    get:
+      parameters:
+      - description: search terms
+        in: query
+        name: q
+        required: true
+        type: string
+      responses: {}
+      summary: OPAC search with live availability
+      tags:
+      - Catalog
+  /{tenant}/library/catalog/sru/search:
+    get:
+      parameters:
+      - description: search terms (title/author/ISBN)
+        in: query
+        name: q
+        required: true
+        type: string
+      - description: SRU base URL (defaults to LoC)
+        in: query
+        name: target
+        type: string
+      responses: {}
+      summary: 'Search an external SRU catalog (default: Library of Congress) for
+        copy-cataloging'
+      tags:
+      - Catalog
+  /{tenant}/library/catalog/stocktake:
+    get:
+      responses: {}
+      summary: List stocktake / cycle-count sessions
+      tags:
+      - Catalog
+    post:
+      responses: {}
+      summary: Start a branch stocktake (snapshots the expected copy count)
+      tags:
+      - Catalog
+  /{tenant}/library/catalog/stocktake/{id}/finalize:
+    post:
+      responses: {}
+      summary: Finalize a stocktake — unscanned copies at the branch are flagged LOST
+      tags:
+      - Catalog
+  /{tenant}/library/catalog/stocktake/{id}/scan:
+    post:
+      responses: {}
+      summary: Record a scanned copy as present during a stocktake
+      tags:
+      - Catalog
+  /{tenant}/library/catalog/transfers:
+    get:
+      responses: {}
+      summary: List inter-branch copy transfers
+      tags:
+      - Catalog
+    post:
+      responses: {}
+      summary: Start an inter-branch transfer of a copy (copy → IN_TRANSIT)
+      tags:
+      - Catalog
+  /{tenant}/library/catalog/transfers/{id}/receive:
+    post:
+      responses: {}
+      summary: Receive a transfer at the destination (copy → destination branch, AVAILABLE)
+      tags:
+      - Catalog
+  /{tenant}/library/circulation/checkout:
+    post:
+      responses: {}
+      summary: Check out a copy to a member (scan-driven)
+      tags:
+      - Circulation
+  /{tenant}/library/circulation/loans:
+    get:
+      responses: {}
+      summary: List loans (filter by status/member/overdue)
+      tags:
+      - Circulation
+  /{tenant}/library/circulation/renew/{loan_id}:
+    post:
+      responses: {}
+      summary: Renew an active loan
+      tags:
+      - Circulation
+  /{tenant}/library/circulation/return:
+    post:
+      responses: {}
+      summary: Check a copy back in
+      tags:
+      - Circulation
+  /{tenant}/library/ebooks:
+    get:
+      responses: {}
+      summary: List e-books
+      tags:
+      - Ebooks
+    post:
+      responses: {}
+  /{tenant}/library/ebooks/{id}/download:
+    get:
+      responses: {}
+      summary: Download a purchased e-book (token-gated; requires a PAID purchase)
+      tags:
+      - Ebooks
+  /{tenant}/library/ebooks/{id}/lend:
+    post:
+      responses: {}
+      summary: Borrow an e-book (controlled digital lending — concurrency-limited)
+      tags:
+      - Ebooks
+  /{tenant}/library/ebooks/{id}/purchase:
+    post:
+      responses: {}
+      summary: Buy an e-book outright (Phase 2) — creates a treasury payment intent
+      tags:
+      - Ebooks
+  /{tenant}/library/ebooks/{id}/read:
+    get:
+      responses: {}
+      summary: Stream the e-book file for an active reader session (token-gated)
+      tags:
+      - Ebooks
+  /{tenant}/library/ebooks/loans/{id}/position:
+    post:
+      responses: {}
+      summary: Persist reading progress
+      tags:
+      - Ebooks
+  /{tenant}/library/fines:
+    get:
+      responses: {}
+      summary: List fines (filter by status/member)
+      tags:
+      - Fines
+  /{tenant}/library/fines/{id}/pay:
+    post:
+      responses: {}
+      summary: Create a treasury payment intent for a fine
+      tags:
+      - Fines
+  /{tenant}/library/fines/{id}/waive:
+    post:
+      responses: {}
+      summary: Waive a fine (sensitive — audited)
+      tags:
+      - Fines
+  /{tenant}/library/holds:
+    get:
+      responses: {}
+    post:
+      responses: {}
+      summary: Place a hold on a bib record
+      tags:
+      - Holds
+  /{tenant}/library/holds/{id}:
+    delete:
+      responses: {}
+  /{tenant}/library/loan-policies:
+    get:
+      responses: {}
+    post:
+      responses: {}
+  /{tenant}/library/member-tiers:
+    get:
+      responses: {}
+    post:
+      responses: {}
+  /{tenant}/library/member-tiers/{id}:
+    put:
+      responses: {}
+  /{tenant}/library/members:
+    get:
+      responses: {}
+    post:
+      responses: {}
+  /{tenant}/library/members/{id}:
+    get:
+      responses: {}
+    put:
+      responses: {}
+  /{tenant}/library/members/{id}/fines:
+    get:
+      responses: {}
+  /{tenant}/library/members/{id}/loans:
+    get:
+      responses: {}
+  /{tenant}/library/members/{id}/membership-fee:
+    post:
+      responses: {}
+      summary: Issue an annual membership fee for a member and start payment
+      tags:
+      - Members
+  /{tenant}/library/membership-fees:
+    get:
+      responses: {}
+      summary: List membership fees
+      tags:
+      - Members
+  /{tenant}/library/membership-fees/{id}/pay:
+    post:
+      responses: {}
+      summary: Create a treasury intent for an existing pending membership fee
+      tags:
+      - Members
+  /{tenant}/library/rbac/permissions:
+    get:
+      responses: {}
+  /{tenant}/library/rbac/roles:
+    get:
+      responses: {}
+  /{tenant}/library/reports/summary:
+    get:
+      responses: {}
+      summary: Dashboard summary counts
+      tags:
+      - Reports
+  /{tenant}/library/team:
+    get:
+      responses: {}
+  /{tenant}/library/team/{user_id}/roles:
+    put:
+      responses: {}
+schemes:
+- http
+- https
+securityDefinitions:
+  bearerAuth:
+    description: 'JWT token from auth-service. Format: Bearer {token}'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

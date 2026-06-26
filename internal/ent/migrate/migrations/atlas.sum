@@ -1,0 +1,6 @@
+h1:Zj0eYzImCbMSuhbWiYmlV317o6zQWoyVtUOaOsUhit4=
+20260626135020_init_library_schema.sql h1:Qt4ItOd+TbONDhHhmgV6+XcuPB/EbtPXH1b5OUdLz3Q=
+20260626163557_add_copy_transfer.sql h1:csII0mqoLACvht1WebGl/+CT42KWS1eyzkD19xQi500=
+20260626165654_add_stock_count.sql h1:ktPdhWDJXz/8BaBapl4At37Ty3HIgZP0qPXViAbtSxI=
+20260626174058_add_library_user_pin.sql h1:3sZ6XIRRt3og9axUAy2dWpJD5tHSm0Rm1UMRemP6r/A=
+20260626175055_add_loan_client_reference.sql h1:p0UgGXHLggdzowfD2ZF0k58wg8hFG14xOPmTBGAwJis=

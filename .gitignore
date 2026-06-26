@@ -1,0 +1,21 @@
+# Binaries
+/library
+/library-api
+*.exe
+/out/
+
+# Local env + secrets (NEVER commit real secrets)
+.env
+.env.local
+*.pem
+*.key
+
+# Local media / e-book uploads (runtime, PVC-backed in prod)
+/media/images/
+/media/ebooks/
+/data/
+
+# Editor/OS
+.DS_Store
+.idea/
+.vscode/

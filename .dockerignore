@@ -1,0 +1,12 @@
+.git
+.gitignore
+*.md
+.env
+.env.*
+out/
+*.exe
+data/
+media/images/
+media/ebooks/
+.vscode/
+.idea/
