@@ -108,6 +108,9 @@ func New(d Deps) http.Handler {
 			lib.Post("/auth/pin/set", d.PINAuth.SetPIN)
 		}
 		lib.Get("/reports/summary", d.Reports.Summary)
+		lib.Get("/reports/popular", d.Reports.Popular)
+		lib.Get("/reports/circulation", d.Reports.Circulation)
+		lib.Get("/reports/overdue", d.Reports.Overdue)
 
 		// Catalog
 		lib.Route("/catalog", func(c chi.Router) {
@@ -186,6 +189,9 @@ func New(d Deps) http.Handler {
 
 		// RBAC / team
 		lib.Get("/rbac/roles", d.RBACHandler.ListRoles)
+		lib.Post("/rbac/roles", d.RBACHandler.CreateRole)
+		lib.Put("/rbac/roles/{id}", d.RBACHandler.UpdateRole)
+		lib.Delete("/rbac/roles/{id}", d.RBACHandler.DeleteRole)
 		lib.Get("/rbac/permissions", d.RBACHandler.ListPermissions)
 		lib.Get("/team", d.RBACHandler.ListTeam)
 		lib.Put("/team/{user_id}/roles", d.RBACHandler.AssignRoles)

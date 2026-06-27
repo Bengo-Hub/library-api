@@ -38,6 +38,64 @@ func (h *RBACHandler) ListPermissions(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, listEnvelope{Data: cat, Total: len(cat)})
 }
 
+type roleRequest struct {
+	Name        string   `json:"name"`
+	Description string   `json:"description"`
+	Permissions []string `json:"permissions"`
+}
+
+// CreateRole godoc
+// @Router /{tenant}/library/rbac/roles [post]
+func (h *RBACHandler) CreateRole(w http.ResponseWriter, r *http.Request) {
+	var req roleRequest
+	if err := Decode(r, &req); err != nil || req.Name == "" {
+		respondError(w, http.StatusBadRequest, "name is required", "invalid_request")
+		return
+	}
+	row, err := h.rbac.CreateRole(r.Context(), req.Name, req.Description, req.Permissions)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "create_failed")
+		return
+	}
+	respondJSON(w, http.StatusCreated, row)
+}
+
+// UpdateRole godoc
+// @Router /{tenant}/library/rbac/roles/{id} [put]
+func (h *RBACHandler) UpdateRole(w http.ResponseWriter, r *http.Request) {
+	id, err := ParseUUIDParam(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "bad id", "invalid_request")
+		return
+	}
+	var req roleRequest
+	if err := Decode(r, &req); err != nil {
+		respondError(w, http.StatusBadRequest, "bad body", "invalid_request")
+		return
+	}
+	row, err := h.rbac.UpdateRolePermissions(r.Context(), id, req.Permissions, req.Description)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "update_failed")
+		return
+	}
+	respondJSON(w, http.StatusOK, row)
+}
+
+// DeleteRole godoc
+// @Router /{tenant}/library/rbac/roles/{id} [delete]
+func (h *RBACHandler) DeleteRole(w http.ResponseWriter, r *http.Request) {
+	id, err := ParseUUIDParam(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "bad id", "invalid_request")
+		return
+	}
+	if err := h.rbac.DeleteRole(r.Context(), id); err != nil {
+		respondError(w, http.StatusConflict, err.Error(), "delete_failed")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"deleted": true})
+}
+
 // ListTeam godoc
 // @Router /{tenant}/library/team [get]
 func (h *RBACHandler) ListTeam(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +109,20 @@ func (h *RBACHandler) ListTeam(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	// Clean shape: the UI keys role/PIN assignment on user_id (not the local row id).
+	out := make([]map[string]any, 0, len(rows))
+	for _, u := range rows {
+		out = append(out, map[string]any{
+			"user_id":   u.UserID,
+			"email":     u.Email,
+			"full_name": u.DisplayName,
+			"name":      u.DisplayName,
+			"roles":     u.Roles,
+			"is_active": u.IsActive,
+			"has_pin":   u.PinHash != nil && *u.PinHash != "",
+		})
+	}
+	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
 }
 
 // AssignRoles godoc

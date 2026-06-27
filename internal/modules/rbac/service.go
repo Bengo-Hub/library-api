@@ -189,6 +189,40 @@ func (s *Service) ListRoles(ctx context.Context) ([]*ent.LibraryRole, error) {
 	return s.db.LibraryRole.Query().All(ctx)
 }
 
+// CreateRole creates a custom (non-system) role.
+func (s *Service) CreateRole(ctx context.Context, name, description string, permissions []string) (*ent.LibraryRole, error) {
+	return s.db.LibraryRole.Create().
+		SetName(name).SetDescription(description).SetPermissions(permissions).SetIsSystem(false).
+		Save(ctx)
+}
+
+// UpdateRolePermissions replaces a role's permission set (and optionally its description).
+func (s *Service) UpdateRolePermissions(ctx context.Context, id uuid.UUID, permissions []string, description string) (*ent.LibraryRole, error) {
+	u := s.db.LibraryRole.UpdateOneID(id).SetPermissions(permissions)
+	if description != "" {
+		u.SetDescription(description)
+	}
+	return u.Save(ctx)
+}
+
+// DeleteRole removes a custom role (system roles are protected).
+func (s *Service) DeleteRole(ctx context.Context, id uuid.UUID) error {
+	role, err := s.db.LibraryRole.Get(ctx, id)
+	if err != nil {
+		return err
+	}
+	if role.IsSystem {
+		return errSystemRoleLocked
+	}
+	return s.db.LibraryRole.DeleteOneID(id).Exec(ctx)
+}
+
+var errSystemRoleLocked = stringError("system roles cannot be deleted")
+
+type stringError string
+
+func (e stringError) Error() string { return string(e) }
+
 // ListUsers returns the tenant's provisioned library users (the team).
 func (s *Service) ListUsers(ctx context.Context, tenantID uuid.UUID) ([]*ent.LibraryUser, error) {
 	return s.db.LibraryUser.Query().Where(libraryuser.TenantID(tenantID)).All(ctx)
