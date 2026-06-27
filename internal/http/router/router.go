@@ -112,8 +112,9 @@ func New(d Deps) http.Handler {
 		lib.Get("/reports/circulation", d.Reports.Circulation)
 		lib.Get("/reports/overdue", d.Reports.Overdue)
 
-		// Catalog
+		// Catalog (OPAC search + bib/copy management) — gated on library_catalog.
 		lib.Route("/catalog", func(c chi.Router) {
+			c.Use(libmw.RequireFeature("library_catalog"))
 			c.Get("/bibs", d.Catalog.ListBibs)
 			c.Post("/bibs", d.Catalog.CreateBib)
 			c.Get("/search", d.Catalog.Search)
@@ -146,46 +147,61 @@ func New(d Deps) http.Handler {
 		lib.Post("/branches", d.Branch.Create)
 		lib.Put("/branches/{id}", d.Branch.Update)
 
-		// Members + tiers + policies
-		lib.Get("/members", d.Member.ListMembers)
-		lib.Post("/members", d.Member.CreateMember)
-		lib.Get("/members/{id}", d.Member.GetMember)
-		lib.Put("/members/{id}", d.Member.UpdateMember)
-		lib.Get("/members/{id}/loans", d.Member.MemberLoans)
-		lib.Get("/members/{id}/fines", d.Member.MemberFines)
-		lib.Get("/member-tiers", d.Member.ListTiers)
-		lib.Post("/member-tiers", d.Member.CreateTier)
-		lib.Put("/member-tiers/{id}", d.Member.UpdateTier)
-		lib.Get("/loan-policies", d.Member.ListPolicies)
-		lib.Post("/loan-policies", d.Member.CreatePolicy)
-		lib.Get("/membership-fees", d.Membership.List)
-		lib.Post("/members/{id}/membership-fee", d.Membership.Issue)
-		lib.Post("/membership-fees/{id}/pay", d.Membership.Pay)
+		// Members + tiers + policies + membership fees — gated on library_members.
+		lib.Group(func(m chi.Router) {
+			m.Use(libmw.RequireFeature("library_members"))
+			m.Get("/members", d.Member.ListMembers)
+			m.Post("/members", d.Member.CreateMember)
+			m.Get("/members/{id}", d.Member.GetMember)
+			m.Put("/members/{id}", d.Member.UpdateMember)
+			m.Get("/members/{id}/loans", d.Member.MemberLoans)
+			m.Get("/members/{id}/fines", d.Member.MemberFines)
+			m.Get("/member-tiers", d.Member.ListTiers)
+			m.Post("/member-tiers", d.Member.CreateTier)
+			m.Put("/member-tiers/{id}", d.Member.UpdateTier)
+			m.Get("/loan-policies", d.Member.ListPolicies)
+			m.Post("/loan-policies", d.Member.CreatePolicy)
+			m.Get("/membership-fees", d.Membership.List)
+			m.Post("/members/{id}/membership-fee", d.Membership.Issue)
+			m.Post("/membership-fees/{id}/pay", d.Membership.Pay)
+		})
 
-		// Circulation
-		lib.Post("/circulation/checkout", d.Circulation.Checkout)
-		lib.Post("/circulation/return", d.Circulation.Return)
-		lib.Post("/circulation/renew/{loan_id}", d.Circulation.Renew)
-		lib.Get("/circulation/loans", d.Circulation.ListLoans)
+		// Circulation (checkout/return/renew) — gated on library_circulation.
+		lib.Group(func(c chi.Router) {
+			c.Use(libmw.RequireFeature("library_circulation"))
+			c.Post("/circulation/checkout", d.Circulation.Checkout)
+			c.Post("/circulation/return", d.Circulation.Return)
+			c.Post("/circulation/renew/{loan_id}", d.Circulation.Renew)
+			c.Get("/circulation/loans", d.Circulation.ListLoans)
+		})
 
-		// Holds
-		lib.Get("/holds", d.Hold.List)
-		lib.Post("/holds", d.Hold.Place)
-		lib.Delete("/holds/{id}", d.Hold.Cancel)
+		// Holds & reservations — gated on library_holds.
+		lib.Group(func(h chi.Router) {
+			h.Use(libmw.RequireFeature("library_holds"))
+			h.Get("/holds", d.Hold.List)
+			h.Post("/holds", d.Hold.Place)
+			h.Delete("/holds/{id}", d.Hold.Cancel)
+		})
 
-		// Fines
-		lib.Get("/fines", d.Fine.List)
-		lib.Post("/fines/{id}/waive", d.Fine.Waive)
-		lib.Post("/fines/{id}/pay", d.Fine.Pay)
+		// Fines & fees — gated on library_fines.
+		lib.Group(func(f chi.Router) {
+			f.Use(libmw.RequireFeature("library_fines"))
+			f.Get("/fines", d.Fine.List)
+			f.Post("/fines/{id}/waive", d.Fine.Waive)
+			f.Post("/fines/{id}/pay", d.Fine.Pay)
+		})
 
-		// Ebooks
-		lib.Get("/ebooks", d.Ebook.List)
-		lib.Post("/ebooks", d.Ebook.Create)
-		lib.Post("/ebooks/{id}/lend", d.Ebook.Lend)
-		lib.Get("/ebooks/{id}/read", d.Ebook.Read)
-		lib.Post("/ebooks/loans/{id}/position", d.Ebook.SavePosition)
-		lib.Post("/ebooks/{id}/purchase", d.Ebook.Purchase)
-		lib.Get("/ebooks/{id}/download", d.Ebook.Download)
+		// E-books & controlled digital lending — gated on library_ebooks.
+		lib.Group(func(e chi.Router) {
+			e.Use(libmw.RequireFeature("library_ebooks"))
+			e.Get("/ebooks", d.Ebook.List)
+			e.Post("/ebooks", d.Ebook.Create)
+			e.Post("/ebooks/{id}/lend", d.Ebook.Lend)
+			e.Get("/ebooks/{id}/read", d.Ebook.Read)
+			e.Post("/ebooks/loans/{id}/position", d.Ebook.SavePosition)
+			e.Post("/ebooks/{id}/purchase", d.Ebook.Purchase)
+			e.Get("/ebooks/{id}/download", d.Ebook.Download)
+		})
 
 		// RBAC / team
 		lib.Get("/rbac/roles", d.RBACHandler.ListRoles)
