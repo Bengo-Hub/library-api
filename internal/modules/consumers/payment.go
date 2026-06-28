@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"time"
 
+	eventslib "github.com/Bengo-Hub/shared-events"
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 	"go.uber.org/zap"
@@ -47,10 +48,15 @@ type paymentPayload struct {
 	Status        string `json:"status"`
 }
 
-// Start subscribes to treasury.payment.succeeded as a durable queue consumer so multiple
-// replicas share the work without double-processing.
+// Start subscribes to treasury.payment.succeeded as a durable deliver-group consumer so
+// multiple replicas share the work without double-processing or "already bound" conflicts.
+// Uses the shared-events canonical primitive (queue == durable name) which adds the
+// one-time self-heal of any stale non-deliver-group durable plus rebind resilience.
 func (c *PaymentConsumer) Start(ctx context.Context, js nats.JetStreamContext) error {
-	_, err := js.QueueSubscribe(
+	eventslib.SubscribeQueueWithRebind(
+		c.log,
+		js,
+		"treasury",
 		"treasury.payment.succeeded",
 		"library-payment-reconcile",
 		func(m *nats.Msg) { c.handle(ctx, m) },
@@ -59,7 +65,7 @@ func (c *PaymentConsumer) Start(ctx context.Context, js nats.JetStreamContext) e
 		nats.AckWait(30*time.Second),
 		nats.DeliverAll(),
 	)
-	return err
+	return nil
 }
 
 func (c *PaymentConsumer) handle(ctx context.Context, m *nats.Msg) {

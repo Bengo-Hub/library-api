@@ -10,7 +10,7 @@ require (
 	entgo.io/ent v0.14.5
 	github.com/Bengo-Hub/httpware v0.5.0
 	github.com/Bengo-Hub/shared-auth-client v0.0.0-00010101000000-000000000000
-	github.com/Bengo-Hub/shared-events v0.5.1
+	github.com/Bengo-Hub/shared-events v0.6.0
 	github.com/boombuler/barcode v1.1.0
 	github.com/go-chi/chi/v5 v5.0.12
 	github.com/go-chi/cors v1.2.1
