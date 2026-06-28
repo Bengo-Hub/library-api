@@ -14,6 +14,7 @@ import (
 
 	"github.com/bengobox/library-service/internal/ent"
 	"github.com/bengobox/library-service/internal/ent/bibrecord"
+	"github.com/bengobox/library-service/internal/platform/secrets"
 )
 
 // isbnMetadata is the flat shape the cataloging UI expects from the ISBN lookup endpoint.
@@ -29,6 +30,7 @@ type isbnMetadata struct {
 	ISBN            string   `json:"isbn"`
 	Pages           int      `json:"pages,omitempty"`
 	CoverURL        string   `json:"cover_url,omitempty"`
+	Description     string   `json:"description,omitempty"`
 	Subjects        []string `json:"subjects,omitempty"`
 	Language        string   `json:"language,omitempty"`
 	Source          string   `json:"source,omitempty"` // debug-only: where fields came from
@@ -78,6 +80,19 @@ func (h *CatalogHandler) ISBNLookup(w http.ResponseWriter, r *http.Request) {
 		{2, "open_library", fetchOpenLibrary},
 		{3, "loc_sru", fetchSRUMetadata},
 	}
+	// ISBNdb (priority 0 = richest: covers + synopsis) only when a platform API key is
+	// configured. The key is stored encrypted in ServiceConfig (platform settings), never env.
+	if h.secrets != nil {
+		if apiKey, ok := h.secrets.GetSecret(r.Context(), secrets.KeyISBNdbAPIKey); ok {
+			providers = append(providers, struct {
+				priority int
+				name     string
+				fn       func(context.Context, string) *isbnMetadata
+			}{0, "isbndb", func(ctx context.Context, isbn string) *isbnMetadata {
+				return fetchISBNdb(ctx, apiKey, isbn)
+			}})
+		}
+	}
 	results := make(chan result, len(providers))
 	for _, p := range providers {
 		p := p
@@ -111,6 +126,7 @@ merge:
 
 	out.ISBN = isbn // ensure the echoed ISBN is never overwritten/lost
 	out.Author = strings.Join(out.Authors, ", ")
+	out.Description = stripTags(out.Description) // ISBNdb synopsis / some Google blurbs carry HTML
 	if len(sources) == 0 {
 		out.Source = "none"
 	} else {
@@ -187,6 +203,10 @@ func mergeMetadata(dst *isbnMetadata, src *isbnMetadata) bool {
 		dst.CoverURL = src.CoverURL
 		contributed = true
 	}
+	if dst.Description == "" && src.Description != "" {
+		dst.Description = src.Description
+		contributed = true
+	}
 	if len(dst.Subjects) == 0 && len(src.Subjects) > 0 {
 		dst.Subjects = src.Subjects
 		contributed = true
@@ -235,6 +255,7 @@ type googleBooksResponse struct {
 			Authors       []string `json:"authors"`
 			Publisher     string   `json:"publisher"`
 			PublishedDate string   `json:"publishedDate"`
+			Description   string   `json:"description"`
 			PageCount     int      `json:"pageCount"`
 			Categories    []string `json:"categories"`
 			Language      string   `json:"language"`
@@ -264,6 +285,7 @@ func fetchGoogleBooks(ctx context.Context, isbn string) *isbnMetadata {
 		Pages:           vi.PageCount,
 		Subjects:        vi.Categories,
 		Language:        vi.Language,
+		Description:     strings.TrimSpace(vi.Description),
 		CoverURL:        normalizeGoogleCover(vi.ImageLinks.Thumbnail),
 	}
 	if m.CoverURL == "" {
@@ -348,6 +370,104 @@ func fetchOpenLibrary(ctx context.Context, isbn string) *isbnMetadata {
 		m.CoverURL = "https://covers.openlibrary.org/b/isbn/" + isbn + "-L.jpg"
 	}
 	return m
+}
+
+// --- ISBNdb (richest source: covers + synopsis) — requires a platform-configured API key ---
+// https://api2.isbndb.com/book/{isbn} with header `Authorization: <key>`. Key is stored
+// encrypted in ServiceConfig (platform settings), decrypted per lookup — never read from env.
+
+type isbndbResponse struct {
+	Book struct {
+		Title         string   `json:"title"`
+		TitleLong     string   `json:"title_long"`
+		Authors       []string `json:"authors"`
+		Publisher     string   `json:"publisher"`
+		DatePublished string   `json:"date_published"`
+		Pages         int      `json:"pages"`
+		Overview      string   `json:"overview"`
+		Synopsis      string   `json:"synopsis"`
+		Subjects      []string `json:"subjects"`
+		Language      string   `json:"language"`
+		Image         string   `json:"image"`
+	} `json:"book"`
+}
+
+func fetchISBNdb(ctx context.Context, apiKey, isbn string) *isbnMetadata {
+	reqCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, "https://api2.isbndb.com/book/"+isbn, nil)
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("Authorization", apiKey)
+	req.Header.Set("Accept", "application/json")
+	resp, err := (&http.Client{Timeout: 3 * time.Second}).Do(req)
+	if err != nil {
+		return nil
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil
+	}
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+	var d isbndbResponse
+	if err := json.Unmarshal(body, &d); err != nil || d.Book.Title == "" {
+		return nil
+	}
+	b := d.Book
+	m := &isbnMetadata{
+		Title:           strings.TrimSpace(b.Title),
+		Authors:         b.Authors,
+		Publisher:       strings.TrimSpace(b.Publisher),
+		PublicationYear: parseYear(b.DatePublished),
+		Pages:           b.Pages,
+		Subjects:        b.Subjects,
+		Language:        b.Language,
+		CoverURL:        strings.TrimSpace(b.Image),
+		Description:     strings.TrimSpace(firstNonEmpty(b.Synopsis, b.Overview)),
+	}
+	// title_long often carries "Title: Subtitle"; derive a subtitle when present.
+	if b.TitleLong != "" && b.TitleLong != b.Title {
+		if _, after, found := strings.Cut(b.TitleLong, ": "); found {
+			m.Subtitle = strings.TrimSpace(after)
+		}
+	}
+	return m
+}
+
+// stripTags removes simple HTML tags and collapses whitespace so a synopsis renders cleanly in
+// the cataloging textarea. Best-effort (not a sanitizer) — the value is only ever displayed.
+func stripTags(s string) string {
+	if s == "" || !strings.ContainsAny(s, "<&") {
+		return strings.TrimSpace(s)
+	}
+	var b strings.Builder
+	inTag := false
+	for _, r := range s {
+		switch {
+		case r == '<':
+			inTag = true
+		case r == '>':
+			inTag = false
+		case !inTag:
+			b.WriteRune(r)
+		}
+	}
+	out := b.String()
+	out = strings.ReplaceAll(out, "&amp;", "&")
+	out = strings.ReplaceAll(out, "&quot;", "\"")
+	out = strings.ReplaceAll(out, "&#39;", "'")
+	out = strings.ReplaceAll(out, "&nbsp;", " ")
+	return strings.TrimSpace(strings.Join(strings.Fields(out), " "))
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
 }
 
 // --- LoC SRU (last resort) — reuses fetchSRU/marcToPreview from sru.go ---

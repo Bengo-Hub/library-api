@@ -51,6 +51,21 @@ func RequireServicePermission(rbacSvc PermissionChecker, perms ...string) func(h
 	}
 }
 
+// RequirePlatformOwner gates platform-level configuration (encryption key, integration secrets)
+// to the platform owner / superuser only. Mounted on the platform routes.
+func RequirePlatformOwner() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			claims, ok := authclient.ClaimsFromContext(r.Context())
+			if !ok || claims == nil || !(claims.IsPlatformOwner || claims.IsSuperuser()) {
+				writeForbidden(w)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
 func writeForbidden(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusForbidden)

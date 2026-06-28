@@ -14,17 +14,19 @@ import (
 	"github.com/bengobox/library-service/internal/ent/collection"
 	"github.com/bengobox/library-service/internal/ent/subject"
 	"github.com/bengobox/library-service/internal/events"
+	"github.com/bengobox/library-service/internal/platform/secrets"
 )
 
 // CatalogHandler serves bibliographic + copy endpoints.
 type CatalogHandler struct {
-	db  *ent.Client
-	log *zap.Logger
+	db      *ent.Client
+	secrets *secrets.Store // platform secret store; supplies the optional ISBNdb key for lookups
+	log     *zap.Logger
 }
 
-// NewCatalogHandler builds the catalog handler.
-func NewCatalogHandler(db *ent.Client, log *zap.Logger) *CatalogHandler {
-	return &CatalogHandler{db: db, log: log}
+// NewCatalogHandler builds the catalog handler. secretStore may be nil (ISBNdb enrichment off).
+func NewCatalogHandler(db *ent.Client, secretStore *secrets.Store, log *zap.Logger) *CatalogHandler {
+	return &CatalogHandler{db: db, secrets: secretStore, log: log}
 }
 
 // bibRequest is the create/update payload for a bibliographic record.

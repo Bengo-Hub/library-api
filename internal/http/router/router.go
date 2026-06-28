@@ -33,6 +33,7 @@ type Deps struct {
 	RBACHandler    *handlers.RBACHandler
 	Membership     *handlers.MembershipHandler
 	PINAuth        *handlers.PINAuthHandler
+	PlatformConfig *handlers.PlatformConfigHandler
 	AuthMiddleware *authclient.AuthMiddleware
 	RBAC           *rbac.Service
 	AllowedOrigins []string
@@ -106,6 +107,15 @@ func New(d Deps) http.Handler {
 		lib.Get("/auth/me", d.Auth.Me)
 		if d.PINAuth != nil {
 			lib.Post("/auth/pin/set", d.PINAuth.SetPIN)
+		}
+
+		// Platform-owner-only configuration (credential-encryption key + integration secrets
+		// like the ISBNdb API key). Platform owners bypass the subscription gate above.
+		if d.PlatformConfig != nil {
+			lib.Route("/platform", func(p chi.Router) {
+				p.Use(libmw.RequirePlatformOwner())
+				d.PlatformConfig.RegisterRoutes(p)
+			})
 		}
 		lib.Get("/reports/summary", d.Reports.Summary)
 		lib.Get("/reports/popular", d.Reports.Popular)

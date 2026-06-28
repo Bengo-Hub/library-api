@@ -32,6 +32,7 @@ import (
 	"github.com/bengobox/library-service/internal/platform/cache"
 	"github.com/bengobox/library-service/internal/platform/database"
 	"github.com/bengobox/library-service/internal/platform/events"
+	"github.com/bengobox/library-service/internal/platform/secrets"
 	"github.com/bengobox/library-service/internal/platform/subscriptions"
 	"github.com/bengobox/library-service/internal/platform/treasury"
 	"github.com/bengobox/library-service/internal/shared/logger"
@@ -137,11 +138,12 @@ func New(ctx context.Context) (*App, error) {
 	// Domain services + handlers.
 	circulationSvc := circulation.NewService(ormClient, log)
 	membershipSvc := membership.NewService(ormClient, log)
+	secretStore := secrets.NewStore(ormClient, log)
 	deps := router.Deps{
 		Log:            log,
 		Health:         healthHandler,
 		Auth:           handlers.NewAuthHandler(rbacService, log),
-		Catalog:        handlers.NewCatalogHandler(ormClient, log),
+		Catalog:        handlers.NewCatalogHandler(ormClient, secretStore, log),
 		Branch:         handlers.NewBranchHandler(ormClient, log),
 		Member:         handlers.NewMemberHandler(ormClient, log),
 		Circulation:    handlers.NewCirculationHandler(ormClient, circulationSvc, log),
@@ -152,6 +154,7 @@ func New(ctx context.Context) (*App, error) {
 		RBACHandler:    handlers.NewRBACHandler(rbacService, log),
 		Membership:     handlers.NewMembershipHandler(ormClient, membershipSvc, treasuryClient, log),
 		PINAuth:        handlers.NewPINAuthHandler(ormClient, rbacService, subsClient, cfg.Auth.TerminalJWTSecret, log),
+		PlatformConfig: handlers.NewPlatformConfigHandler(secretStore, log),
 		RBAC:           rbacService,
 		AllowedOrigins: cfg.HTTP.AllowedOrigins,
 		MediaRoot:      cfg.Media.Root,
