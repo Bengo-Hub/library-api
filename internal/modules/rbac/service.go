@@ -16,6 +16,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/branch"
 	"github.com/bengobox/library-service/internal/ent/libraryrole"
 	"github.com/bengobox/library-service/internal/ent/libraryuser"
+	"github.com/bengobox/library-service/internal/ent/tenant"
 )
 
 // Library service roles (global; seeded once).
@@ -106,6 +107,13 @@ func (s *Service) EnsureUserFromToken(ctx context.Context, claims *authclient.Cl
 	tenantID, err := uuid.Parse(claims.TenantID)
 	if err != nil {
 		return nil
+	}
+	// Cache the tenant slug→id mapping locally so the PUBLIC PIN-login routes (which have no
+	// JWT) can resolve the org slug. Best-effort, get-or-create by the auth tenant UUID.
+	if slug := claims.GetTenantSlug(); slug != "" {
+		if exists, _ := s.db.Tenant.Query().Where(tenant.IDEQ(tenantID)).Exist(ctx); !exists {
+			_, _ = s.db.Tenant.Create().SetID(tenantID).SetSlug(slug).Save(ctx)
+		}
 	}
 	roles := MapGlobalRoles(claims.Roles)
 	// If SSO scoped the user to a single outlet, link that to the matching library branch so

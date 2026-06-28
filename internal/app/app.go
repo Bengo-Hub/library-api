@@ -55,6 +55,16 @@ type App struct {
 }
 
 // New constructs and wires the application.
+// terminalJWTSecret returns the PIN/terminal JWT signing secret, falling back to the shared
+// INTERNAL_SERVICE_KEY when TERMINAL_JWT_SECRET isn't set (mirrors pos-api) so desk/kiosk PIN
+// login works without provisioning a dedicated secret.
+func terminalJWTSecret(cfg *config.Config) string {
+	if cfg.Auth.TerminalJWTSecret != "" {
+		return cfg.Auth.TerminalJWTSecret
+	}
+	return cfg.Auth.APIKey
+}
+
 func New(ctx context.Context) (*App, error) {
 	cfg, err := config.Load()
 	if err != nil {
@@ -158,7 +168,7 @@ func New(ctx context.Context) (*App, error) {
 		Reports:        handlers.NewReportsHandler(ormClient, log),
 		RBACHandler:    handlers.NewRBACHandler(rbacService, log),
 		Membership:     handlers.NewMembershipHandler(ormClient, membershipSvc, treasuryClient, log),
-		PINAuth:        handlers.NewPINAuthHandler(ormClient, rbacService, subsClient, cfg.Auth.TerminalJWTSecret, log),
+		PINAuth:        handlers.NewPINAuthHandler(ormClient, rbacService, subsClient, terminalJWTSecret(cfg), log),
 		PlatformConfig: handlers.NewPlatformConfigHandler(secretStore, log),
 		RBAC:           rbacService,
 		AllowedOrigins: cfg.HTTP.AllowedOrigins,
