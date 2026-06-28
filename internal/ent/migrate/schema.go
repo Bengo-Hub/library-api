@@ -547,9 +547,12 @@ var (
 		{Name: "email", Type: field.TypeString, Nullable: true},
 		{Name: "display_name", Type: field.TypeString, Nullable: true},
 		{Name: "roles", Type: field.TypeJSON, Nullable: true},
+		{Name: "branch_ids", Type: field.TypeJSON, Nullable: true},
 		{Name: "is_active", Type: field.TypeBool, Default: true},
 		{Name: "pin_hash", Type: field.TypeString, Nullable: true},
 		{Name: "pin_fast_hash", Type: field.TypeString, Nullable: true},
+		{Name: "pin_failed_attempts", Type: field.TypeInt, Default: 0},
+		{Name: "pin_locked_until", Type: field.TypeTime, Nullable: true},
 	}
 	// LibraryUsersTable holds the schema information for the "library_users" table.
 	LibraryUsersTable = &schema.Table{

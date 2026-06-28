@@ -100,6 +100,16 @@ func PinFastHash(v string) predicate.LibraryUser {
 	return predicate.LibraryUser(sql.FieldEQ(FieldPinFastHash, v))
 }
 
+// PinFailedAttempts applies equality check predicate on the "pin_failed_attempts" field. It's identical to PinFailedAttemptsEQ.
+func PinFailedAttempts(v int) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldEQ(FieldPinFailedAttempts, v))
+}
+
+// PinLockedUntil applies equality check predicate on the "pin_locked_until" field. It's identical to PinLockedUntilEQ.
+func PinLockedUntil(v time.Time) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldEQ(FieldPinLockedUntil, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.LibraryUser {
 	return predicate.LibraryUser(sql.FieldEQ(FieldCreatedAt, v))
@@ -445,6 +455,16 @@ func RolesNotNil() predicate.LibraryUser {
 	return predicate.LibraryUser(sql.FieldNotNull(FieldRoles))
 }
 
+// BranchIdsIsNil applies the IsNil predicate on the "branch_ids" field.
+func BranchIdsIsNil() predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldIsNull(FieldBranchIds))
+}
+
+// BranchIdsNotNil applies the NotNil predicate on the "branch_ids" field.
+func BranchIdsNotNil() predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldNotNull(FieldBranchIds))
+}
+
 // IsActiveEQ applies the EQ predicate on the "is_active" field.
 func IsActiveEQ(v bool) predicate.LibraryUser {
 	return predicate.LibraryUser(sql.FieldEQ(FieldIsActive, v))
@@ -603,6 +623,96 @@ func PinFastHashEqualFold(v string) predicate.LibraryUser {
 // PinFastHashContainsFold applies the ContainsFold predicate on the "pin_fast_hash" field.
 func PinFastHashContainsFold(v string) predicate.LibraryUser {
 	return predicate.LibraryUser(sql.FieldContainsFold(FieldPinFastHash, v))
+}
+
+// PinFailedAttemptsEQ applies the EQ predicate on the "pin_failed_attempts" field.
+func PinFailedAttemptsEQ(v int) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldEQ(FieldPinFailedAttempts, v))
+}
+
+// PinFailedAttemptsNEQ applies the NEQ predicate on the "pin_failed_attempts" field.
+func PinFailedAttemptsNEQ(v int) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldNEQ(FieldPinFailedAttempts, v))
+}
+
+// PinFailedAttemptsIn applies the In predicate on the "pin_failed_attempts" field.
+func PinFailedAttemptsIn(vs ...int) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldIn(FieldPinFailedAttempts, vs...))
+}
+
+// PinFailedAttemptsNotIn applies the NotIn predicate on the "pin_failed_attempts" field.
+func PinFailedAttemptsNotIn(vs ...int) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldNotIn(FieldPinFailedAttempts, vs...))
+}
+
+// PinFailedAttemptsGT applies the GT predicate on the "pin_failed_attempts" field.
+func PinFailedAttemptsGT(v int) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldGT(FieldPinFailedAttempts, v))
+}
+
+// PinFailedAttemptsGTE applies the GTE predicate on the "pin_failed_attempts" field.
+func PinFailedAttemptsGTE(v int) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldGTE(FieldPinFailedAttempts, v))
+}
+
+// PinFailedAttemptsLT applies the LT predicate on the "pin_failed_attempts" field.
+func PinFailedAttemptsLT(v int) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldLT(FieldPinFailedAttempts, v))
+}
+
+// PinFailedAttemptsLTE applies the LTE predicate on the "pin_failed_attempts" field.
+func PinFailedAttemptsLTE(v int) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldLTE(FieldPinFailedAttempts, v))
+}
+
+// PinLockedUntilEQ applies the EQ predicate on the "pin_locked_until" field.
+func PinLockedUntilEQ(v time.Time) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldEQ(FieldPinLockedUntil, v))
+}
+
+// PinLockedUntilNEQ applies the NEQ predicate on the "pin_locked_until" field.
+func PinLockedUntilNEQ(v time.Time) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldNEQ(FieldPinLockedUntil, v))
+}
+
+// PinLockedUntilIn applies the In predicate on the "pin_locked_until" field.
+func PinLockedUntilIn(vs ...time.Time) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldIn(FieldPinLockedUntil, vs...))
+}
+
+// PinLockedUntilNotIn applies the NotIn predicate on the "pin_locked_until" field.
+func PinLockedUntilNotIn(vs ...time.Time) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldNotIn(FieldPinLockedUntil, vs...))
+}
+
+// PinLockedUntilGT applies the GT predicate on the "pin_locked_until" field.
+func PinLockedUntilGT(v time.Time) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldGT(FieldPinLockedUntil, v))
+}
+
+// PinLockedUntilGTE applies the GTE predicate on the "pin_locked_until" field.
+func PinLockedUntilGTE(v time.Time) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldGTE(FieldPinLockedUntil, v))
+}
+
+// PinLockedUntilLT applies the LT predicate on the "pin_locked_until" field.
+func PinLockedUntilLT(v time.Time) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldLT(FieldPinLockedUntil, v))
+}
+
+// PinLockedUntilLTE applies the LTE predicate on the "pin_locked_until" field.
+func PinLockedUntilLTE(v time.Time) predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldLTE(FieldPinLockedUntil, v))
+}
+
+// PinLockedUntilIsNil applies the IsNil predicate on the "pin_locked_until" field.
+func PinLockedUntilIsNil() predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldIsNull(FieldPinLockedUntil))
+}
+
+// PinLockedUntilNotNil applies the NotNil predicate on the "pin_locked_until" field.
+func PinLockedUntilNotNil() predicate.LibraryUser {
+	return predicate.LibraryUser(sql.FieldNotNull(FieldPinLockedUntil))
 }
 
 // And groups predicates with the AND operator between them.

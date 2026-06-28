@@ -28,12 +28,18 @@ const (
 	FieldDisplayName = "display_name"
 	// FieldRoles holds the string denoting the roles field in the database.
 	FieldRoles = "roles"
+	// FieldBranchIds holds the string denoting the branch_ids field in the database.
+	FieldBranchIds = "branch_ids"
 	// FieldIsActive holds the string denoting the is_active field in the database.
 	FieldIsActive = "is_active"
 	// FieldPinHash holds the string denoting the pin_hash field in the database.
 	FieldPinHash = "pin_hash"
 	// FieldPinFastHash holds the string denoting the pin_fast_hash field in the database.
 	FieldPinFastHash = "pin_fast_hash"
+	// FieldPinFailedAttempts holds the string denoting the pin_failed_attempts field in the database.
+	FieldPinFailedAttempts = "pin_failed_attempts"
+	// FieldPinLockedUntil holds the string denoting the pin_locked_until field in the database.
+	FieldPinLockedUntil = "pin_locked_until"
 	// Table holds the table name of the libraryuser in the database.
 	Table = "library_users"
 )
@@ -48,9 +54,12 @@ var Columns = []string{
 	FieldEmail,
 	FieldDisplayName,
 	FieldRoles,
+	FieldBranchIds,
 	FieldIsActive,
 	FieldPinHash,
 	FieldPinFastHash,
+	FieldPinFailedAttempts,
+	FieldPinLockedUntil,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -74,6 +83,8 @@ var (
 	UserIDValidator func(string) error
 	// DefaultIsActive holds the default value on creation for the "is_active" field.
 	DefaultIsActive bool
+	// DefaultPinFailedAttempts holds the default value on creation for the "pin_failed_attempts" field.
+	DefaultPinFailedAttempts int
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )
@@ -129,4 +140,14 @@ func ByPinHash(opts ...sql.OrderTermOption) OrderOption {
 // ByPinFastHash orders the results by the pin_fast_hash field.
 func ByPinFastHash(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPinFastHash, opts...).ToFunc()
+}
+
+// ByPinFailedAttempts orders the results by the pin_failed_attempts field.
+func ByPinFailedAttempts(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPinFailedAttempts, opts...).ToFunc()
+}
+
+// ByPinLockedUntil orders the results by the pin_locked_until field.
+func ByPinLockedUntil(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPinLockedUntil, opts...).ToFunc()
 }

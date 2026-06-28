@@ -98,6 +98,12 @@ func (_c *LibraryUserCreate) SetRoles(v []string) *LibraryUserCreate {
 	return _c
 }
 
+// SetBranchIds sets the "branch_ids" field.
+func (_c *LibraryUserCreate) SetBranchIds(v []string) *LibraryUserCreate {
+	_c.mutation.SetBranchIds(v)
+	return _c
+}
+
 // SetIsActive sets the "is_active" field.
 func (_c *LibraryUserCreate) SetIsActive(v bool) *LibraryUserCreate {
 	_c.mutation.SetIsActive(v)
@@ -136,6 +142,34 @@ func (_c *LibraryUserCreate) SetPinFastHash(v string) *LibraryUserCreate {
 func (_c *LibraryUserCreate) SetNillablePinFastHash(v *string) *LibraryUserCreate {
 	if v != nil {
 		_c.SetPinFastHash(*v)
+	}
+	return _c
+}
+
+// SetPinFailedAttempts sets the "pin_failed_attempts" field.
+func (_c *LibraryUserCreate) SetPinFailedAttempts(v int) *LibraryUserCreate {
+	_c.mutation.SetPinFailedAttempts(v)
+	return _c
+}
+
+// SetNillablePinFailedAttempts sets the "pin_failed_attempts" field if the given value is not nil.
+func (_c *LibraryUserCreate) SetNillablePinFailedAttempts(v *int) *LibraryUserCreate {
+	if v != nil {
+		_c.SetPinFailedAttempts(*v)
+	}
+	return _c
+}
+
+// SetPinLockedUntil sets the "pin_locked_until" field.
+func (_c *LibraryUserCreate) SetPinLockedUntil(v time.Time) *LibraryUserCreate {
+	_c.mutation.SetPinLockedUntil(v)
+	return _c
+}
+
+// SetNillablePinLockedUntil sets the "pin_locked_until" field if the given value is not nil.
+func (_c *LibraryUserCreate) SetNillablePinLockedUntil(v *time.Time) *LibraryUserCreate {
+	if v != nil {
+		_c.SetPinLockedUntil(*v)
 	}
 	return _c
 }
@@ -201,6 +235,10 @@ func (_c *LibraryUserCreate) defaults() {
 		v := libraryuser.DefaultIsActive
 		_c.mutation.SetIsActive(v)
 	}
+	if _, ok := _c.mutation.PinFailedAttempts(); !ok {
+		v := libraryuser.DefaultPinFailedAttempts
+		_c.mutation.SetPinFailedAttempts(v)
+	}
 	if _, ok := _c.mutation.ID(); !ok {
 		v := libraryuser.DefaultID()
 		_c.mutation.SetID(v)
@@ -228,6 +266,9 @@ func (_c *LibraryUserCreate) check() error {
 	}
 	if _, ok := _c.mutation.IsActive(); !ok {
 		return &ValidationError{Name: "is_active", err: errors.New(`ent: missing required field "LibraryUser.is_active"`)}
+	}
+	if _, ok := _c.mutation.PinFailedAttempts(); !ok {
+		return &ValidationError{Name: "pin_failed_attempts", err: errors.New(`ent: missing required field "LibraryUser.pin_failed_attempts"`)}
 	}
 	return nil
 }
@@ -293,6 +334,10 @@ func (_c *LibraryUserCreate) createSpec() (*LibraryUser, *sqlgraph.CreateSpec) {
 		_spec.SetField(libraryuser.FieldRoles, field.TypeJSON, value)
 		_node.Roles = value
 	}
+	if value, ok := _c.mutation.BranchIds(); ok {
+		_spec.SetField(libraryuser.FieldBranchIds, field.TypeJSON, value)
+		_node.BranchIds = value
+	}
 	if value, ok := _c.mutation.IsActive(); ok {
 		_spec.SetField(libraryuser.FieldIsActive, field.TypeBool, value)
 		_node.IsActive = value
@@ -304,6 +349,14 @@ func (_c *LibraryUserCreate) createSpec() (*LibraryUser, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.PinFastHash(); ok {
 		_spec.SetField(libraryuser.FieldPinFastHash, field.TypeString, value)
 		_node.PinFastHash = value
+	}
+	if value, ok := _c.mutation.PinFailedAttempts(); ok {
+		_spec.SetField(libraryuser.FieldPinFailedAttempts, field.TypeInt, value)
+		_node.PinFailedAttempts = value
+	}
+	if value, ok := _c.mutation.PinLockedUntil(); ok {
+		_spec.SetField(libraryuser.FieldPinLockedUntil, field.TypeTime, value)
+		_node.PinLockedUntil = &value
 	}
 	return _node, _spec
 }
@@ -447,6 +500,24 @@ func (u *LibraryUserUpsert) ClearRoles() *LibraryUserUpsert {
 	return u
 }
 
+// SetBranchIds sets the "branch_ids" field.
+func (u *LibraryUserUpsert) SetBranchIds(v []string) *LibraryUserUpsert {
+	u.Set(libraryuser.FieldBranchIds, v)
+	return u
+}
+
+// UpdateBranchIds sets the "branch_ids" field to the value that was provided on create.
+func (u *LibraryUserUpsert) UpdateBranchIds() *LibraryUserUpsert {
+	u.SetExcluded(libraryuser.FieldBranchIds)
+	return u
+}
+
+// ClearBranchIds clears the value of the "branch_ids" field.
+func (u *LibraryUserUpsert) ClearBranchIds() *LibraryUserUpsert {
+	u.SetNull(libraryuser.FieldBranchIds)
+	return u
+}
+
 // SetIsActive sets the "is_active" field.
 func (u *LibraryUserUpsert) SetIsActive(v bool) *LibraryUserUpsert {
 	u.Set(libraryuser.FieldIsActive, v)
@@ -492,6 +563,42 @@ func (u *LibraryUserUpsert) UpdatePinFastHash() *LibraryUserUpsert {
 // ClearPinFastHash clears the value of the "pin_fast_hash" field.
 func (u *LibraryUserUpsert) ClearPinFastHash() *LibraryUserUpsert {
 	u.SetNull(libraryuser.FieldPinFastHash)
+	return u
+}
+
+// SetPinFailedAttempts sets the "pin_failed_attempts" field.
+func (u *LibraryUserUpsert) SetPinFailedAttempts(v int) *LibraryUserUpsert {
+	u.Set(libraryuser.FieldPinFailedAttempts, v)
+	return u
+}
+
+// UpdatePinFailedAttempts sets the "pin_failed_attempts" field to the value that was provided on create.
+func (u *LibraryUserUpsert) UpdatePinFailedAttempts() *LibraryUserUpsert {
+	u.SetExcluded(libraryuser.FieldPinFailedAttempts)
+	return u
+}
+
+// AddPinFailedAttempts adds v to the "pin_failed_attempts" field.
+func (u *LibraryUserUpsert) AddPinFailedAttempts(v int) *LibraryUserUpsert {
+	u.Add(libraryuser.FieldPinFailedAttempts, v)
+	return u
+}
+
+// SetPinLockedUntil sets the "pin_locked_until" field.
+func (u *LibraryUserUpsert) SetPinLockedUntil(v time.Time) *LibraryUserUpsert {
+	u.Set(libraryuser.FieldPinLockedUntil, v)
+	return u
+}
+
+// UpdatePinLockedUntil sets the "pin_locked_until" field to the value that was provided on create.
+func (u *LibraryUserUpsert) UpdatePinLockedUntil() *LibraryUserUpsert {
+	u.SetExcluded(libraryuser.FieldPinLockedUntil)
+	return u
+}
+
+// ClearPinLockedUntil clears the value of the "pin_locked_until" field.
+func (u *LibraryUserUpsert) ClearPinLockedUntil() *LibraryUserUpsert {
+	u.SetNull(libraryuser.FieldPinLockedUntil)
 	return u
 }
 
@@ -651,6 +758,27 @@ func (u *LibraryUserUpsertOne) ClearRoles() *LibraryUserUpsertOne {
 	})
 }
 
+// SetBranchIds sets the "branch_ids" field.
+func (u *LibraryUserUpsertOne) SetBranchIds(v []string) *LibraryUserUpsertOne {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.SetBranchIds(v)
+	})
+}
+
+// UpdateBranchIds sets the "branch_ids" field to the value that was provided on create.
+func (u *LibraryUserUpsertOne) UpdateBranchIds() *LibraryUserUpsertOne {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.UpdateBranchIds()
+	})
+}
+
+// ClearBranchIds clears the value of the "branch_ids" field.
+func (u *LibraryUserUpsertOne) ClearBranchIds() *LibraryUserUpsertOne {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.ClearBranchIds()
+	})
+}
+
 // SetIsActive sets the "is_active" field.
 func (u *LibraryUserUpsertOne) SetIsActive(v bool) *LibraryUserUpsertOne {
 	return u.Update(func(s *LibraryUserUpsert) {
@@ -704,6 +832,48 @@ func (u *LibraryUserUpsertOne) UpdatePinFastHash() *LibraryUserUpsertOne {
 func (u *LibraryUserUpsertOne) ClearPinFastHash() *LibraryUserUpsertOne {
 	return u.Update(func(s *LibraryUserUpsert) {
 		s.ClearPinFastHash()
+	})
+}
+
+// SetPinFailedAttempts sets the "pin_failed_attempts" field.
+func (u *LibraryUserUpsertOne) SetPinFailedAttempts(v int) *LibraryUserUpsertOne {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.SetPinFailedAttempts(v)
+	})
+}
+
+// AddPinFailedAttempts adds v to the "pin_failed_attempts" field.
+func (u *LibraryUserUpsertOne) AddPinFailedAttempts(v int) *LibraryUserUpsertOne {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.AddPinFailedAttempts(v)
+	})
+}
+
+// UpdatePinFailedAttempts sets the "pin_failed_attempts" field to the value that was provided on create.
+func (u *LibraryUserUpsertOne) UpdatePinFailedAttempts() *LibraryUserUpsertOne {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.UpdatePinFailedAttempts()
+	})
+}
+
+// SetPinLockedUntil sets the "pin_locked_until" field.
+func (u *LibraryUserUpsertOne) SetPinLockedUntil(v time.Time) *LibraryUserUpsertOne {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.SetPinLockedUntil(v)
+	})
+}
+
+// UpdatePinLockedUntil sets the "pin_locked_until" field to the value that was provided on create.
+func (u *LibraryUserUpsertOne) UpdatePinLockedUntil() *LibraryUserUpsertOne {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.UpdatePinLockedUntil()
+	})
+}
+
+// ClearPinLockedUntil clears the value of the "pin_locked_until" field.
+func (u *LibraryUserUpsertOne) ClearPinLockedUntil() *LibraryUserUpsertOne {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.ClearPinLockedUntil()
 	})
 }
 
@@ -1030,6 +1200,27 @@ func (u *LibraryUserUpsertBulk) ClearRoles() *LibraryUserUpsertBulk {
 	})
 }
 
+// SetBranchIds sets the "branch_ids" field.
+func (u *LibraryUserUpsertBulk) SetBranchIds(v []string) *LibraryUserUpsertBulk {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.SetBranchIds(v)
+	})
+}
+
+// UpdateBranchIds sets the "branch_ids" field to the value that was provided on create.
+func (u *LibraryUserUpsertBulk) UpdateBranchIds() *LibraryUserUpsertBulk {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.UpdateBranchIds()
+	})
+}
+
+// ClearBranchIds clears the value of the "branch_ids" field.
+func (u *LibraryUserUpsertBulk) ClearBranchIds() *LibraryUserUpsertBulk {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.ClearBranchIds()
+	})
+}
+
 // SetIsActive sets the "is_active" field.
 func (u *LibraryUserUpsertBulk) SetIsActive(v bool) *LibraryUserUpsertBulk {
 	return u.Update(func(s *LibraryUserUpsert) {
@@ -1083,6 +1274,48 @@ func (u *LibraryUserUpsertBulk) UpdatePinFastHash() *LibraryUserUpsertBulk {
 func (u *LibraryUserUpsertBulk) ClearPinFastHash() *LibraryUserUpsertBulk {
 	return u.Update(func(s *LibraryUserUpsert) {
 		s.ClearPinFastHash()
+	})
+}
+
+// SetPinFailedAttempts sets the "pin_failed_attempts" field.
+func (u *LibraryUserUpsertBulk) SetPinFailedAttempts(v int) *LibraryUserUpsertBulk {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.SetPinFailedAttempts(v)
+	})
+}
+
+// AddPinFailedAttempts adds v to the "pin_failed_attempts" field.
+func (u *LibraryUserUpsertBulk) AddPinFailedAttempts(v int) *LibraryUserUpsertBulk {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.AddPinFailedAttempts(v)
+	})
+}
+
+// UpdatePinFailedAttempts sets the "pin_failed_attempts" field to the value that was provided on create.
+func (u *LibraryUserUpsertBulk) UpdatePinFailedAttempts() *LibraryUserUpsertBulk {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.UpdatePinFailedAttempts()
+	})
+}
+
+// SetPinLockedUntil sets the "pin_locked_until" field.
+func (u *LibraryUserUpsertBulk) SetPinLockedUntil(v time.Time) *LibraryUserUpsertBulk {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.SetPinLockedUntil(v)
+	})
+}
+
+// UpdatePinLockedUntil sets the "pin_locked_until" field to the value that was provided on create.
+func (u *LibraryUserUpsertBulk) UpdatePinLockedUntil() *LibraryUserUpsertBulk {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.UpdatePinLockedUntil()
+	})
+}
+
+// ClearPinLockedUntil clears the value of the "pin_locked_until" field.
+func (u *LibraryUserUpsertBulk) ClearPinLockedUntil() *LibraryUserUpsertBulk {
+	return u.Update(func(s *LibraryUserUpsert) {
+		s.ClearPinLockedUntil()
 	})
 }
 

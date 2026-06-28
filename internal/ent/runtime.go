@@ -442,9 +442,13 @@ func init() {
 	// libraryuser.UserIDValidator is a validator for the "user_id" field. It is called by the builders before save.
 	libraryuser.UserIDValidator = libraryuserDescUserID.Validators[0].(func(string) error)
 	// libraryuserDescIsActive is the schema descriptor for is_active field.
-	libraryuserDescIsActive := libraryuserFields[4].Descriptor()
+	libraryuserDescIsActive := libraryuserFields[5].Descriptor()
 	// libraryuser.DefaultIsActive holds the default value on creation for the is_active field.
 	libraryuser.DefaultIsActive = libraryuserDescIsActive.Default.(bool)
+	// libraryuserDescPinFailedAttempts is the schema descriptor for pin_failed_attempts field.
+	libraryuserDescPinFailedAttempts := libraryuserFields[8].Descriptor()
+	// libraryuser.DefaultPinFailedAttempts holds the default value on creation for the pin_failed_attempts field.
+	libraryuser.DefaultPinFailedAttempts = libraryuserDescPinFailedAttempts.Default.(int)
 	// libraryuserDescID is the schema descriptor for id field.
 	libraryuserDescID := libraryuserMixinFields0[0].Descriptor()
 	// libraryuser.DefaultID holds the default value on creation for the id field.

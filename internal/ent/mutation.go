@@ -14708,24 +14708,29 @@ func (m *LibraryRoleMutation) ResetEdge(name string) error {
 // LibraryUserMutation represents an operation that mutates the LibraryUser nodes in the graph.
 type LibraryUserMutation struct {
 	config
-	op            Op
-	typ           string
-	id            *uuid.UUID
-	created_at    *time.Time
-	updated_at    *time.Time
-	tenant_id     *uuid.UUID
-	user_id       *string
-	email         *string
-	display_name  *string
-	roles         *[]string
-	appendroles   []string
-	is_active     *bool
-	pin_hash      *string
-	pin_fast_hash *string
-	clearedFields map[string]struct{}
-	done          bool
-	oldValue      func(context.Context) (*LibraryUser, error)
-	predicates    []predicate.LibraryUser
+	op                     Op
+	typ                    string
+	id                     *uuid.UUID
+	created_at             *time.Time
+	updated_at             *time.Time
+	tenant_id              *uuid.UUID
+	user_id                *string
+	email                  *string
+	display_name           *string
+	roles                  *[]string
+	appendroles            []string
+	branch_ids             *[]string
+	appendbranch_ids       []string
+	is_active              *bool
+	pin_hash               *string
+	pin_fast_hash          *string
+	pin_failed_attempts    *int
+	addpin_failed_attempts *int
+	pin_locked_until       *time.Time
+	clearedFields          map[string]struct{}
+	done                   bool
+	oldValue               func(context.Context) (*LibraryUser, error)
+	predicates             []predicate.LibraryUser
 }
 
 var _ ent.Mutation = (*LibraryUserMutation)(nil)
@@ -15139,6 +15144,71 @@ func (m *LibraryUserMutation) ResetRoles() {
 	delete(m.clearedFields, libraryuser.FieldRoles)
 }
 
+// SetBranchIds sets the "branch_ids" field.
+func (m *LibraryUserMutation) SetBranchIds(s []string) {
+	m.branch_ids = &s
+	m.appendbranch_ids = nil
+}
+
+// BranchIds returns the value of the "branch_ids" field in the mutation.
+func (m *LibraryUserMutation) BranchIds() (r []string, exists bool) {
+	v := m.branch_ids
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBranchIds returns the old "branch_ids" field's value of the LibraryUser entity.
+// If the LibraryUser object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LibraryUserMutation) OldBranchIds(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBranchIds is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBranchIds requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBranchIds: %w", err)
+	}
+	return oldValue.BranchIds, nil
+}
+
+// AppendBranchIds adds s to the "branch_ids" field.
+func (m *LibraryUserMutation) AppendBranchIds(s []string) {
+	m.appendbranch_ids = append(m.appendbranch_ids, s...)
+}
+
+// AppendedBranchIds returns the list of values that were appended to the "branch_ids" field in this mutation.
+func (m *LibraryUserMutation) AppendedBranchIds() ([]string, bool) {
+	if len(m.appendbranch_ids) == 0 {
+		return nil, false
+	}
+	return m.appendbranch_ids, true
+}
+
+// ClearBranchIds clears the value of the "branch_ids" field.
+func (m *LibraryUserMutation) ClearBranchIds() {
+	m.branch_ids = nil
+	m.appendbranch_ids = nil
+	m.clearedFields[libraryuser.FieldBranchIds] = struct{}{}
+}
+
+// BranchIdsCleared returns if the "branch_ids" field was cleared in this mutation.
+func (m *LibraryUserMutation) BranchIdsCleared() bool {
+	_, ok := m.clearedFields[libraryuser.FieldBranchIds]
+	return ok
+}
+
+// ResetBranchIds resets all changes to the "branch_ids" field.
+func (m *LibraryUserMutation) ResetBranchIds() {
+	m.branch_ids = nil
+	m.appendbranch_ids = nil
+	delete(m.clearedFields, libraryuser.FieldBranchIds)
+}
+
 // SetIsActive sets the "is_active" field.
 func (m *LibraryUserMutation) SetIsActive(b bool) {
 	m.is_active = &b
@@ -15273,6 +15343,111 @@ func (m *LibraryUserMutation) ResetPinFastHash() {
 	delete(m.clearedFields, libraryuser.FieldPinFastHash)
 }
 
+// SetPinFailedAttempts sets the "pin_failed_attempts" field.
+func (m *LibraryUserMutation) SetPinFailedAttempts(i int) {
+	m.pin_failed_attempts = &i
+	m.addpin_failed_attempts = nil
+}
+
+// PinFailedAttempts returns the value of the "pin_failed_attempts" field in the mutation.
+func (m *LibraryUserMutation) PinFailedAttempts() (r int, exists bool) {
+	v := m.pin_failed_attempts
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPinFailedAttempts returns the old "pin_failed_attempts" field's value of the LibraryUser entity.
+// If the LibraryUser object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LibraryUserMutation) OldPinFailedAttempts(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPinFailedAttempts is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPinFailedAttempts requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPinFailedAttempts: %w", err)
+	}
+	return oldValue.PinFailedAttempts, nil
+}
+
+// AddPinFailedAttempts adds i to the "pin_failed_attempts" field.
+func (m *LibraryUserMutation) AddPinFailedAttempts(i int) {
+	if m.addpin_failed_attempts != nil {
+		*m.addpin_failed_attempts += i
+	} else {
+		m.addpin_failed_attempts = &i
+	}
+}
+
+// AddedPinFailedAttempts returns the value that was added to the "pin_failed_attempts" field in this mutation.
+func (m *LibraryUserMutation) AddedPinFailedAttempts() (r int, exists bool) {
+	v := m.addpin_failed_attempts
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPinFailedAttempts resets all changes to the "pin_failed_attempts" field.
+func (m *LibraryUserMutation) ResetPinFailedAttempts() {
+	m.pin_failed_attempts = nil
+	m.addpin_failed_attempts = nil
+}
+
+// SetPinLockedUntil sets the "pin_locked_until" field.
+func (m *LibraryUserMutation) SetPinLockedUntil(t time.Time) {
+	m.pin_locked_until = &t
+}
+
+// PinLockedUntil returns the value of the "pin_locked_until" field in the mutation.
+func (m *LibraryUserMutation) PinLockedUntil() (r time.Time, exists bool) {
+	v := m.pin_locked_until
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPinLockedUntil returns the old "pin_locked_until" field's value of the LibraryUser entity.
+// If the LibraryUser object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LibraryUserMutation) OldPinLockedUntil(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPinLockedUntil is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPinLockedUntil requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPinLockedUntil: %w", err)
+	}
+	return oldValue.PinLockedUntil, nil
+}
+
+// ClearPinLockedUntil clears the value of the "pin_locked_until" field.
+func (m *LibraryUserMutation) ClearPinLockedUntil() {
+	m.pin_locked_until = nil
+	m.clearedFields[libraryuser.FieldPinLockedUntil] = struct{}{}
+}
+
+// PinLockedUntilCleared returns if the "pin_locked_until" field was cleared in this mutation.
+func (m *LibraryUserMutation) PinLockedUntilCleared() bool {
+	_, ok := m.clearedFields[libraryuser.FieldPinLockedUntil]
+	return ok
+}
+
+// ResetPinLockedUntil resets all changes to the "pin_locked_until" field.
+func (m *LibraryUserMutation) ResetPinLockedUntil() {
+	m.pin_locked_until = nil
+	delete(m.clearedFields, libraryuser.FieldPinLockedUntil)
+}
+
 // Where appends a list predicates to the LibraryUserMutation builder.
 func (m *LibraryUserMutation) Where(ps ...predicate.LibraryUser) {
 	m.predicates = append(m.predicates, ps...)
@@ -15307,7 +15482,7 @@ func (m *LibraryUserMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *LibraryUserMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 13)
 	if m.created_at != nil {
 		fields = append(fields, libraryuser.FieldCreatedAt)
 	}
@@ -15329,6 +15504,9 @@ func (m *LibraryUserMutation) Fields() []string {
 	if m.roles != nil {
 		fields = append(fields, libraryuser.FieldRoles)
 	}
+	if m.branch_ids != nil {
+		fields = append(fields, libraryuser.FieldBranchIds)
+	}
 	if m.is_active != nil {
 		fields = append(fields, libraryuser.FieldIsActive)
 	}
@@ -15337,6 +15515,12 @@ func (m *LibraryUserMutation) Fields() []string {
 	}
 	if m.pin_fast_hash != nil {
 		fields = append(fields, libraryuser.FieldPinFastHash)
+	}
+	if m.pin_failed_attempts != nil {
+		fields = append(fields, libraryuser.FieldPinFailedAttempts)
+	}
+	if m.pin_locked_until != nil {
+		fields = append(fields, libraryuser.FieldPinLockedUntil)
 	}
 	return fields
 }
@@ -15360,12 +15544,18 @@ func (m *LibraryUserMutation) Field(name string) (ent.Value, bool) {
 		return m.DisplayName()
 	case libraryuser.FieldRoles:
 		return m.Roles()
+	case libraryuser.FieldBranchIds:
+		return m.BranchIds()
 	case libraryuser.FieldIsActive:
 		return m.IsActive()
 	case libraryuser.FieldPinHash:
 		return m.PinHash()
 	case libraryuser.FieldPinFastHash:
 		return m.PinFastHash()
+	case libraryuser.FieldPinFailedAttempts:
+		return m.PinFailedAttempts()
+	case libraryuser.FieldPinLockedUntil:
+		return m.PinLockedUntil()
 	}
 	return nil, false
 }
@@ -15389,12 +15579,18 @@ func (m *LibraryUserMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldDisplayName(ctx)
 	case libraryuser.FieldRoles:
 		return m.OldRoles(ctx)
+	case libraryuser.FieldBranchIds:
+		return m.OldBranchIds(ctx)
 	case libraryuser.FieldIsActive:
 		return m.OldIsActive(ctx)
 	case libraryuser.FieldPinHash:
 		return m.OldPinHash(ctx)
 	case libraryuser.FieldPinFastHash:
 		return m.OldPinFastHash(ctx)
+	case libraryuser.FieldPinFailedAttempts:
+		return m.OldPinFailedAttempts(ctx)
+	case libraryuser.FieldPinLockedUntil:
+		return m.OldPinLockedUntil(ctx)
 	}
 	return nil, fmt.Errorf("unknown LibraryUser field %s", name)
 }
@@ -15453,6 +15649,13 @@ func (m *LibraryUserMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetRoles(v)
 		return nil
+	case libraryuser.FieldBranchIds:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBranchIds(v)
+		return nil
 	case libraryuser.FieldIsActive:
 		v, ok := value.(bool)
 		if !ok {
@@ -15474,6 +15677,20 @@ func (m *LibraryUserMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetPinFastHash(v)
 		return nil
+	case libraryuser.FieldPinFailedAttempts:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPinFailedAttempts(v)
+		return nil
+	case libraryuser.FieldPinLockedUntil:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPinLockedUntil(v)
+		return nil
 	}
 	return fmt.Errorf("unknown LibraryUser field %s", name)
 }
@@ -15481,13 +15698,21 @@ func (m *LibraryUserMutation) SetField(name string, value ent.Value) error {
 // AddedFields returns all numeric fields that were incremented/decremented during
 // this mutation.
 func (m *LibraryUserMutation) AddedFields() []string {
-	return nil
+	var fields []string
+	if m.addpin_failed_attempts != nil {
+		fields = append(fields, libraryuser.FieldPinFailedAttempts)
+	}
+	return fields
 }
 
 // AddedField returns the numeric value that was incremented/decremented on a field
 // with the given name. The second boolean return value indicates that this field
 // was not set, or was not defined in the schema.
 func (m *LibraryUserMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case libraryuser.FieldPinFailedAttempts:
+		return m.AddedPinFailedAttempts()
+	}
 	return nil, false
 }
 
@@ -15496,6 +15721,13 @@ func (m *LibraryUserMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *LibraryUserMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case libraryuser.FieldPinFailedAttempts:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPinFailedAttempts(v)
+		return nil
 	}
 	return fmt.Errorf("unknown LibraryUser numeric field %s", name)
 }
@@ -15513,11 +15745,17 @@ func (m *LibraryUserMutation) ClearedFields() []string {
 	if m.FieldCleared(libraryuser.FieldRoles) {
 		fields = append(fields, libraryuser.FieldRoles)
 	}
+	if m.FieldCleared(libraryuser.FieldBranchIds) {
+		fields = append(fields, libraryuser.FieldBranchIds)
+	}
 	if m.FieldCleared(libraryuser.FieldPinHash) {
 		fields = append(fields, libraryuser.FieldPinHash)
 	}
 	if m.FieldCleared(libraryuser.FieldPinFastHash) {
 		fields = append(fields, libraryuser.FieldPinFastHash)
+	}
+	if m.FieldCleared(libraryuser.FieldPinLockedUntil) {
+		fields = append(fields, libraryuser.FieldPinLockedUntil)
 	}
 	return fields
 }
@@ -15542,11 +15780,17 @@ func (m *LibraryUserMutation) ClearField(name string) error {
 	case libraryuser.FieldRoles:
 		m.ClearRoles()
 		return nil
+	case libraryuser.FieldBranchIds:
+		m.ClearBranchIds()
+		return nil
 	case libraryuser.FieldPinHash:
 		m.ClearPinHash()
 		return nil
 	case libraryuser.FieldPinFastHash:
 		m.ClearPinFastHash()
+		return nil
+	case libraryuser.FieldPinLockedUntil:
+		m.ClearPinLockedUntil()
 		return nil
 	}
 	return fmt.Errorf("unknown LibraryUser nullable field %s", name)
@@ -15577,6 +15821,9 @@ func (m *LibraryUserMutation) ResetField(name string) error {
 	case libraryuser.FieldRoles:
 		m.ResetRoles()
 		return nil
+	case libraryuser.FieldBranchIds:
+		m.ResetBranchIds()
+		return nil
 	case libraryuser.FieldIsActive:
 		m.ResetIsActive()
 		return nil
@@ -15585,6 +15832,12 @@ func (m *LibraryUserMutation) ResetField(name string) error {
 		return nil
 	case libraryuser.FieldPinFastHash:
 		m.ResetPinFastHash()
+		return nil
+	case libraryuser.FieldPinFailedAttempts:
+		m.ResetPinFailedAttempts()
+		return nil
+	case libraryuser.FieldPinLockedUntil:
+		m.ResetPinLockedUntil()
 		return nil
 	}
 	return fmt.Errorf("unknown LibraryUser field %s", name)

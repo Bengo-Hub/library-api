@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -11,6 +13,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/bengobox/library-service/internal/ent"
+	"github.com/bengobox/library-service/internal/ent/branch"
 	"github.com/bengobox/library-service/internal/ent/libraryuser"
 	"github.com/bengobox/library-service/internal/ent/tenant"
 	"github.com/bengobox/library-service/internal/modules/rbac"
@@ -18,7 +21,9 @@ import (
 )
 
 // PINAuthHandler implements terminal/PIN login that supplements SSO for the circulation
-// desk and self-checkout kiosk (quick staff switching without a full SSO round-trip).
+// desk and self-checkout kiosk. Adapted from pos-api: branch (outlet) is chosen first, then a
+// PIN; staff may only log in to a branch they're assigned to (admins → any branch). Lockout
+// after repeated wrong PINs mirrors the POS lockout policy.
 type PINAuthHandler struct {
 	db        *ent.Client
 	rbac      *rbac.Service
@@ -35,6 +40,12 @@ func NewPINAuthHandler(db *ent.Client, rbacSvc *rbac.Service, subs *subscription
 // Secret exposes the HMAC secret so the router can build RequireAnyAuth.
 func (h *PINAuthHandler) Secret() []byte { return h.jwtSecret }
 
+// PIN lockout policy (mirrors pos-api).
+const (
+	maxFailedPINAttempts = 5
+	pinLockoutDuration   = 15 * time.Minute
+)
+
 func pinFastHash(tenantID uuid.UUID, userID, pin string) string {
 	sum := sha256.Sum256([]byte(tenantID.String() + ":" + userID + ":" + pin))
 	return hex.EncodeToString(sum[:])
@@ -49,8 +60,168 @@ func (h *PINAuthHandler) tenantBySlug(r *http.Request) (*ent.Tenant, bool) {
 	return t, true
 }
 
+// isLibraryAdmin reports whether the user's roles grant cross-branch (any-branch) access.
+func isLibraryAdmin(roles []string) bool {
+	for _, r := range roles {
+		if r == rbac.RoleAdmin {
+			return true
+		}
+	}
+	return false
+}
+
+// branchAllowed reports whether a user may log in to branchID (admins → any active branch).
+func branchAllowed(u *ent.LibraryUser, branchID string) bool {
+	if isLibraryAdmin(u.Roles) {
+		return true
+	}
+	for _, b := range u.BranchIds {
+		if b == branchID {
+			return true
+		}
+	}
+	return false
+}
+
+// activeBranches returns the tenant's active branches (auto-provisions a default HQ when none).
+func (h *PINAuthHandler) activeBranches(ctx context.Context, tenantID uuid.UUID) []*ent.Branch {
+	rows, _ := h.db.Branch.Query().Where(branch.TenantID(tenantID), branch.IsActive(true)).All(ctx)
+	if len(rows) == 0 {
+		if b := EnsureDefaultBranch(ctx, h.db, tenantID); b != nil {
+			rows = []*ent.Branch{b}
+		}
+	}
+	return rows
+}
+
+func branchJSON(b *ent.Branch) map[string]any {
+	return map[string]any{"id": b.ID.String(), "name": b.Name, "code": b.Code, "is_default": b.IsDefault}
+}
+
+// PINBranches godoc
+// @Summary Active branches for the PIN-login branch picker (public per tenant)
+// @Tags Auth
+// @Router /{tenant}/library/auth/pin/branches [get]
+func (h *PINAuthHandler) PINBranches(w http.ResponseWriter, r *http.Request) {
+	t, ok := h.tenantBySlug(r)
+	if !ok {
+		respondError(w, http.StatusNotFound, "unknown tenant", "not_found")
+		return
+	}
+	rows := h.activeBranches(r.Context(), t.ID)
+	out := make([]map[string]any, 0, len(rows))
+	for _, b := range rows {
+		out = append(out, branchJSON(b))
+	}
+	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
+}
+
+func (h *PINAuthHandler) terminalClaimsFor(ctx context.Context, t *ent.Tenant, u *ent.LibraryUser) terminalClaims {
+	tc := terminalClaims{
+		UserID:             u.UserID,
+		TenantID:           t.ID.String(),
+		TenantSlug:         t.Slug,
+		Email:              u.Email,
+		Name:               u.DisplayName,
+		Roles:              u.Roles,
+		Permissions:        h.rbac.ListPermissions(ctx, t.ID, u.UserID),
+		SubscriptionStatus: "active",
+	}
+	if e := h.subs.GetEntitlements(ctx, t.ID.String()); e != nil {
+		tc.SubscriptionStatus = e.Status
+		tc.SubscriptionFeatures = e.Features
+		tc.BillingMode = e.BillingMode
+		tc.IsDemo = e.IsDemoBypass
+	}
+	return tc
+}
+
+// loginResponse builds the shared PIN-login success body (token + user + selected branch).
+func (h *PINAuthHandler) loginResponse(ctx context.Context, t *ent.Tenant, u *ent.LibraryUser, br *ent.Branch) (map[string]any, error) {
+	token, err := issueTerminalJWT(h.jwtSecret, h.terminalClaimsFor(ctx, t, u))
+	if err != nil {
+		return nil, err
+	}
+	body := map[string]any{
+		"access_token": token,
+		"token_type":   "terminal",
+		"user_id":      u.UserID,
+		"name":         u.DisplayName,
+		"roles":        u.Roles,
+		"is_admin":     isLibraryAdmin(u.Roles),
+		"expires_in":   8 * 3600,
+	}
+	if br != nil {
+		body["branch_id"] = br.ID.String()
+		body["branch_name"] = br.Name
+	}
+	return body, nil
+}
+
+// resolveLoginBranch picks/validates the branch for a PIN login: explicit branch_id (validated),
+// else the sole allowed branch, else error. Returns the branch + an error message ("" = ok).
+func (h *PINAuthHandler) resolveLoginBranch(ctx context.Context, tenantID uuid.UUID, u *ent.LibraryUser, branchID string) (*ent.Branch, string) {
+	all := h.activeBranches(ctx, tenantID)
+	byID := map[string]*ent.Branch{}
+	for _, b := range all {
+		byID[b.ID.String()] = b
+	}
+	if branchID != "" {
+		b, ok := byID[branchID]
+		if !ok {
+			return nil, "unknown branch"
+		}
+		if !branchAllowed(u, branchID) {
+			return nil, "you are not assigned to this branch"
+		}
+		return b, ""
+	}
+	// No branch supplied — admins default to the default/first; others to their sole allowed one.
+	if isLibraryAdmin(u.Roles) {
+		for _, b := range all {
+			if b.IsDefault {
+				return b, ""
+			}
+		}
+		if len(all) > 0 {
+			return all[0], ""
+		}
+		return nil, "no branches configured"
+	}
+	allowed := make([]*ent.Branch, 0)
+	for _, b := range all {
+		if branchAllowed(u, b.ID.String()) {
+			allowed = append(allowed, b)
+		}
+	}
+	if len(allowed) == 1 {
+		return allowed[0], ""
+	}
+	if len(allowed) == 0 {
+		return nil, "no branch assigned — ask an admin to assign you a branch"
+	}
+	return nil, "select a branch"
+}
+
+// checkLockout returns a non-empty message when the user's PIN is currently locked.
+func lockoutMessage(u *ent.LibraryUser) string {
+	if u.PinLockedUntil != nil && time.Now().Before(*u.PinLockedUntil) {
+		return "PIN locked. Try again in " + time.Until(*u.PinLockedUntil).Round(time.Second).String()
+	}
+	return ""
+}
+
+func (h *PINAuthHandler) registerPINFailure(ctx context.Context, u *ent.LibraryUser) {
+	attempts := u.PinFailedAttempts + 1
+	upd := h.db.LibraryUser.UpdateOne(u).SetPinFailedAttempts(attempts)
+	if attempts >= maxFailedPINAttempts {
+		upd = upd.SetPinLockedUntil(time.Now().Add(pinLockoutDuration))
+	}
+	_ = upd.Exec(ctx)
+}
+
 // Login godoc
-// @Summary PIN login — validate a staff PIN and return a short-lived terminal JWT
+// @Summary PIN login by profile — validate a staff PIN at a branch and return a terminal JWT
 // @Tags Auth
 // @Router /{tenant}/library/auth/pin [post]
 func (h *PINAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
@@ -64,8 +235,9 @@ func (h *PINAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		UserID string `json:"user_id"`
-		PIN    string `json:"pin"`
+		UserID   string `json:"user_id"`
+		PIN      string `json:"pin"`
+		BranchID string `json:"branch_id"`
 	}
 	if err := Decode(r, &body); err != nil || body.UserID == "" || body.PIN == "" {
 		respondError(w, http.StatusBadRequest, "user_id and pin are required", "invalid_request")
@@ -76,41 +248,92 @@ func (h *PINAuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusUnauthorized, "invalid PIN", "invalid_pin")
 		return
 	}
+	if msg := lockoutMessage(u); msg != "" {
+		respondError(w, http.StatusTooManyRequests, msg, "pin_locked")
+		return
+	}
 	if bcrypt.CompareHashAndPassword([]byte(*u.PinHash), []byte(body.PIN)) != nil {
+		h.registerPINFailure(r.Context(), u)
 		respondError(w, http.StatusUnauthorized, "invalid PIN", "invalid_pin")
 		return
 	}
-
-	tc := terminalClaims{
-		UserID:      u.UserID,
-		TenantID:    t.ID.String(),
-		TenantSlug:  t.Slug,
-		Email:       u.Email,
-		Name:        u.DisplayName,
-		Roles:       u.Roles,
-		Permissions: h.rbac.ListPermissions(r.Context(), t.ID, u.UserID),
-		// Subscription snapshot (so the mutations gate treats PIN sessions like SSO).
-		SubscriptionStatus: "active",
+	br, msg := h.resolveLoginBranch(r.Context(), t.ID, u, body.BranchID)
+	if msg != "" {
+		respondError(w, http.StatusBadRequest, msg, "branch_required")
+		return
 	}
-	if e := h.subs.GetEntitlements(r.Context(), t.ID.String()); e != nil {
-		tc.SubscriptionStatus = e.Status
-		tc.SubscriptionFeatures = e.Features
-		tc.BillingMode = e.BillingMode
-		tc.IsDemo = e.IsDemoBypass
-	}
-	token, err := issueTerminalJWT(h.jwtSecret, tc)
+	_ = h.db.LibraryUser.UpdateOne(u).SetPinFailedAttempts(0).ClearPinLockedUntil().Exec(r.Context())
+	resp, err := h.loginResponse(r.Context(), t, u, br)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "token_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, map[string]any{
-		"access_token": token,
-		"token_type":   "terminal",
-		"user_id":      u.UserID,
-		"name":         u.DisplayName,
-		"roles":        u.Roles,
-		"expires_in":   8 * 3600,
-	})
+	respondJSON(w, http.StatusOK, resp)
+}
+
+// IdentifyByPIN godoc
+// @Summary PIN-first login — identify staff by PIN at a branch (no profile picker)
+// @Tags Auth
+// @Router /{tenant}/library/auth/pin/identify [post]
+func (h *PINAuthHandler) IdentifyByPIN(w http.ResponseWriter, r *http.Request) {
+	if len(h.jwtSecret) == 0 {
+		respondError(w, http.StatusServiceUnavailable, "PIN auth not configured", "pin_unconfigured")
+		return
+	}
+	t, ok := h.tenantBySlug(r)
+	if !ok {
+		respondError(w, http.StatusNotFound, "unknown tenant", "not_found")
+		return
+	}
+	var body struct {
+		PIN      string `json:"pin"`
+		BranchID string `json:"branch_id"`
+	}
+	if err := Decode(r, &body); err != nil || body.PIN == "" || body.BranchID == "" {
+		respondError(w, http.StatusBadRequest, "pin and branch_id are required", "invalid_request")
+		return
+	}
+	br, err := h.db.Branch.Query().Where(branch.IDEQ(uuid.MustParse(orZeroUUID(body.BranchID))), branch.TenantID(t.ID)).Only(r.Context())
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "unknown branch", "invalid_request")
+		return
+	}
+	// Candidates: active staff with a PIN who are allowed at this branch (admins always).
+	candidates, _ := h.db.LibraryUser.Query().
+		Where(libraryuser.TenantID(t.ID), libraryuser.IsActive(true), libraryuser.PinHashNotNil()).
+		All(r.Context())
+	var matched *ent.LibraryUser
+	for _, u := range candidates {
+		if !branchAllowed(u, br.ID.String()) {
+			continue
+		}
+		if msg := lockoutMessage(u); msg != "" {
+			continue
+		}
+		if bcrypt.CompareHashAndPassword([]byte(*u.PinHash), []byte(body.PIN)) == nil {
+			matched = u
+			break
+		}
+	}
+	if matched == nil {
+		respondError(w, http.StatusUnauthorized, "invalid PIN for this branch", "invalid_pin")
+		return
+	}
+	_ = h.db.LibraryUser.UpdateOne(matched).SetPinFailedAttempts(0).ClearPinLockedUntil().Exec(r.Context())
+	resp, err := h.loginResponse(r.Context(), t, matched, br)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "token_failed")
+		return
+	}
+	respondJSON(w, http.StatusOK, resp)
+}
+
+// orZeroUUID returns s if it's a valid UUID, else the nil UUID string (so MustParse never panics).
+func orZeroUUID(s string) string {
+	if _, err := uuid.Parse(s); err != nil {
+		return uuid.Nil.String()
+	}
+	return s
 }
 
 // SetPIN godoc
@@ -142,7 +365,8 @@ func (h *PINAuthHandler) SetPIN(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := h.db.LibraryUser.UpdateOne(u).
-		SetPinHash(string(hash)).SetPinFastHash(pinFastHash(tenantID, u.UserID, body.PIN)).Save(r.Context()); err != nil {
+		SetPinHash(string(hash)).SetPinFastHash(pinFastHash(tenantID, u.UserID, body.PIN)).
+		SetPinFailedAttempts(0).ClearPinLockedUntil().Save(r.Context()); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "save_failed")
 		return
 	}
@@ -150,7 +374,7 @@ func (h *PINAuthHandler) SetPIN(w http.ResponseWriter, r *http.Request) {
 }
 
 // StaffProfiles godoc
-// @Summary List staff with PINs for the keypad picker (public; no PINs returned)
+// @Summary List staff with PINs for the keypad picker (public; optional ?branch_id scoping)
 // @Tags Auth
 // @Router /{tenant}/library/auth/pin/profiles [get]
 func (h *PINAuthHandler) StaffProfiles(w http.ResponseWriter, r *http.Request) {
@@ -166,9 +390,16 @@ func (h *PINAuthHandler) StaffProfiles(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
+	branchID := r.URL.Query().Get("branch_id")
 	out := make([]map[string]any, 0, len(rows))
 	for _, u := range rows {
-		out = append(out, map[string]any{"user_id": u.UserID, "name": u.DisplayName, "roles": u.Roles, "has_pin": true})
+		if branchID != "" && !branchAllowed(u, branchID) {
+			continue
+		}
+		out = append(out, map[string]any{
+			"user_id": u.UserID, "name": u.DisplayName, "roles": u.Roles,
+			"has_pin": true, "is_admin": isLibraryAdmin(u.Roles),
+		})
 	}
 	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
 }

@@ -50,10 +50,14 @@ func (LibraryUser) Fields() []ent.Field {
 		field.String("email").Optional(),
 		field.String("display_name").Optional(),
 		field.JSON("roles", []string{}).Optional().Comment("Assigned LibraryRole names"),
+		field.JSON("branch_ids", []string{}).Optional().
+			Comment("Library Branch IDs this user may log in to (empty = unrestricted for admins)"),
 		field.Bool("is_active").Default(true),
 		field.String("pin_hash").Optional().Nillable().Sensitive().
 			Comment("bcrypt hash of the desk/kiosk PIN (supplements SSO); never returned"),
 		field.String("pin_fast_hash").Optional().Comment("hex(SHA256(tenant:user:pin)) for O(1) PIN lookup"),
+		field.Int("pin_failed_attempts").Default(0).Comment("consecutive wrong-PIN attempts (lockout)"),
+		field.Time("pin_locked_until").Optional().Nillable().Comment("PIN locked until this time after too many failures"),
 	}
 }
 

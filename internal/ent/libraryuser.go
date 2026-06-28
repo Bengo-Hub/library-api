@@ -33,13 +33,19 @@ type LibraryUser struct {
 	DisplayName string `json:"display_name,omitempty"`
 	// Assigned LibraryRole names
 	Roles []string `json:"roles,omitempty"`
+	// Library Branch IDs this user may log in to (empty = unrestricted for admins)
+	BranchIds []string `json:"branch_ids,omitempty"`
 	// IsActive holds the value of the "is_active" field.
 	IsActive bool `json:"is_active,omitempty"`
 	// bcrypt hash of the desk/kiosk PIN (supplements SSO); never returned
 	PinHash *string `json:"-"`
 	// hex(SHA256(tenant:user:pin)) for O(1) PIN lookup
-	PinFastHash  string `json:"pin_fast_hash,omitempty"`
-	selectValues sql.SelectValues
+	PinFastHash string `json:"pin_fast_hash,omitempty"`
+	// consecutive wrong-PIN attempts (lockout)
+	PinFailedAttempts int `json:"pin_failed_attempts,omitempty"`
+	// PIN locked until this time after too many failures
+	PinLockedUntil *time.Time `json:"pin_locked_until,omitempty"`
+	selectValues   sql.SelectValues
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -47,13 +53,15 @@ func (*LibraryUser) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case libraryuser.FieldRoles:
+		case libraryuser.FieldRoles, libraryuser.FieldBranchIds:
 			values[i] = new([]byte)
 		case libraryuser.FieldIsActive:
 			values[i] = new(sql.NullBool)
+		case libraryuser.FieldPinFailedAttempts:
+			values[i] = new(sql.NullInt64)
 		case libraryuser.FieldUserID, libraryuser.FieldEmail, libraryuser.FieldDisplayName, libraryuser.FieldPinHash, libraryuser.FieldPinFastHash:
 			values[i] = new(sql.NullString)
-		case libraryuser.FieldCreatedAt, libraryuser.FieldUpdatedAt:
+		case libraryuser.FieldCreatedAt, libraryuser.FieldUpdatedAt, libraryuser.FieldPinLockedUntil:
 			values[i] = new(sql.NullTime)
 		case libraryuser.FieldID, libraryuser.FieldTenantID:
 			values[i] = new(uuid.UUID)
@@ -122,6 +130,14 @@ func (_m *LibraryUser) assignValues(columns []string, values []any) error {
 					return fmt.Errorf("unmarshal field roles: %w", err)
 				}
 			}
+		case libraryuser.FieldBranchIds:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field branch_ids", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.BranchIds); err != nil {
+					return fmt.Errorf("unmarshal field branch_ids: %w", err)
+				}
+			}
 		case libraryuser.FieldIsActive:
 			if value, ok := values[i].(*sql.NullBool); !ok {
 				return fmt.Errorf("unexpected type %T for field is_active", values[i])
@@ -140,6 +156,19 @@ func (_m *LibraryUser) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field pin_fast_hash", values[i])
 			} else if value.Valid {
 				_m.PinFastHash = value.String
+			}
+		case libraryuser.FieldPinFailedAttempts:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field pin_failed_attempts", values[i])
+			} else if value.Valid {
+				_m.PinFailedAttempts = int(value.Int64)
+			}
+		case libraryuser.FieldPinLockedUntil:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field pin_locked_until", values[i])
+			} else if value.Valid {
+				_m.PinLockedUntil = new(time.Time)
+				*_m.PinLockedUntil = value.Time
 			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
@@ -198,6 +227,9 @@ func (_m *LibraryUser) String() string {
 	builder.WriteString("roles=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Roles))
 	builder.WriteString(", ")
+	builder.WriteString("branch_ids=")
+	builder.WriteString(fmt.Sprintf("%v", _m.BranchIds))
+	builder.WriteString(", ")
 	builder.WriteString("is_active=")
 	builder.WriteString(fmt.Sprintf("%v", _m.IsActive))
 	builder.WriteString(", ")
@@ -205,6 +237,14 @@ func (_m *LibraryUser) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("pin_fast_hash=")
 	builder.WriteString(_m.PinFastHash)
+	builder.WriteString(", ")
+	builder.WriteString("pin_failed_attempts=")
+	builder.WriteString(fmt.Sprintf("%v", _m.PinFailedAttempts))
+	builder.WriteString(", ")
+	if v := _m.PinLockedUntil; v != nil {
+		builder.WriteString("pin_locked_until=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

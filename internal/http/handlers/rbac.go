@@ -117,12 +117,37 @@ func (h *RBACHandler) ListTeam(w http.ResponseWriter, r *http.Request) {
 			"email":     u.Email,
 			"full_name": u.DisplayName,
 			"name":      u.DisplayName,
-			"roles":     u.Roles,
-			"is_active": u.IsActive,
-			"has_pin":   u.PinHash != nil && *u.PinHash != "",
+			"roles":      u.Roles,
+			"branch_ids": u.BranchIds,
+			"is_active":  u.IsActive,
+			"has_pin":    u.PinHash != nil && *u.PinHash != "",
 		})
 	}
 	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
+}
+
+// AssignBranches godoc
+// @Summary Set the branches a staff member may log in to (branch-scoped PIN login)
+// @Router /{tenant}/library/team/{user_id}/branches [put]
+func (h *RBACHandler) AssignBranches(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := TenantUUID(r)
+	if !ok {
+		respondError(w, http.StatusUnauthorized, "missing tenant", "unauthorized")
+		return
+	}
+	userID := chi.URLParam(r, "user_id")
+	var body struct {
+		BranchIDs []string `json:"branch_ids"`
+	}
+	if err := Decode(r, &body); err != nil {
+		respondError(w, http.StatusBadRequest, "bad body", "invalid_request")
+		return
+	}
+	if err := h.rbac.AssignBranches(r.Context(), tenantID, userID, body.BranchIDs); err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "assign_failed")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"updated": true})
 }
 
 // AssignRoles godoc

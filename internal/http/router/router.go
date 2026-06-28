@@ -78,7 +78,9 @@ func New(d Deps) http.Handler {
 	// Public PIN/terminal auth (no SSO) — desk/kiosk quick login.
 	if d.PINAuth != nil {
 		r.Post("/api/v1/{tenant}/library/auth/pin", d.PINAuth.Login)
+		r.Post("/api/v1/{tenant}/library/auth/pin/identify", d.PINAuth.IdentifyByPIN)
 		r.Get("/api/v1/{tenant}/library/auth/pin/profiles", d.PINAuth.StaffProfiles)
+		r.Get("/api/v1/{tenant}/library/auth/pin/branches", d.PINAuth.PINBranches)
 	}
 
 	r.Route("/api/v1/{tenant}/library", func(lib chi.Router) {
@@ -226,6 +228,7 @@ func New(d Deps) http.Handler {
 		lib.Get("/rbac/permissions", d.RBACHandler.ListPermissions)
 		lib.Get("/team", d.RBACHandler.ListTeam)
 		lib.Put("/team/{user_id}/roles", d.RBACHandler.AssignRoles)
+		lib.Put("/team/{user_id}/branches", d.RBACHandler.AssignBranches)
 	})
 
 	return r

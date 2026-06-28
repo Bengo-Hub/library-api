@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/bengobox/library-service/internal/ent"
+	"github.com/bengobox/library-service/internal/ent/branch"
 	"github.com/bengobox/library-service/internal/ent/libraryrole"
 	"github.com/bengobox/library-service/internal/ent/libraryuser"
 )
@@ -107,25 +108,57 @@ func (s *Service) EnsureUserFromToken(ctx context.Context, claims *authclient.Cl
 		return nil
 	}
 	roles := MapGlobalRoles(claims.Roles)
+	// If SSO scoped the user to a single outlet, link that to the matching library branch so
+	// branch-scoped PIN login works without manual assignment ("sync from SSO outlet links").
+	ssoBranchID := s.resolveSSOBranchID(ctx, tenantID, claims)
 
 	existing, err := s.db.LibraryUser.Query().
 		Where(libraryuser.TenantID(tenantID), libraryuser.UserID(claims.Subject)).
 		Only(ctx)
 	if ent.IsNotFound(err) {
-		_, cerr := s.db.LibraryUser.Create().
+		c := s.db.LibraryUser.Create().
 			SetTenantID(tenantID).
 			SetUserID(claims.Subject).
 			SetEmail(claims.Email).
-			SetRoles(roles).
-			Save(ctx)
+			SetRoles(roles)
+		if ssoBranchID != "" {
+			c.SetBranchIds([]string{ssoBranchID})
+		}
+		_, cerr := c.Save(ctx)
 		return cerr
 	} else if err != nil {
 		return err
 	}
 	// Heal roles (merge mapped roles into any explicitly-granted ones).
 	merged := mergeUnique(existing.Roles, roles)
-	_, err = s.db.LibraryUser.UpdateOne(existing).SetRoles(merged).SetEmail(claims.Email).Save(ctx)
+	u := s.db.LibraryUser.UpdateOne(existing).SetRoles(merged).SetEmail(claims.Email)
+	if ssoBranchID != "" {
+		u.SetBranchIds(mergeUnique(existing.BranchIds, []string{ssoBranchID}))
+	}
+	_, err = u.Save(ctx)
 	return err
+}
+
+// resolveSSOBranchID maps the SSO-selected outlet (claims OutletID/OutletCode) to a library
+// Branch id for non-admin users, so an outlet linked in SSO scopes the user's library branch.
+// Returns "" for admins/HQ users (unrestricted) or when no branch matches.
+func (s *Service) resolveSSOBranchID(ctx context.Context, tenantID uuid.UUID, claims *authclient.Claims) string {
+	if claims.CanAccessAllOutlets() {
+		return ""
+	}
+	if oid := claims.GetOutletID(); oid != "" {
+		if u, err := uuid.Parse(oid); err == nil {
+			if b, err := s.db.Branch.Query().Where(branch.TenantID(tenantID), branch.OutletID(u)).First(ctx); err == nil {
+				return b.ID.String()
+			}
+		}
+	}
+	if claims.OutletCode != "" {
+		if b, err := s.db.Branch.Query().Where(branch.TenantID(tenantID), branch.Code(claims.OutletCode)).First(ctx); err == nil {
+			return b.ID.String()
+		}
+	}
+	return ""
 }
 
 // HasAnyPermission resolves the user's local role permissions and reports whether any of
@@ -235,6 +268,17 @@ func (s *Service) AssignRoles(ctx context.Context, tenantID uuid.UUID, userID st
 		return err
 	}
 	_, err = s.db.LibraryUser.UpdateOne(u).SetRoles(roles).Save(ctx)
+	return err
+}
+
+// AssignBranches sets the branches a user may log in to (replacing the current set). An empty
+// list clears the restriction (the user then has no branch unless they're an admin).
+func (s *Service) AssignBranches(ctx context.Context, tenantID uuid.UUID, userID string, branchIDs []string) error {
+	u, err := s.db.LibraryUser.Query().Where(libraryuser.TenantID(tenantID), libraryuser.UserID(userID)).Only(ctx)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.LibraryUser.UpdateOne(u).SetBranchIds(branchIDs).Save(ctx)
 	return err
 }
 

@@ -122,6 +122,24 @@ func (_u *LibraryUserUpdate) ClearRoles() *LibraryUserUpdate {
 	return _u
 }
 
+// SetBranchIds sets the "branch_ids" field.
+func (_u *LibraryUserUpdate) SetBranchIds(v []string) *LibraryUserUpdate {
+	_u.mutation.SetBranchIds(v)
+	return _u
+}
+
+// AppendBranchIds appends value to the "branch_ids" field.
+func (_u *LibraryUserUpdate) AppendBranchIds(v []string) *LibraryUserUpdate {
+	_u.mutation.AppendBranchIds(v)
+	return _u
+}
+
+// ClearBranchIds clears the value of the "branch_ids" field.
+func (_u *LibraryUserUpdate) ClearBranchIds() *LibraryUserUpdate {
+	_u.mutation.ClearBranchIds()
+	return _u
+}
+
 // SetIsActive sets the "is_active" field.
 func (_u *LibraryUserUpdate) SetIsActive(v bool) *LibraryUserUpdate {
 	_u.mutation.SetIsActive(v)
@@ -173,6 +191,47 @@ func (_u *LibraryUserUpdate) SetNillablePinFastHash(v *string) *LibraryUserUpdat
 // ClearPinFastHash clears the value of the "pin_fast_hash" field.
 func (_u *LibraryUserUpdate) ClearPinFastHash() *LibraryUserUpdate {
 	_u.mutation.ClearPinFastHash()
+	return _u
+}
+
+// SetPinFailedAttempts sets the "pin_failed_attempts" field.
+func (_u *LibraryUserUpdate) SetPinFailedAttempts(v int) *LibraryUserUpdate {
+	_u.mutation.ResetPinFailedAttempts()
+	_u.mutation.SetPinFailedAttempts(v)
+	return _u
+}
+
+// SetNillablePinFailedAttempts sets the "pin_failed_attempts" field if the given value is not nil.
+func (_u *LibraryUserUpdate) SetNillablePinFailedAttempts(v *int) *LibraryUserUpdate {
+	if v != nil {
+		_u.SetPinFailedAttempts(*v)
+	}
+	return _u
+}
+
+// AddPinFailedAttempts adds value to the "pin_failed_attempts" field.
+func (_u *LibraryUserUpdate) AddPinFailedAttempts(v int) *LibraryUserUpdate {
+	_u.mutation.AddPinFailedAttempts(v)
+	return _u
+}
+
+// SetPinLockedUntil sets the "pin_locked_until" field.
+func (_u *LibraryUserUpdate) SetPinLockedUntil(v time.Time) *LibraryUserUpdate {
+	_u.mutation.SetPinLockedUntil(v)
+	return _u
+}
+
+// SetNillablePinLockedUntil sets the "pin_locked_until" field if the given value is not nil.
+func (_u *LibraryUserUpdate) SetNillablePinLockedUntil(v *time.Time) *LibraryUserUpdate {
+	if v != nil {
+		_u.SetPinLockedUntil(*v)
+	}
+	return _u
+}
+
+// ClearPinLockedUntil clears the value of the "pin_locked_until" field.
+func (_u *LibraryUserUpdate) ClearPinLockedUntil() *LibraryUserUpdate {
+	_u.mutation.ClearPinLockedUntil()
 	return _u
 }
 
@@ -271,6 +330,17 @@ func (_u *LibraryUserUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	if _u.mutation.RolesCleared() {
 		_spec.ClearField(libraryuser.FieldRoles, field.TypeJSON)
 	}
+	if value, ok := _u.mutation.BranchIds(); ok {
+		_spec.SetField(libraryuser.FieldBranchIds, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedBranchIds(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, libraryuser.FieldBranchIds, value)
+		})
+	}
+	if _u.mutation.BranchIdsCleared() {
+		_spec.ClearField(libraryuser.FieldBranchIds, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.IsActive(); ok {
 		_spec.SetField(libraryuser.FieldIsActive, field.TypeBool, value)
 	}
@@ -285,6 +355,18 @@ func (_u *LibraryUserUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	}
 	if _u.mutation.PinFastHashCleared() {
 		_spec.ClearField(libraryuser.FieldPinFastHash, field.TypeString)
+	}
+	if value, ok := _u.mutation.PinFailedAttempts(); ok {
+		_spec.SetField(libraryuser.FieldPinFailedAttempts, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedPinFailedAttempts(); ok {
+		_spec.AddField(libraryuser.FieldPinFailedAttempts, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.PinLockedUntil(); ok {
+		_spec.SetField(libraryuser.FieldPinLockedUntil, field.TypeTime, value)
+	}
+	if _u.mutation.PinLockedUntilCleared() {
+		_spec.ClearField(libraryuser.FieldPinLockedUntil, field.TypeTime)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -398,6 +480,24 @@ func (_u *LibraryUserUpdateOne) ClearRoles() *LibraryUserUpdateOne {
 	return _u
 }
 
+// SetBranchIds sets the "branch_ids" field.
+func (_u *LibraryUserUpdateOne) SetBranchIds(v []string) *LibraryUserUpdateOne {
+	_u.mutation.SetBranchIds(v)
+	return _u
+}
+
+// AppendBranchIds appends value to the "branch_ids" field.
+func (_u *LibraryUserUpdateOne) AppendBranchIds(v []string) *LibraryUserUpdateOne {
+	_u.mutation.AppendBranchIds(v)
+	return _u
+}
+
+// ClearBranchIds clears the value of the "branch_ids" field.
+func (_u *LibraryUserUpdateOne) ClearBranchIds() *LibraryUserUpdateOne {
+	_u.mutation.ClearBranchIds()
+	return _u
+}
+
 // SetIsActive sets the "is_active" field.
 func (_u *LibraryUserUpdateOne) SetIsActive(v bool) *LibraryUserUpdateOne {
 	_u.mutation.SetIsActive(v)
@@ -449,6 +549,47 @@ func (_u *LibraryUserUpdateOne) SetNillablePinFastHash(v *string) *LibraryUserUp
 // ClearPinFastHash clears the value of the "pin_fast_hash" field.
 func (_u *LibraryUserUpdateOne) ClearPinFastHash() *LibraryUserUpdateOne {
 	_u.mutation.ClearPinFastHash()
+	return _u
+}
+
+// SetPinFailedAttempts sets the "pin_failed_attempts" field.
+func (_u *LibraryUserUpdateOne) SetPinFailedAttempts(v int) *LibraryUserUpdateOne {
+	_u.mutation.ResetPinFailedAttempts()
+	_u.mutation.SetPinFailedAttempts(v)
+	return _u
+}
+
+// SetNillablePinFailedAttempts sets the "pin_failed_attempts" field if the given value is not nil.
+func (_u *LibraryUserUpdateOne) SetNillablePinFailedAttempts(v *int) *LibraryUserUpdateOne {
+	if v != nil {
+		_u.SetPinFailedAttempts(*v)
+	}
+	return _u
+}
+
+// AddPinFailedAttempts adds value to the "pin_failed_attempts" field.
+func (_u *LibraryUserUpdateOne) AddPinFailedAttempts(v int) *LibraryUserUpdateOne {
+	_u.mutation.AddPinFailedAttempts(v)
+	return _u
+}
+
+// SetPinLockedUntil sets the "pin_locked_until" field.
+func (_u *LibraryUserUpdateOne) SetPinLockedUntil(v time.Time) *LibraryUserUpdateOne {
+	_u.mutation.SetPinLockedUntil(v)
+	return _u
+}
+
+// SetNillablePinLockedUntil sets the "pin_locked_until" field if the given value is not nil.
+func (_u *LibraryUserUpdateOne) SetNillablePinLockedUntil(v *time.Time) *LibraryUserUpdateOne {
+	if v != nil {
+		_u.SetPinLockedUntil(*v)
+	}
+	return _u
+}
+
+// ClearPinLockedUntil clears the value of the "pin_locked_until" field.
+func (_u *LibraryUserUpdateOne) ClearPinLockedUntil() *LibraryUserUpdateOne {
+	_u.mutation.ClearPinLockedUntil()
 	return _u
 }
 
@@ -577,6 +718,17 @@ func (_u *LibraryUserUpdateOne) sqlSave(ctx context.Context) (_node *LibraryUser
 	if _u.mutation.RolesCleared() {
 		_spec.ClearField(libraryuser.FieldRoles, field.TypeJSON)
 	}
+	if value, ok := _u.mutation.BranchIds(); ok {
+		_spec.SetField(libraryuser.FieldBranchIds, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedBranchIds(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, libraryuser.FieldBranchIds, value)
+		})
+	}
+	if _u.mutation.BranchIdsCleared() {
+		_spec.ClearField(libraryuser.FieldBranchIds, field.TypeJSON)
+	}
 	if value, ok := _u.mutation.IsActive(); ok {
 		_spec.SetField(libraryuser.FieldIsActive, field.TypeBool, value)
 	}
@@ -591,6 +743,18 @@ func (_u *LibraryUserUpdateOne) sqlSave(ctx context.Context) (_node *LibraryUser
 	}
 	if _u.mutation.PinFastHashCleared() {
 		_spec.ClearField(libraryuser.FieldPinFastHash, field.TypeString)
+	}
+	if value, ok := _u.mutation.PinFailedAttempts(); ok {
+		_spec.SetField(libraryuser.FieldPinFailedAttempts, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedPinFailedAttempts(); ok {
+		_spec.AddField(libraryuser.FieldPinFailedAttempts, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.PinLockedUntil(); ok {
+		_spec.SetField(libraryuser.FieldPinLockedUntil, field.TypeTime, value)
+	}
+	if _u.mutation.PinLockedUntilCleared() {
+		_spec.ClearField(libraryuser.FieldPinLockedUntil, field.TypeTime)
 	}
 	_node = &LibraryUser{config: _u.config}
 	_spec.Assign = _node.assignValues
