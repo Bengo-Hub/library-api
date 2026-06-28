@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
@@ -105,11 +106,13 @@ func (h *PlatformConfigHandler) encryptionStatus(r *http.Request) encryptionKeyR
 type integrationResponse struct {
 	Configured     bool    `json:"configured"`
 	KeyFingerprint string  `json:"key_fingerprint"`
+	BaseURL        string  `json:"base_url"`
 	UpdatedAt      *string `json:"updated_at"`
 }
 
 type putISBNdbRequest struct {
-	APIKey string `json:"api_key"`
+	APIKey  string `json:"api_key"`
+	BaseURL string `json:"base_url"`
 }
 
 // GetISBNdb godoc
@@ -135,15 +138,25 @@ func (h *PlatformConfigHandler) PutISBNdb(w http.ResponseWriter, r *http.Request
 		respondError(w, http.StatusInternalServerError, "failed to save key", "save_failed")
 		return
 	}
+	// Optional plan-specific base URL (Basic=api2, Premium/Pro differ). Empty resets to default.
+	if err := h.store.SetConfig(r.Context(), secrets.KeyISBNdbBaseURL, strings.TrimRight(strings.TrimSpace(req.BaseURL), "/"), "ISBNdb API base URL (plan-specific host)"); err != nil {
+		h.log.Error("failed to save ISBNdb base URL", zap.Error(err))
+		respondError(w, http.StatusInternalServerError, "failed to save base URL", "save_failed")
+		return
+	}
 	respondJSON(w, http.StatusOK, h.isbndbStatus(r))
 }
 
 func (h *PlatformConfigHandler) isbndbStatus(r *http.Request) integrationResponse {
 	configured, fp, updatedAt := h.store.SecretStatus(r.Context(), secrets.KeyISBNdbAPIKey)
+	baseURL, ok := h.store.GetConfig(r.Context(), secrets.KeyISBNdbBaseURL)
+	if !ok {
+		baseURL = secrets.ISBNdbDefaultBaseURL
+	}
 	var ts *string
 	if updatedAt != nil {
 		s := updatedAt.Format("2006-01-02T15:04:05Z")
 		ts = &s
 	}
-	return integrationResponse{Configured: configured, KeyFingerprint: fp, UpdatedAt: ts}
+	return integrationResponse{Configured: configured, KeyFingerprint: fp, BaseURL: baseURL, UpdatedAt: ts}
 }

@@ -84,12 +84,16 @@ func (h *CatalogHandler) ISBNLookup(w http.ResponseWriter, r *http.Request) {
 	// configured. The key is stored encrypted in ServiceConfig (platform settings), never env.
 	if h.secrets != nil {
 		if apiKey, ok := h.secrets.GetSecret(r.Context(), secrets.KeyISBNdbAPIKey); ok {
+			baseURL, hasBase := h.secrets.GetConfig(r.Context(), secrets.KeyISBNdbBaseURL)
+			if !hasBase {
+				baseURL = secrets.ISBNdbDefaultBaseURL
+			}
 			providers = append(providers, struct {
 				priority int
 				name     string
 				fn       func(context.Context, string) *isbnMetadata
 			}{0, "isbndb", func(ctx context.Context, isbn string) *isbnMetadata {
-				return fetchISBNdb(ctx, apiKey, isbn)
+				return fetchISBNdb(ctx, baseURL, apiKey, isbn)
 			}})
 		}
 	}
@@ -392,10 +396,13 @@ type isbndbResponse struct {
 	} `json:"book"`
 }
 
-func fetchISBNdb(ctx context.Context, apiKey, isbn string) *isbnMetadata {
+func fetchISBNdb(ctx context.Context, baseURL, apiKey, isbn string) *isbnMetadata {
+	if baseURL == "" {
+		baseURL = secrets.ISBNdbDefaultBaseURL
+	}
 	reqCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, "https://api2.isbndb.com/book/"+isbn, nil)
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, strings.TrimRight(baseURL, "/")+"/book/"+isbn, nil)
 	if err != nil {
 		return nil
 	}

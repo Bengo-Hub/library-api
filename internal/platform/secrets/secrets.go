@@ -34,6 +34,11 @@ const (
 	EncryptionKeyConfigKey = "encryption_key"
 	// KeyISBNdbAPIKey is the platform ServiceConfig.config_key holding the (encrypted) ISBNdb API key.
 	KeyISBNdbAPIKey = "isbndb_api_key"
+	// KeyISBNdbBaseURL is the platform ServiceConfig.config_key holding the ISBNdb API base URL
+	// (plaintext, not secret). Differs by plan: api2 (Basic) / api.premium / api.pro.
+	KeyISBNdbBaseURL = "isbndb_base_url"
+	// ISBNdbDefaultBaseURL is the Basic-plan host, used when no base URL is configured.
+	ISBNdbDefaultBaseURL = "https://api2.isbndb.com"
 
 	envKeyVar     = "LIBRARY_ENCRYPTION_KEY"
 	devKey        = "bengobox-library-dev-key-32byte!" // 32 bytes; LAST candidate so dev data still decrypts
@@ -271,7 +276,7 @@ func (s *Store) SetEncryptionKey(ctx context.Context, keyBytes []byte) error {
 		return errors.New("key must be exactly 32 bytes")
 	}
 	encoded := base64.StdEncoding.EncodeToString(keyBytes)
-	if err := s.upsert(ctx, EncryptionKeyConfigKey, encoded, "AES-256-GCM key for credential encryption at rest"); err != nil {
+	if err := s.upsert(ctx, EncryptionKeyConfigKey, encoded, "AES-256-GCM key for credential encryption at rest", true); err != nil {
 		return err
 	}
 	s.kp.Invalidate()
@@ -306,7 +311,30 @@ func (s *Store) SetSecret(ctx context.Context, key, plaintext, description strin
 	if err != nil {
 		return err
 	}
-	return s.upsert(ctx, key, enc, description)
+	return s.upsert(ctx, key, enc, description, true)
+}
+
+// GetConfig returns a non-secret plaintext config value, ok=false when unset/empty.
+func (s *Store) GetConfig(ctx context.Context, key string) (string, bool) {
+	row, err := s.client.ServiceConfig.Query().
+		Where(serviceconfig.ConfigKey(key), serviceconfig.TenantIDIsNil()).First(ctx)
+	if err != nil || row.ConfigValue == "" {
+		return "", false
+	}
+	return row.ConfigValue, true
+}
+
+// SetConfig upserts a non-secret plaintext config value (empty clears the row).
+func (s *Store) SetConfig(ctx context.Context, key, value, description string) error {
+	if value == "" {
+		_, err := s.client.ServiceConfig.Delete().
+			Where(serviceconfig.ConfigKey(key), serviceconfig.TenantIDIsNil()).Exec(ctx)
+		if ent.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+	return s.upsert(ctx, key, value, description, false)
 }
 
 // SecretStatus reports whether a platform secret is configured + a safe fingerprint of its value.
@@ -324,17 +352,17 @@ func (s *Store) SecretStatus(ctx context.Context, key string) (configured bool, 
 	return true, fingerprint([]byte(val)), &ts
 }
 
-func (s *Store) upsert(ctx context.Context, key, value, description string) error {
+func (s *Store) upsert(ctx context.Context, key, value, description string, isSecret bool) error {
 	existing, err := s.client.ServiceConfig.Query().
 		Where(serviceconfig.ConfigKey(key), serviceconfig.TenantIDIsNil()).First(ctx)
 	if err != nil {
 		_, createErr := s.client.ServiceConfig.Create().
 			SetConfigKey(key).SetConfigValue(value).SetConfigType("string").
-			SetIsSecret(true).SetDescription(description).Save(ctx)
+			SetIsSecret(isSecret).SetDescription(description).Save(ctx)
 		return createErr
 	}
 	_, updErr := existing.Update().
 		SetConfigValue(value).SetConfigType("string").
-		SetIsSecret(true).SetDescription(description).Save(ctx)
+		SetIsSecret(isSecret).SetDescription(description).Save(ctx)
 	return updErr
 }
