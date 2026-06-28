@@ -1,10 +1,7 @@
 package handlers
 
 import (
-	"context"
-	"encoding/json"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -16,6 +13,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/branch"
 	"github.com/bengobox/library-service/internal/ent/collection"
 	"github.com/bengobox/library-service/internal/ent/subject"
+	"github.com/bengobox/library-service/internal/events"
 )
 
 // CatalogHandler serves bibliographic + copy endpoints.
@@ -100,11 +98,26 @@ func (h *CatalogHandler) CreateBib(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "title is required", "invalid_request")
 		return
 	}
-	c := h.db.BibRecord.Create().SetTenantID(tenantID).SetTitle(req.Title)
+	tx, err := h.db.Tx(r.Context())
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "tx_failed")
+		return
+	}
+	c := tx.BibRecord.Create().SetTenantID(tenantID).SetTitle(req.Title)
 	applyBibFields(c, req)
 	row, err := c.Save(r.Context())
 	if err != nil {
+		_ = tx.Rollback()
 		respondError(w, http.StatusInternalServerError, err.Error(), "create_failed")
+		return
+	}
+	// Publish bib.created on the transactional outbox (atomic with the write), mirroring
+	// member.registered / loan.created etc.
+	_ = events.Publish(r.Context(), tx.OutboxEvent, tenantID, row.ID.String(), events.EventBibCreated, map[string]any{
+		"bib_id": row.ID, "title": row.Title, "isbn13": row.Isbn13, "isbn10": row.Isbn10,
+	})
+	if err := tx.Commit(); err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "commit_failed")
 		return
 	}
 	respondJSON(w, http.StatusCreated, row)
@@ -286,26 +299,8 @@ func (h *CatalogHandler) Facets(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// ISBNLookup godoc
-// @Summary Look up bibliographic metadata by ISBN (local first, then OpenLibrary)
-// @Tags Catalog
-// @Router /{tenant}/library/catalog/isbn/{isbn} [get]
-func (h *CatalogHandler) ISBNLookup(w http.ResponseWriter, r *http.Request) {
-	tenantID, _ := TenantUUID(r)
-	isbn := chi.URLParam(r, "isbn")
-	// Local hit first.
-	if local, err := h.db.BibRecord.Query().Where(bibrecord.TenantID(tenantID),
-		bibrecord.Or(bibrecord.Isbn13(isbn), bibrecord.Isbn10(isbn))).First(r.Context()); err == nil {
-		respondJSON(w, http.StatusOK, map[string]any{"source": "local", "bib": local})
-		return
-	}
-	meta := fetchOpenLibrary(r.Context(), isbn)
-	if meta == nil {
-		respondJSON(w, http.StatusOK, map[string]any{"source": "none", "isbn13": isbn})
-		return
-	}
-	respondJSON(w, http.StatusOK, map[string]any{"source": "openlibrary", "metadata": meta})
-}
+// ISBNLookup is implemented in isbn_lookup.go (local DB -> Google Books -> Open Library ->
+// LoC SRU cascade, returning the flat isbnMetadata shape the cataloging UI expects).
 
 func applyBibFields(c *ent.BibRecordCreate, req bibRequest) {
 	if req.Subtitle != "" {
@@ -374,38 +369,4 @@ func applyBibUpdate(u *ent.BibRecordUpdateOne, req bibRequest) {
 	if req.CoverImageURL != "" {
 		u.SetCoverImageURL(req.CoverImageURL)
 	}
-}
-
-// fetchOpenLibrary best-effort fetches title/authors/publisher from OpenLibrary. Returns
-// nil on any error (offline, not found) — ISBN auto-fill is a convenience, never required.
-func fetchOpenLibrary(ctx context.Context, isbn string) map[string]any {
-	url := "https://openlibrary.org/isbn/" + isbn + ".json"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
-	if err != nil {
-		return nil
-	}
-	client := &http.Client{Timeout: 4 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil
-	}
-	var raw map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
-		return nil
-	}
-	out := map[string]any{"isbn13": isbn}
-	if v, ok := raw["title"]; ok {
-		out["title"] = v
-	}
-	if v, ok := raw["publish_date"]; ok {
-		out["publish_date"] = v
-	}
-	if v, ok := raw["number_of_pages"]; ok {
-		out["page_count"] = v
-	}
-	return out
 }
