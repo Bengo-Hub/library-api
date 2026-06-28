@@ -119,116 +119,131 @@ func New(d Deps) http.Handler {
 				d.PlatformConfig.RegisterRoutes(p)
 			})
 		}
-		lib.Get("/reports/summary", d.Reports.Summary)
-		lib.Get("/reports/popular", d.Reports.Popular)
-		lib.Get("/reports/circulation", d.Reports.Circulation)
-		lib.Get("/reports/overdue", d.Reports.Overdue)
+		// Per-route Django-style permission gates (library.{module}.{action}). `view` accepts
+		// view|manage; `act` accepts the specific action|manage. library_admin (*) + superuser +
+		// platform owner bypass. This is Layer-3 RBAC on top of the subscription/feature gates.
+		view := func(mod string) func(http.Handler) http.Handler {
+			return libmw.RequireServicePermission(d.RBAC, "library."+mod+".view", "library."+mod+".manage")
+		}
+		act := func(mod, action string) func(http.Handler) http.Handler {
+			return libmw.RequireServicePermission(d.RBAC, "library."+mod+"."+action, "library."+mod+".manage")
+		}
 
-		// Catalog (OPAC search + bib/copy management) — gated on library_catalog.
+		lib.With(view("reports")).Get("/reports/summary", d.Reports.Summary)
+		lib.With(view("reports")).Get("/reports/popular", d.Reports.Popular)
+		lib.With(view("reports")).Get("/reports/circulation", d.Reports.Circulation)
+		lib.With(view("reports")).Get("/reports/overdue", d.Reports.Overdue)
+
+		// Catalog (OPAC search + bib/copy management) — feature gate + per-route permission gate.
 		lib.Route("/catalog", func(c chi.Router) {
 			c.Use(libmw.RequireFeature("library_catalog"))
-			c.Get("/bibs", d.Catalog.ListBibs)
-			c.Post("/bibs", d.Catalog.CreateBib)
-			c.Get("/search", d.Catalog.Search)
-			c.Get("/facets", d.Catalog.Facets)
-			c.Get("/collections", d.Catalog.ListCollections)
-			c.Post("/collections", d.Catalog.CreateCollection)
-			c.Put("/collections/{id}", d.Catalog.UpdateCollection)
-			c.Delete("/collections/{id}", d.Catalog.DeleteCollection)
-			c.Get("/isbn/{isbn}", d.Catalog.ISBNLookup)
-			c.Post("/bibs/{id}/cover", d.Catalog.UploadCover)
-			c.Get("/bibs/{id}/marc.xml", d.Catalog.MarcXML)
-			c.Get("/bibs/{id}/marc.json", d.Catalog.MarcJSON)
-			c.Post("/import/marc", d.Catalog.ImportMarc)
-			c.Get("/bibs/{id}", d.Catalog.GetBib)
-			c.Put("/bibs/{id}", d.Catalog.UpdateBib)
-			c.Delete("/bibs/{id}", d.Catalog.DeleteBib)
-			c.Get("/bibs/{id}/copies", d.Catalog.ListCopies)
-			c.Post("/copies", d.Catalog.CreateCopy)
-			c.Put("/copies/{id}", d.Catalog.UpdateCopy)
-			c.Get("/copies/by-barcode/{barcode}", d.Catalog.GetCopyByBarcode)
-			c.Get("/copies/{id}/label.pdf", d.Catalog.CopyLabel)
-			c.Get("/transfers", d.Catalog.ListTransfers)
-			c.Post("/transfers", d.Catalog.CreateTransfer)
-			c.Post("/transfers/{id}/receive", d.Catalog.ReceiveTransfer)
-			c.Get("/stocktake", d.Catalog.ListStocktakes)
-			c.Post("/stocktake", d.Catalog.StartStocktake)
-			c.Post("/stocktake/{id}/scan", d.Catalog.ScanStocktake)
-			c.Post("/stocktake/{id}/finalize", d.Catalog.FinalizeStocktake)
-			c.Get("/bibs/{id}/recommendations", d.Catalog.Recommend)
-			c.Get("/sru/search", d.Catalog.SRUSearch)
+			// Catalog (bibs) — members have catalog.view (OPAC); staff/admin add/change/delete.
+			c.With(view("catalog")).Get("/bibs", d.Catalog.ListBibs)
+			c.With(act("catalog", "add")).Post("/bibs", d.Catalog.CreateBib)
+			c.With(view("catalog")).Get("/search", d.Catalog.Search)
+			c.With(view("catalog")).Get("/facets", d.Catalog.Facets)
+			c.With(view("catalog")).Get("/isbn/{isbn}", d.Catalog.ISBNLookup)
+			c.With(view("catalog")).Get("/sru/search", d.Catalog.SRUSearch)
+			c.With(view("catalog")).Get("/bibs/{id}", d.Catalog.GetBib)
+			c.With(view("catalog")).Get("/bibs/{id}/marc.xml", d.Catalog.MarcXML)
+			c.With(view("catalog")).Get("/bibs/{id}/marc.json", d.Catalog.MarcJSON)
+			c.With(view("catalog")).Get("/bibs/{id}/recommendations", d.Catalog.Recommend)
+			c.With(act("catalog", "change")).Put("/bibs/{id}", d.Catalog.UpdateBib)
+			c.With(act("catalog", "delete")).Delete("/bibs/{id}", d.Catalog.DeleteBib)
+			c.With(act("catalog", "change")).Post("/bibs/{id}/cover", d.Catalog.UploadCover)
+			c.With(act("catalog", "add")).Post("/import/marc", d.Catalog.ImportMarc)
+			// Collections
+			c.With(view("catalog")).Get("/collections", d.Catalog.ListCollections)
+			c.With(act("collections", "add")).Post("/collections", d.Catalog.CreateCollection)
+			c.With(act("collections", "change")).Put("/collections/{id}", d.Catalog.UpdateCollection)
+			c.With(act("collections", "delete")).Delete("/collections/{id}", d.Catalog.DeleteCollection)
+			// Copies & holdings
+			c.With(view("copies")).Get("/bibs/{id}/copies", d.Catalog.ListCopies)
+			c.With(act("copies", "add")).Post("/copies", d.Catalog.CreateCopy)
+			c.With(act("copies", "change")).Put("/copies/{id}", d.Catalog.UpdateCopy)
+			c.With(view("copies")).Get("/copies/by-barcode/{barcode}", d.Catalog.GetCopyByBarcode)
+			c.With(view("copies")).Get("/copies/{id}/label.pdf", d.Catalog.CopyLabel)
+			// Transfers
+			c.With(view("transfers")).Get("/transfers", d.Catalog.ListTransfers)
+			c.With(act("transfers", "add")).Post("/transfers", d.Catalog.CreateTransfer)
+			c.With(act("transfers", "receive")).Post("/transfers/{id}/receive", d.Catalog.ReceiveTransfer)
+			// Stocktake
+			c.With(view("stocktake")).Get("/stocktake", d.Catalog.ListStocktakes)
+			c.With(act("stocktake", "add")).Post("/stocktake", d.Catalog.StartStocktake)
+			c.With(act("stocktake", "scan")).Post("/stocktake/{id}/scan", d.Catalog.ScanStocktake)
+			c.With(act("stocktake", "finalize")).Post("/stocktake/{id}/finalize", d.Catalog.FinalizeStocktake)
 		})
 
-		// Branches
-		lib.Get("/branches", d.Branch.List)
-		lib.Post("/branches", d.Branch.Create)
-		lib.Put("/branches/{id}", d.Branch.Update)
+		// Branches — staff read (copy form / branch filter); admin manages.
+		lib.With(view("branches")).Get("/branches", d.Branch.List)
+		lib.With(act("branches", "add")).Post("/branches", d.Branch.Create)
+		lib.With(act("branches", "change")).Put("/branches/{id}", d.Branch.Update)
 
-		// Members + tiers + policies + membership fees — gated on library_members.
+		// Members + tiers + policies + membership fees — feature gate + per-route permission gate.
 		lib.Group(func(m chi.Router) {
 			m.Use(libmw.RequireFeature("library_members"))
-			m.Get("/members", d.Member.ListMembers)
-			m.Post("/members", d.Member.CreateMember)
-			m.Get("/members/{id}", d.Member.GetMember)
-			m.Put("/members/{id}", d.Member.UpdateMember)
-			m.Get("/members/{id}/loans", d.Member.MemberLoans)
-			m.Get("/members/{id}/fines", d.Member.MemberFines)
-			m.Get("/member-tiers", d.Member.ListTiers)
-			m.Post("/member-tiers", d.Member.CreateTier)
-			m.Put("/member-tiers/{id}", d.Member.UpdateTier)
-			m.Get("/loan-policies", d.Member.ListPolicies)
-			m.Post("/loan-policies", d.Member.CreatePolicy)
-			m.Get("/membership-fees", d.Membership.List)
-			m.Post("/members/{id}/membership-fee", d.Membership.Issue)
-			m.Post("/membership-fees/{id}/pay", d.Membership.Pay)
+			m.With(view("members")).Get("/members", d.Member.ListMembers)
+			m.With(act("members", "add")).Post("/members", d.Member.CreateMember)
+			m.With(view("members")).Get("/members/{id}", d.Member.GetMember)
+			m.With(act("members", "change")).Put("/members/{id}", d.Member.UpdateMember)
+			m.With(view("members")).Get("/members/{id}/loans", d.Member.MemberLoans)
+			m.With(view("members")).Get("/members/{id}/fines", d.Member.MemberFines)
+			m.With(view("member_tiers")).Get("/member-tiers", d.Member.ListTiers)
+			m.With(act("member_tiers", "add")).Post("/member-tiers", d.Member.CreateTier)
+			m.With(act("member_tiers", "change")).Put("/member-tiers/{id}", d.Member.UpdateTier)
+			m.With(view("loan_policies")).Get("/loan-policies", d.Member.ListPolicies)
+			m.With(act("loan_policies", "add")).Post("/loan-policies", d.Member.CreatePolicy)
+			m.With(view("membership_fees")).Get("/membership-fees", d.Membership.List)
+			m.With(act("membership_fees", "add")).Post("/members/{id}/membership-fee", d.Membership.Issue)
+			m.With(act("membership_fees", "pay")).Post("/membership-fees/{id}/pay", d.Membership.Pay)
 		})
 
-		// Circulation (checkout/return/renew) — gated on library_circulation.
+		// Circulation (checkout/return/renew) — feature gate + per-action permission gate.
 		lib.Group(func(c chi.Router) {
 			c.Use(libmw.RequireFeature("library_circulation"))
-			c.Post("/circulation/checkout", d.Circulation.Checkout)
-			c.Post("/circulation/return", d.Circulation.Return)
-			c.Post("/circulation/renew/{loan_id}", d.Circulation.Renew)
-			c.Get("/circulation/loans", d.Circulation.ListLoans)
+			c.With(act("circulation", "checkout")).Post("/circulation/checkout", d.Circulation.Checkout)
+			c.With(act("circulation", "return")).Post("/circulation/return", d.Circulation.Return)
+			c.With(act("circulation", "renew")).Post("/circulation/renew/{loan_id}", d.Circulation.Renew)
+			c.With(view("circulation")).Get("/circulation/loans", d.Circulation.ListLoans)
 		})
 
-		// Holds & reservations — gated on library_holds.
+		// Holds & reservations — feature gate + per-action permission gate.
 		lib.Group(func(h chi.Router) {
 			h.Use(libmw.RequireFeature("library_holds"))
-			h.Get("/holds", d.Hold.List)
-			h.Post("/holds", d.Hold.Place)
-			h.Delete("/holds/{id}", d.Hold.Cancel)
+			h.With(view("holds")).Get("/holds", d.Hold.List)
+			h.With(act("holds", "place")).Post("/holds", d.Hold.Place)
+			h.With(act("holds", "delete")).Delete("/holds/{id}", d.Hold.Cancel)
 		})
 
-		// Fines & fees — gated on library_fines.
+		// Fines & fees — feature gate + per-action permission gate.
 		lib.Group(func(f chi.Router) {
 			f.Use(libmw.RequireFeature("library_fines"))
-			f.Get("/fines", d.Fine.List)
-			f.Post("/fines/{id}/waive", d.Fine.Waive)
-			f.Post("/fines/{id}/pay", d.Fine.Pay)
+			f.With(view("fines")).Get("/fines", d.Fine.List)
+			f.With(act("fines", "waive")).Post("/fines/{id}/waive", d.Fine.Waive)
+			f.With(act("fines", "pay")).Post("/fines/{id}/pay", d.Fine.Pay)
 		})
 
-		// E-books & controlled digital lending — gated on library_ebooks.
+		// E-books & controlled digital lending — feature gate + per-action permission gate.
 		lib.Group(func(e chi.Router) {
 			e.Use(libmw.RequireFeature("library_ebooks"))
-			e.Get("/ebooks", d.Ebook.List)
-			e.Post("/ebooks", d.Ebook.Create)
-			e.Post("/ebooks/{id}/lend", d.Ebook.Lend)
-			e.Get("/ebooks/{id}/read", d.Ebook.Read)
-			e.Post("/ebooks/loans/{id}/position", d.Ebook.SavePosition)
-			e.Post("/ebooks/{id}/purchase", d.Ebook.Purchase)
-			e.Get("/ebooks/{id}/download", d.Ebook.Download)
+			e.With(view("ebooks")).Get("/ebooks", d.Ebook.List)
+			e.With(act("ebooks", "add")).Post("/ebooks", d.Ebook.Create)
+			e.With(act("ebooks", "lend")).Post("/ebooks/{id}/lend", d.Ebook.Lend)
+			e.With(view("ebooks")).Get("/ebooks/{id}/read", d.Ebook.Read)
+			e.With(view("ebooks")).Post("/ebooks/loans/{id}/position", d.Ebook.SavePosition)
+			e.With(act("ebooks", "change")).Post("/ebooks/{id}/purchase", d.Ebook.Purchase)
+			e.With(view("ebooks")).Get("/ebooks/{id}/download", d.Ebook.Download)
 		})
 
-		// RBAC / team
-		lib.Get("/rbac/roles", d.RBACHandler.ListRoles)
-		lib.Post("/rbac/roles", d.RBACHandler.CreateRole)
-		lib.Put("/rbac/roles/{id}", d.RBACHandler.UpdateRole)
-		lib.Delete("/rbac/roles/{id}", d.RBACHandler.DeleteRole)
-		lib.Get("/rbac/permissions", d.RBACHandler.ListPermissions)
-		lib.Get("/team", d.RBACHandler.ListTeam)
-		lib.Put("/team/{user_id}/roles", d.RBACHandler.AssignRoles)
-		lib.Put("/team/{user_id}/branches", d.RBACHandler.AssignBranches)
+		// RBAC / team — admin only (team.view / team.manage).
+		lib.With(view("team")).Get("/rbac/roles", d.RBACHandler.ListRoles)
+		lib.With(act("team", "manage")).Post("/rbac/roles", d.RBACHandler.CreateRole)
+		lib.With(act("team", "manage")).Put("/rbac/roles/{id}", d.RBACHandler.UpdateRole)
+		lib.With(act("team", "manage")).Delete("/rbac/roles/{id}", d.RBACHandler.DeleteRole)
+		lib.With(view("team")).Get("/rbac/permissions", d.RBACHandler.ListPermissions)
+		lib.With(view("team")).Get("/team", d.RBACHandler.ListTeam)
+		lib.With(act("team", "manage")).Put("/team/{user_id}/roles", d.RBACHandler.AssignRoles)
+		lib.With(act("team", "manage")).Put("/team/{user_id}/branches", d.RBACHandler.AssignBranches)
 	})
 
 	return r

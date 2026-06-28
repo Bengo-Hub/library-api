@@ -37,6 +37,40 @@ func NewService(db *ent.Client, log *zap.Logger) *Service {
 	return &Service{db: db, log: log}
 }
 
+// crudCodes returns the Django-style CRUD permission codes for a module
+// (library.{module}.{view|add|change|delete|manage}).
+func crudCodes(mod string) []string {
+	return []string{
+		"library." + mod + ".view",
+		"library." + mod + ".add",
+		"library." + mod + ".change",
+		"library." + mod + ".delete",
+		"library." + mod + ".manage",
+	}
+}
+
+// staffPermissions is the library_staff grant: full CRUD on day-to-day modules + the custom
+// circulation/holds/fines/transfers/stocktake actions, but NOT admin-only config (tiers/policies
+// manage, branches, team, settings).
+func staffPermissions() []string {
+	out := []string{}
+	for _, m := range []string{"catalog", "copies", "collections", "members", "ebooks"} {
+		out = append(out, crudCodes(m)...)
+	}
+	out = append(out,
+		"library.member_tiers.view", "library.loan_policies.view",
+		"library.circulation.view", "library.circulation.checkout", "library.circulation.return", "library.circulation.renew",
+		"library.holds.view", "library.holds.place", "library.holds.change", "library.holds.delete", "library.holds.manage",
+		"library.fines.view", "library.fines.assess", "library.fines.waive", "library.fines.pay",
+		"library.ebooks.lend",
+		"library.transfers.view", "library.transfers.add", "library.transfers.receive", "library.transfers.manage",
+		"library.stocktake.view", "library.stocktake.add", "library.stocktake.scan", "library.stocktake.finalize", "library.stocktake.manage",
+		"library.membership_fees.view", "library.membership_fees.add", "library.membership_fees.pay",
+		"library.reports.view",
+	)
+	return out
+}
+
 // SeedGlobalRoles idempotently upserts the global library roles + their permission sets.
 func (s *Service) SeedGlobalRoles(ctx context.Context) error {
 	defaults := []struct {
@@ -45,13 +79,8 @@ func (s *Service) SeedGlobalRoles(ctx context.Context) error {
 		perms []string
 	}{
 		{RoleAdmin, "Full library administration", []string{"*"}},
-		{RoleStaff, "Circulation desk + cataloging", []string{
-			"library.catalog.view", "library.catalog.manage",
-			"library.circulation.checkout", "library.circulation.return", "library.circulation.renew",
-			"library.holds.manage", "library.members.view", "library.members.manage",
-			"library.fines.view", "library.fines.assess", "library.ebooks.view",
-		}},
-		{RoleMember, "Patron self-service (read + own loans/holds)", []string{
+		{RoleStaff, "Circulation desk + cataloging", staffPermissions()},
+		{RoleMember, "Patron self-service (browse catalog + e-books, place holds)", []string{
 			"library.catalog.view", "library.ebooks.view", "library.holds.place",
 		}},
 	}
@@ -290,25 +319,62 @@ func (s *Service) AssignBranches(ctx context.Context, tenantID uuid.UUID, userID
 	return err
 }
 
-// PermissionCatalog is the static list of library.{module}.{action} codes the team
-// matrix renders. Keep in sync with the role permission sets above + the route guards.
+// PermissionCatalog is the full Django-style list of library.{module}.{action} codes the team
+// matrix renders (grouped by module in the UI). Keep in sync with the role grants + route guards.
 func PermissionCatalog() []map[string]string {
-	codes := []struct{ code, label string }{
-		{"library.catalog.view", "View catalog"},
-		{"library.catalog.manage", "Manage catalog"},
-		{"library.circulation.checkout", "Check out"},
-		{"library.circulation.return", "Check in"},
-		{"library.circulation.renew", "Renew"},
-		{"library.holds.manage", "Manage holds"},
-		{"library.holds.place", "Place holds"},
-		{"library.members.view", "View members"},
-		{"library.members.manage", "Manage members"},
-		{"library.fines.view", "View fines"},
-		{"library.fines.assess", "Assess/waive fines"},
-		{"library.ebooks.view", "Access e-books"},
+	type spec struct{ code, label string }
+	specs := []spec{}
+	addCrud := func(mod, label string) {
+		specs = append(specs,
+			spec{"library." + mod + ".view", "View " + label},
+			spec{"library." + mod + ".add", "Add " + label},
+			spec{"library." + mod + ".change", "Edit " + label},
+			spec{"library." + mod + ".delete", "Delete " + label},
+			spec{"library." + mod + ".manage", "Manage " + label},
+		)
 	}
-	out := make([]map[string]string, 0, len(codes))
-	for _, c := range codes {
+	addCrud("catalog", "catalog")
+	addCrud("copies", "copies")
+	addCrud("collections", "collections")
+	addCrud("members", "members")
+	addCrud("member_tiers", "member tiers")
+	addCrud("loan_policies", "loan policies")
+	addCrud("branches", "branches")
+	addCrud("ebooks", "e-books")
+	specs = append(specs,
+		spec{"library.ebooks.lend", "Lend e-books (CDL)"},
+		spec{"library.circulation.view", "View circulation"},
+		spec{"library.circulation.checkout", "Check out"},
+		spec{"library.circulation.return", "Check in / return"},
+		spec{"library.circulation.renew", "Renew loans"},
+		spec{"library.holds.view", "View holds"},
+		spec{"library.holds.place", "Place holds"},
+		spec{"library.holds.change", "Edit holds"},
+		spec{"library.holds.delete", "Cancel holds"},
+		spec{"library.holds.manage", "Manage holds"},
+		spec{"library.fines.view", "View fines"},
+		spec{"library.fines.assess", "Assess fines"},
+		spec{"library.fines.waive", "Waive fines"},
+		spec{"library.fines.pay", "Take fine payments"},
+		spec{"library.transfers.view", "View transfers"},
+		spec{"library.transfers.add", "Create transfers"},
+		spec{"library.transfers.receive", "Receive transfers"},
+		spec{"library.transfers.manage", "Manage transfers"},
+		spec{"library.stocktake.view", "View stocktake"},
+		spec{"library.stocktake.add", "Start stocktake"},
+		spec{"library.stocktake.scan", "Scan stocktake"},
+		spec{"library.stocktake.finalize", "Finalize stocktake"},
+		spec{"library.stocktake.manage", "Manage stocktake"},
+		spec{"library.membership_fees.view", "View membership fees"},
+		spec{"library.membership_fees.add", "Charge membership fees"},
+		spec{"library.membership_fees.pay", "Take membership fee payments"},
+		spec{"library.reports.view", "View reports"},
+		spec{"library.team.view", "View team"},
+		spec{"library.team.manage", "Manage team & roles"},
+		spec{"library.settings.manage", "Manage settings"},
+	)
+	out := make([]map[string]string, 0, len(specs))
+	for _, c := range specs {
 		out = append(out, map[string]string{"code": c.code, "label": c.label})
 	}
 	return out
