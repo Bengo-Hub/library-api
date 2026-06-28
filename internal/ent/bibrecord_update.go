@@ -265,6 +265,26 @@ func (_u *BibRecordUpdate) ClearPublicationYear() *BibRecordUpdate {
 	return _u
 }
 
+// SetPublicationPlace sets the "publication_place" field.
+func (_u *BibRecordUpdate) SetPublicationPlace(v string) *BibRecordUpdate {
+	_u.mutation.SetPublicationPlace(v)
+	return _u
+}
+
+// SetNillablePublicationPlace sets the "publication_place" field if the given value is not nil.
+func (_u *BibRecordUpdate) SetNillablePublicationPlace(v *string) *BibRecordUpdate {
+	if v != nil {
+		_u.SetPublicationPlace(*v)
+	}
+	return _u
+}
+
+// ClearPublicationPlace clears the value of the "publication_place" field.
+func (_u *BibRecordUpdate) ClearPublicationPlace() *BibRecordUpdate {
+	_u.mutation.ClearPublicationPlace()
+	return _u
+}
+
 // SetPageCount sets the "page_count" field.
 func (_u *BibRecordUpdate) SetPageCount(v int) *BibRecordUpdate {
 	_u.mutation.ResetPageCount()
@@ -440,6 +460,26 @@ func (_u *BibRecordUpdate) ClearCoverImageURL() *BibRecordUpdate {
 	return _u
 }
 
+// SetCoverBackImageURL sets the "cover_back_image_url" field.
+func (_u *BibRecordUpdate) SetCoverBackImageURL(v string) *BibRecordUpdate {
+	_u.mutation.SetCoverBackImageURL(v)
+	return _u
+}
+
+// SetNillableCoverBackImageURL sets the "cover_back_image_url" field if the given value is not nil.
+func (_u *BibRecordUpdate) SetNillableCoverBackImageURL(v *string) *BibRecordUpdate {
+	if v != nil {
+		_u.SetCoverBackImageURL(*v)
+	}
+	return _u
+}
+
+// ClearCoverBackImageURL clears the value of the "cover_back_image_url" field.
+func (_u *BibRecordUpdate) ClearCoverBackImageURL() *BibRecordUpdate {
+	_u.mutation.ClearCoverBackImageURL()
+	return _u
+}
+
 // SetAuthors sets the "authors" field.
 func (_u *BibRecordUpdate) SetAuthors(v []string) *BibRecordUpdate {
 	_u.mutation.SetAuthors(v)
@@ -455,6 +495,42 @@ func (_u *BibRecordUpdate) AppendAuthors(v []string) *BibRecordUpdate {
 // ClearAuthors clears the value of the "authors" field.
 func (_u *BibRecordUpdate) ClearAuthors() *BibRecordUpdate {
 	_u.mutation.ClearAuthors()
+	return _u
+}
+
+// SetSubjects sets the "subjects" field.
+func (_u *BibRecordUpdate) SetSubjects(v []string) *BibRecordUpdate {
+	_u.mutation.SetSubjects(v)
+	return _u
+}
+
+// AppendSubjects appends value to the "subjects" field.
+func (_u *BibRecordUpdate) AppendSubjects(v []string) *BibRecordUpdate {
+	_u.mutation.AppendSubjects(v)
+	return _u
+}
+
+// ClearSubjects clears the value of the "subjects" field.
+func (_u *BibRecordUpdate) ClearSubjects() *BibRecordUpdate {
+	_u.mutation.ClearSubjects()
+	return _u
+}
+
+// SetOtherIsbns sets the "other_isbns" field.
+func (_u *BibRecordUpdate) SetOtherIsbns(v []string) *BibRecordUpdate {
+	_u.mutation.SetOtherIsbns(v)
+	return _u
+}
+
+// AppendOtherIsbns appends value to the "other_isbns" field.
+func (_u *BibRecordUpdate) AppendOtherIsbns(v []string) *BibRecordUpdate {
+	_u.mutation.AppendOtherIsbns(v)
+	return _u
+}
+
+// ClearOtherIsbns clears the value of the "other_isbns" field.
+func (_u *BibRecordUpdate) ClearOtherIsbns() *BibRecordUpdate {
+	_u.mutation.ClearOtherIsbns()
 	return _u
 }
 
@@ -644,6 +720,12 @@ func (_u *BibRecordUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.PublicationYearCleared() {
 		_spec.ClearField(bibrecord.FieldPublicationYear, field.TypeInt)
 	}
+	if value, ok := _u.mutation.PublicationPlace(); ok {
+		_spec.SetField(bibrecord.FieldPublicationPlace, field.TypeString, value)
+	}
+	if _u.mutation.PublicationPlaceCleared() {
+		_spec.ClearField(bibrecord.FieldPublicationPlace, field.TypeString)
+	}
 	if value, ok := _u.mutation.PageCount(); ok {
 		_spec.SetField(bibrecord.FieldPageCount, field.TypeInt, value)
 	}
@@ -695,6 +777,12 @@ func (_u *BibRecordUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.CoverImageURLCleared() {
 		_spec.ClearField(bibrecord.FieldCoverImageURL, field.TypeString)
 	}
+	if value, ok := _u.mutation.CoverBackImageURL(); ok {
+		_spec.SetField(bibrecord.FieldCoverBackImageURL, field.TypeString, value)
+	}
+	if _u.mutation.CoverBackImageURLCleared() {
+		_spec.ClearField(bibrecord.FieldCoverBackImageURL, field.TypeString)
+	}
 	if value, ok := _u.mutation.Authors(); ok {
 		_spec.SetField(bibrecord.FieldAuthors, field.TypeJSON, value)
 	}
@@ -705,6 +793,28 @@ func (_u *BibRecordUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.AuthorsCleared() {
 		_spec.ClearField(bibrecord.FieldAuthors, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.Subjects(); ok {
+		_spec.SetField(bibrecord.FieldSubjects, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedSubjects(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, bibrecord.FieldSubjects, value)
+		})
+	}
+	if _u.mutation.SubjectsCleared() {
+		_spec.ClearField(bibrecord.FieldSubjects, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.OtherIsbns(); ok {
+		_spec.SetField(bibrecord.FieldOtherIsbns, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedOtherIsbns(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, bibrecord.FieldOtherIsbns, value)
+		})
+	}
+	if _u.mutation.OtherIsbnsCleared() {
+		_spec.ClearField(bibrecord.FieldOtherIsbns, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.DublinCore(); ok {
 		_spec.SetField(bibrecord.FieldDublinCore, field.TypeJSON, value)
@@ -979,6 +1089,26 @@ func (_u *BibRecordUpdateOne) ClearPublicationYear() *BibRecordUpdateOne {
 	return _u
 }
 
+// SetPublicationPlace sets the "publication_place" field.
+func (_u *BibRecordUpdateOne) SetPublicationPlace(v string) *BibRecordUpdateOne {
+	_u.mutation.SetPublicationPlace(v)
+	return _u
+}
+
+// SetNillablePublicationPlace sets the "publication_place" field if the given value is not nil.
+func (_u *BibRecordUpdateOne) SetNillablePublicationPlace(v *string) *BibRecordUpdateOne {
+	if v != nil {
+		_u.SetPublicationPlace(*v)
+	}
+	return _u
+}
+
+// ClearPublicationPlace clears the value of the "publication_place" field.
+func (_u *BibRecordUpdateOne) ClearPublicationPlace() *BibRecordUpdateOne {
+	_u.mutation.ClearPublicationPlace()
+	return _u
+}
+
 // SetPageCount sets the "page_count" field.
 func (_u *BibRecordUpdateOne) SetPageCount(v int) *BibRecordUpdateOne {
 	_u.mutation.ResetPageCount()
@@ -1154,6 +1284,26 @@ func (_u *BibRecordUpdateOne) ClearCoverImageURL() *BibRecordUpdateOne {
 	return _u
 }
 
+// SetCoverBackImageURL sets the "cover_back_image_url" field.
+func (_u *BibRecordUpdateOne) SetCoverBackImageURL(v string) *BibRecordUpdateOne {
+	_u.mutation.SetCoverBackImageURL(v)
+	return _u
+}
+
+// SetNillableCoverBackImageURL sets the "cover_back_image_url" field if the given value is not nil.
+func (_u *BibRecordUpdateOne) SetNillableCoverBackImageURL(v *string) *BibRecordUpdateOne {
+	if v != nil {
+		_u.SetCoverBackImageURL(*v)
+	}
+	return _u
+}
+
+// ClearCoverBackImageURL clears the value of the "cover_back_image_url" field.
+func (_u *BibRecordUpdateOne) ClearCoverBackImageURL() *BibRecordUpdateOne {
+	_u.mutation.ClearCoverBackImageURL()
+	return _u
+}
+
 // SetAuthors sets the "authors" field.
 func (_u *BibRecordUpdateOne) SetAuthors(v []string) *BibRecordUpdateOne {
 	_u.mutation.SetAuthors(v)
@@ -1169,6 +1319,42 @@ func (_u *BibRecordUpdateOne) AppendAuthors(v []string) *BibRecordUpdateOne {
 // ClearAuthors clears the value of the "authors" field.
 func (_u *BibRecordUpdateOne) ClearAuthors() *BibRecordUpdateOne {
 	_u.mutation.ClearAuthors()
+	return _u
+}
+
+// SetSubjects sets the "subjects" field.
+func (_u *BibRecordUpdateOne) SetSubjects(v []string) *BibRecordUpdateOne {
+	_u.mutation.SetSubjects(v)
+	return _u
+}
+
+// AppendSubjects appends value to the "subjects" field.
+func (_u *BibRecordUpdateOne) AppendSubjects(v []string) *BibRecordUpdateOne {
+	_u.mutation.AppendSubjects(v)
+	return _u
+}
+
+// ClearSubjects clears the value of the "subjects" field.
+func (_u *BibRecordUpdateOne) ClearSubjects() *BibRecordUpdateOne {
+	_u.mutation.ClearSubjects()
+	return _u
+}
+
+// SetOtherIsbns sets the "other_isbns" field.
+func (_u *BibRecordUpdateOne) SetOtherIsbns(v []string) *BibRecordUpdateOne {
+	_u.mutation.SetOtherIsbns(v)
+	return _u
+}
+
+// AppendOtherIsbns appends value to the "other_isbns" field.
+func (_u *BibRecordUpdateOne) AppendOtherIsbns(v []string) *BibRecordUpdateOne {
+	_u.mutation.AppendOtherIsbns(v)
+	return _u
+}
+
+// ClearOtherIsbns clears the value of the "other_isbns" field.
+func (_u *BibRecordUpdateOne) ClearOtherIsbns() *BibRecordUpdateOne {
+	_u.mutation.ClearOtherIsbns()
 	return _u
 }
 
@@ -1388,6 +1574,12 @@ func (_u *BibRecordUpdateOne) sqlSave(ctx context.Context) (_node *BibRecord, er
 	if _u.mutation.PublicationYearCleared() {
 		_spec.ClearField(bibrecord.FieldPublicationYear, field.TypeInt)
 	}
+	if value, ok := _u.mutation.PublicationPlace(); ok {
+		_spec.SetField(bibrecord.FieldPublicationPlace, field.TypeString, value)
+	}
+	if _u.mutation.PublicationPlaceCleared() {
+		_spec.ClearField(bibrecord.FieldPublicationPlace, field.TypeString)
+	}
 	if value, ok := _u.mutation.PageCount(); ok {
 		_spec.SetField(bibrecord.FieldPageCount, field.TypeInt, value)
 	}
@@ -1439,6 +1631,12 @@ func (_u *BibRecordUpdateOne) sqlSave(ctx context.Context) (_node *BibRecord, er
 	if _u.mutation.CoverImageURLCleared() {
 		_spec.ClearField(bibrecord.FieldCoverImageURL, field.TypeString)
 	}
+	if value, ok := _u.mutation.CoverBackImageURL(); ok {
+		_spec.SetField(bibrecord.FieldCoverBackImageURL, field.TypeString, value)
+	}
+	if _u.mutation.CoverBackImageURLCleared() {
+		_spec.ClearField(bibrecord.FieldCoverBackImageURL, field.TypeString)
+	}
 	if value, ok := _u.mutation.Authors(); ok {
 		_spec.SetField(bibrecord.FieldAuthors, field.TypeJSON, value)
 	}
@@ -1449,6 +1647,28 @@ func (_u *BibRecordUpdateOne) sqlSave(ctx context.Context) (_node *BibRecord, er
 	}
 	if _u.mutation.AuthorsCleared() {
 		_spec.ClearField(bibrecord.FieldAuthors, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.Subjects(); ok {
+		_spec.SetField(bibrecord.FieldSubjects, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedSubjects(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, bibrecord.FieldSubjects, value)
+		})
+	}
+	if _u.mutation.SubjectsCleared() {
+		_spec.ClearField(bibrecord.FieldSubjects, field.TypeJSON)
+	}
+	if value, ok := _u.mutation.OtherIsbns(); ok {
+		_spec.SetField(bibrecord.FieldOtherIsbns, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedOtherIsbns(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, bibrecord.FieldOtherIsbns, value)
+		})
+	}
+	if _u.mutation.OtherIsbnsCleared() {
+		_spec.ClearField(bibrecord.FieldOtherIsbns, field.TypeJSON)
 	}
 	if value, ok := _u.mutation.DublinCore(); ok {
 		_spec.SetField(bibrecord.FieldDublinCore, field.TypeJSON, value)

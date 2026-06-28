@@ -125,6 +125,11 @@ func PublicationYear(v int) predicate.BibRecord {
 	return predicate.BibRecord(sql.FieldEQ(FieldPublicationYear, v))
 }
 
+// PublicationPlace applies equality check predicate on the "publication_place" field. It's identical to PublicationPlaceEQ.
+func PublicationPlace(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldEQ(FieldPublicationPlace, v))
+}
+
 // PageCount applies equality check predicate on the "page_count" field. It's identical to PageCountEQ.
 func PageCount(v int) predicate.BibRecord {
 	return predicate.BibRecord(sql.FieldEQ(FieldPageCount, v))
@@ -158,6 +163,11 @@ func Summary(v string) predicate.BibRecord {
 // CoverImageURL applies equality check predicate on the "cover_image_url" field. It's identical to CoverImageURLEQ.
 func CoverImageURL(v string) predicate.BibRecord {
 	return predicate.BibRecord(sql.FieldEQ(FieldCoverImageURL, v))
+}
+
+// CoverBackImageURL applies equality check predicate on the "cover_back_image_url" field. It's identical to CoverBackImageURLEQ.
+func CoverBackImageURL(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldEQ(FieldCoverBackImageURL, v))
 }
 
 // DefaultLoanPolicyID applies equality check predicate on the "default_loan_policy_id" field. It's identical to DefaultLoanPolicyIDEQ.
@@ -1065,6 +1075,81 @@ func PublicationYearNotNil() predicate.BibRecord {
 	return predicate.BibRecord(sql.FieldNotNull(FieldPublicationYear))
 }
 
+// PublicationPlaceEQ applies the EQ predicate on the "publication_place" field.
+func PublicationPlaceEQ(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldEQ(FieldPublicationPlace, v))
+}
+
+// PublicationPlaceNEQ applies the NEQ predicate on the "publication_place" field.
+func PublicationPlaceNEQ(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldNEQ(FieldPublicationPlace, v))
+}
+
+// PublicationPlaceIn applies the In predicate on the "publication_place" field.
+func PublicationPlaceIn(vs ...string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldIn(FieldPublicationPlace, vs...))
+}
+
+// PublicationPlaceNotIn applies the NotIn predicate on the "publication_place" field.
+func PublicationPlaceNotIn(vs ...string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldNotIn(FieldPublicationPlace, vs...))
+}
+
+// PublicationPlaceGT applies the GT predicate on the "publication_place" field.
+func PublicationPlaceGT(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldGT(FieldPublicationPlace, v))
+}
+
+// PublicationPlaceGTE applies the GTE predicate on the "publication_place" field.
+func PublicationPlaceGTE(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldGTE(FieldPublicationPlace, v))
+}
+
+// PublicationPlaceLT applies the LT predicate on the "publication_place" field.
+func PublicationPlaceLT(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldLT(FieldPublicationPlace, v))
+}
+
+// PublicationPlaceLTE applies the LTE predicate on the "publication_place" field.
+func PublicationPlaceLTE(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldLTE(FieldPublicationPlace, v))
+}
+
+// PublicationPlaceContains applies the Contains predicate on the "publication_place" field.
+func PublicationPlaceContains(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldContains(FieldPublicationPlace, v))
+}
+
+// PublicationPlaceHasPrefix applies the HasPrefix predicate on the "publication_place" field.
+func PublicationPlaceHasPrefix(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldHasPrefix(FieldPublicationPlace, v))
+}
+
+// PublicationPlaceHasSuffix applies the HasSuffix predicate on the "publication_place" field.
+func PublicationPlaceHasSuffix(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldHasSuffix(FieldPublicationPlace, v))
+}
+
+// PublicationPlaceIsNil applies the IsNil predicate on the "publication_place" field.
+func PublicationPlaceIsNil() predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldIsNull(FieldPublicationPlace))
+}
+
+// PublicationPlaceNotNil applies the NotNil predicate on the "publication_place" field.
+func PublicationPlaceNotNil() predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldNotNull(FieldPublicationPlace))
+}
+
+// PublicationPlaceEqualFold applies the EqualFold predicate on the "publication_place" field.
+func PublicationPlaceEqualFold(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldEqualFold(FieldPublicationPlace, v))
+}
+
+// PublicationPlaceContainsFold applies the ContainsFold predicate on the "publication_place" field.
+func PublicationPlaceContainsFold(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldContainsFold(FieldPublicationPlace, v))
+}
+
 // PageCountEQ applies the EQ predicate on the "page_count" field.
 func PageCountEQ(v int) predicate.BibRecord {
 	return predicate.BibRecord(sql.FieldEQ(FieldPageCount, v))
@@ -1530,6 +1615,81 @@ func CoverImageURLContainsFold(v string) predicate.BibRecord {
 	return predicate.BibRecord(sql.FieldContainsFold(FieldCoverImageURL, v))
 }
 
+// CoverBackImageURLEQ applies the EQ predicate on the "cover_back_image_url" field.
+func CoverBackImageURLEQ(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldEQ(FieldCoverBackImageURL, v))
+}
+
+// CoverBackImageURLNEQ applies the NEQ predicate on the "cover_back_image_url" field.
+func CoverBackImageURLNEQ(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldNEQ(FieldCoverBackImageURL, v))
+}
+
+// CoverBackImageURLIn applies the In predicate on the "cover_back_image_url" field.
+func CoverBackImageURLIn(vs ...string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldIn(FieldCoverBackImageURL, vs...))
+}
+
+// CoverBackImageURLNotIn applies the NotIn predicate on the "cover_back_image_url" field.
+func CoverBackImageURLNotIn(vs ...string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldNotIn(FieldCoverBackImageURL, vs...))
+}
+
+// CoverBackImageURLGT applies the GT predicate on the "cover_back_image_url" field.
+func CoverBackImageURLGT(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldGT(FieldCoverBackImageURL, v))
+}
+
+// CoverBackImageURLGTE applies the GTE predicate on the "cover_back_image_url" field.
+func CoverBackImageURLGTE(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldGTE(FieldCoverBackImageURL, v))
+}
+
+// CoverBackImageURLLT applies the LT predicate on the "cover_back_image_url" field.
+func CoverBackImageURLLT(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldLT(FieldCoverBackImageURL, v))
+}
+
+// CoverBackImageURLLTE applies the LTE predicate on the "cover_back_image_url" field.
+func CoverBackImageURLLTE(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldLTE(FieldCoverBackImageURL, v))
+}
+
+// CoverBackImageURLContains applies the Contains predicate on the "cover_back_image_url" field.
+func CoverBackImageURLContains(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldContains(FieldCoverBackImageURL, v))
+}
+
+// CoverBackImageURLHasPrefix applies the HasPrefix predicate on the "cover_back_image_url" field.
+func CoverBackImageURLHasPrefix(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldHasPrefix(FieldCoverBackImageURL, v))
+}
+
+// CoverBackImageURLHasSuffix applies the HasSuffix predicate on the "cover_back_image_url" field.
+func CoverBackImageURLHasSuffix(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldHasSuffix(FieldCoverBackImageURL, v))
+}
+
+// CoverBackImageURLIsNil applies the IsNil predicate on the "cover_back_image_url" field.
+func CoverBackImageURLIsNil() predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldIsNull(FieldCoverBackImageURL))
+}
+
+// CoverBackImageURLNotNil applies the NotNil predicate on the "cover_back_image_url" field.
+func CoverBackImageURLNotNil() predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldNotNull(FieldCoverBackImageURL))
+}
+
+// CoverBackImageURLEqualFold applies the EqualFold predicate on the "cover_back_image_url" field.
+func CoverBackImageURLEqualFold(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldEqualFold(FieldCoverBackImageURL, v))
+}
+
+// CoverBackImageURLContainsFold applies the ContainsFold predicate on the "cover_back_image_url" field.
+func CoverBackImageURLContainsFold(v string) predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldContainsFold(FieldCoverBackImageURL, v))
+}
+
 // AuthorsIsNil applies the IsNil predicate on the "authors" field.
 func AuthorsIsNil() predicate.BibRecord {
 	return predicate.BibRecord(sql.FieldIsNull(FieldAuthors))
@@ -1538,6 +1698,26 @@ func AuthorsIsNil() predicate.BibRecord {
 // AuthorsNotNil applies the NotNil predicate on the "authors" field.
 func AuthorsNotNil() predicate.BibRecord {
 	return predicate.BibRecord(sql.FieldNotNull(FieldAuthors))
+}
+
+// SubjectsIsNil applies the IsNil predicate on the "subjects" field.
+func SubjectsIsNil() predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldIsNull(FieldSubjects))
+}
+
+// SubjectsNotNil applies the NotNil predicate on the "subjects" field.
+func SubjectsNotNil() predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldNotNull(FieldSubjects))
+}
+
+// OtherIsbnsIsNil applies the IsNil predicate on the "other_isbns" field.
+func OtherIsbnsIsNil() predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldIsNull(FieldOtherIsbns))
+}
+
+// OtherIsbnsNotNil applies the NotNil predicate on the "other_isbns" field.
+func OtherIsbnsNotNil() predicate.BibRecord {
+	return predicate.BibRecord(sql.FieldNotNull(FieldOtherIsbns))
 }
 
 // DublinCoreIsNil applies the IsNil predicate on the "dublin_core" field.

@@ -47,6 +47,8 @@ type BibRecord struct {
 	LcCallNumber string `json:"lc_call_number,omitempty"`
 	// PublicationYear holds the value of the "publication_year" field.
 	PublicationYear int `json:"publication_year,omitempty"`
+	// Place of publication, e.g. 'Nairobi, Kenya'
+	PublicationPlace string `json:"publication_place,omitempty"`
 	// PageCount holds the value of the "page_count" field.
 	PageCount int `json:"page_count,omitempty"`
 	// Denormalized for display; publisher_id is the ref
@@ -63,10 +65,16 @@ type BibRecord struct {
 	RecordStatus bibrecord.RecordStatus `json:"record_status,omitempty"`
 	// Summary holds the value of the "summary" field.
 	Summary string `json:"summary,omitempty"`
-	// Relative media path, resolved at read
+	// Front cover — relative media path or URL, resolved at read
 	CoverImageURL string `json:"cover_image_url,omitempty"`
+	// Back cover — relative media path or URL
+	CoverBackImageURL string `json:"cover_back_image_url,omitempty"`
 	// Author display names (ordered)
 	Authors []string `json:"authors,omitempty"`
+	// Subject headings (display, denormalized)
+	Subjects []string `json:"subjects,omitempty"`
+	// Alternative/secondary ISBNs (other editions)
+	OtherIsbns []string `json:"other_isbns,omitempty"`
 	// DublinCore holds the value of the "dublin_core" field.
 	DublinCore map[string]interface{} `json:"dublin_core,omitempty"`
 	// MARC-lite leader/008/tags
@@ -83,11 +91,11 @@ func (*BibRecord) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case bibrecord.FieldPublisherID, bibrecord.FieldPrimarySubjectID, bibrecord.FieldCollectionID, bibrecord.FieldDefaultLoanPolicyID:
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
-		case bibrecord.FieldAuthors, bibrecord.FieldDublinCore, bibrecord.FieldMarc:
+		case bibrecord.FieldAuthors, bibrecord.FieldSubjects, bibrecord.FieldOtherIsbns, bibrecord.FieldDublinCore, bibrecord.FieldMarc:
 			values[i] = new([]byte)
 		case bibrecord.FieldPublicationYear, bibrecord.FieldPageCount:
 			values[i] = new(sql.NullInt64)
-		case bibrecord.FieldTitle, bibrecord.FieldSubtitle, bibrecord.FieldIsbn10, bibrecord.FieldIsbn13, bibrecord.FieldIssn, bibrecord.FieldLccn, bibrecord.FieldEdition, bibrecord.FieldLanguage, bibrecord.FieldDdcClassification, bibrecord.FieldLcCallNumber, bibrecord.FieldPublisherName, bibrecord.FieldFormat, bibrecord.FieldRecordStatus, bibrecord.FieldSummary, bibrecord.FieldCoverImageURL:
+		case bibrecord.FieldTitle, bibrecord.FieldSubtitle, bibrecord.FieldIsbn10, bibrecord.FieldIsbn13, bibrecord.FieldIssn, bibrecord.FieldLccn, bibrecord.FieldEdition, bibrecord.FieldLanguage, bibrecord.FieldDdcClassification, bibrecord.FieldLcCallNumber, bibrecord.FieldPublicationPlace, bibrecord.FieldPublisherName, bibrecord.FieldFormat, bibrecord.FieldRecordStatus, bibrecord.FieldSummary, bibrecord.FieldCoverImageURL, bibrecord.FieldCoverBackImageURL:
 			values[i] = new(sql.NullString)
 		case bibrecord.FieldCreatedAt, bibrecord.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -198,6 +206,12 @@ func (_m *BibRecord) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.PublicationYear = int(value.Int64)
 			}
+		case bibrecord.FieldPublicationPlace:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field publication_place", values[i])
+			} else if value.Valid {
+				_m.PublicationPlace = value.String
+			}
 		case bibrecord.FieldPageCount:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field page_count", values[i])
@@ -255,12 +269,34 @@ func (_m *BibRecord) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.CoverImageURL = value.String
 			}
+		case bibrecord.FieldCoverBackImageURL:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field cover_back_image_url", values[i])
+			} else if value.Valid {
+				_m.CoverBackImageURL = value.String
+			}
 		case bibrecord.FieldAuthors:
 			if value, ok := values[i].(*[]byte); !ok {
 				return fmt.Errorf("unexpected type %T for field authors", values[i])
 			} else if value != nil && len(*value) > 0 {
 				if err := json.Unmarshal(*value, &_m.Authors); err != nil {
 					return fmt.Errorf("unmarshal field authors: %w", err)
+				}
+			}
+		case bibrecord.FieldSubjects:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field subjects", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.Subjects); err != nil {
+					return fmt.Errorf("unmarshal field subjects: %w", err)
+				}
+			}
+		case bibrecord.FieldOtherIsbns:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field other_isbns", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.OtherIsbns); err != nil {
+					return fmt.Errorf("unmarshal field other_isbns: %w", err)
 				}
 			}
 		case bibrecord.FieldDublinCore:
@@ -364,6 +400,9 @@ func (_m *BibRecord) String() string {
 	builder.WriteString("publication_year=")
 	builder.WriteString(fmt.Sprintf("%v", _m.PublicationYear))
 	builder.WriteString(", ")
+	builder.WriteString("publication_place=")
+	builder.WriteString(_m.PublicationPlace)
+	builder.WriteString(", ")
 	builder.WriteString("page_count=")
 	builder.WriteString(fmt.Sprintf("%v", _m.PageCount))
 	builder.WriteString(", ")
@@ -397,8 +436,17 @@ func (_m *BibRecord) String() string {
 	builder.WriteString("cover_image_url=")
 	builder.WriteString(_m.CoverImageURL)
 	builder.WriteString(", ")
+	builder.WriteString("cover_back_image_url=")
+	builder.WriteString(_m.CoverBackImageURL)
+	builder.WriteString(", ")
 	builder.WriteString("authors=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Authors))
+	builder.WriteString(", ")
+	builder.WriteString("subjects=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Subjects))
+	builder.WriteString(", ")
+	builder.WriteString("other_isbns=")
+	builder.WriteString(fmt.Sprintf("%v", _m.OtherIsbns))
 	builder.WriteString(", ")
 	builder.WriteString("dublin_core=")
 	builder.WriteString(fmt.Sprintf("%v", _m.DublinCore))

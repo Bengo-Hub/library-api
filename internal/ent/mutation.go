@@ -1587,6 +1587,7 @@ type BibRecordMutation struct {
 	lc_call_number         *string
 	publication_year       *int
 	addpublication_year    *int
+	publication_place      *string
 	page_count             *int
 	addpage_count          *int
 	publisher_name         *string
@@ -1597,8 +1598,13 @@ type BibRecordMutation struct {
 	record_status          *bibrecord.RecordStatus
 	summary                *string
 	cover_image_url        *string
+	cover_back_image_url   *string
 	authors                *[]string
 	appendauthors          []string
+	subjects               *[]string
+	appendsubjects         []string
+	other_isbns            *[]string
+	appendother_isbns      []string
 	dublin_core            *map[string]interface{}
 	marc                   *map[string]interface{}
 	default_loan_policy_id *uuid.UUID
@@ -2354,6 +2360,55 @@ func (m *BibRecordMutation) ResetPublicationYear() {
 	delete(m.clearedFields, bibrecord.FieldPublicationYear)
 }
 
+// SetPublicationPlace sets the "publication_place" field.
+func (m *BibRecordMutation) SetPublicationPlace(s string) {
+	m.publication_place = &s
+}
+
+// PublicationPlace returns the value of the "publication_place" field in the mutation.
+func (m *BibRecordMutation) PublicationPlace() (r string, exists bool) {
+	v := m.publication_place
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPublicationPlace returns the old "publication_place" field's value of the BibRecord entity.
+// If the BibRecord object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BibRecordMutation) OldPublicationPlace(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPublicationPlace is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPublicationPlace requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPublicationPlace: %w", err)
+	}
+	return oldValue.PublicationPlace, nil
+}
+
+// ClearPublicationPlace clears the value of the "publication_place" field.
+func (m *BibRecordMutation) ClearPublicationPlace() {
+	m.publication_place = nil
+	m.clearedFields[bibrecord.FieldPublicationPlace] = struct{}{}
+}
+
+// PublicationPlaceCleared returns if the "publication_place" field was cleared in this mutation.
+func (m *BibRecordMutation) PublicationPlaceCleared() bool {
+	_, ok := m.clearedFields[bibrecord.FieldPublicationPlace]
+	return ok
+}
+
+// ResetPublicationPlace resets all changes to the "publication_place" field.
+func (m *BibRecordMutation) ResetPublicationPlace() {
+	m.publication_place = nil
+	delete(m.clearedFields, bibrecord.FieldPublicationPlace)
+}
+
 // SetPageCount sets the "page_count" field.
 func (m *BibRecordMutation) SetPageCount(i int) {
 	m.page_count = &i
@@ -2790,6 +2845,55 @@ func (m *BibRecordMutation) ResetCoverImageURL() {
 	delete(m.clearedFields, bibrecord.FieldCoverImageURL)
 }
 
+// SetCoverBackImageURL sets the "cover_back_image_url" field.
+func (m *BibRecordMutation) SetCoverBackImageURL(s string) {
+	m.cover_back_image_url = &s
+}
+
+// CoverBackImageURL returns the value of the "cover_back_image_url" field in the mutation.
+func (m *BibRecordMutation) CoverBackImageURL() (r string, exists bool) {
+	v := m.cover_back_image_url
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCoverBackImageURL returns the old "cover_back_image_url" field's value of the BibRecord entity.
+// If the BibRecord object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BibRecordMutation) OldCoverBackImageURL(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCoverBackImageURL is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCoverBackImageURL requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCoverBackImageURL: %w", err)
+	}
+	return oldValue.CoverBackImageURL, nil
+}
+
+// ClearCoverBackImageURL clears the value of the "cover_back_image_url" field.
+func (m *BibRecordMutation) ClearCoverBackImageURL() {
+	m.cover_back_image_url = nil
+	m.clearedFields[bibrecord.FieldCoverBackImageURL] = struct{}{}
+}
+
+// CoverBackImageURLCleared returns if the "cover_back_image_url" field was cleared in this mutation.
+func (m *BibRecordMutation) CoverBackImageURLCleared() bool {
+	_, ok := m.clearedFields[bibrecord.FieldCoverBackImageURL]
+	return ok
+}
+
+// ResetCoverBackImageURL resets all changes to the "cover_back_image_url" field.
+func (m *BibRecordMutation) ResetCoverBackImageURL() {
+	m.cover_back_image_url = nil
+	delete(m.clearedFields, bibrecord.FieldCoverBackImageURL)
+}
+
 // SetAuthors sets the "authors" field.
 func (m *BibRecordMutation) SetAuthors(s []string) {
 	m.authors = &s
@@ -2853,6 +2957,136 @@ func (m *BibRecordMutation) ResetAuthors() {
 	m.authors = nil
 	m.appendauthors = nil
 	delete(m.clearedFields, bibrecord.FieldAuthors)
+}
+
+// SetSubjects sets the "subjects" field.
+func (m *BibRecordMutation) SetSubjects(s []string) {
+	m.subjects = &s
+	m.appendsubjects = nil
+}
+
+// Subjects returns the value of the "subjects" field in the mutation.
+func (m *BibRecordMutation) Subjects() (r []string, exists bool) {
+	v := m.subjects
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubjects returns the old "subjects" field's value of the BibRecord entity.
+// If the BibRecord object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BibRecordMutation) OldSubjects(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubjects is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubjects requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubjects: %w", err)
+	}
+	return oldValue.Subjects, nil
+}
+
+// AppendSubjects adds s to the "subjects" field.
+func (m *BibRecordMutation) AppendSubjects(s []string) {
+	m.appendsubjects = append(m.appendsubjects, s...)
+}
+
+// AppendedSubjects returns the list of values that were appended to the "subjects" field in this mutation.
+func (m *BibRecordMutation) AppendedSubjects() ([]string, bool) {
+	if len(m.appendsubjects) == 0 {
+		return nil, false
+	}
+	return m.appendsubjects, true
+}
+
+// ClearSubjects clears the value of the "subjects" field.
+func (m *BibRecordMutation) ClearSubjects() {
+	m.subjects = nil
+	m.appendsubjects = nil
+	m.clearedFields[bibrecord.FieldSubjects] = struct{}{}
+}
+
+// SubjectsCleared returns if the "subjects" field was cleared in this mutation.
+func (m *BibRecordMutation) SubjectsCleared() bool {
+	_, ok := m.clearedFields[bibrecord.FieldSubjects]
+	return ok
+}
+
+// ResetSubjects resets all changes to the "subjects" field.
+func (m *BibRecordMutation) ResetSubjects() {
+	m.subjects = nil
+	m.appendsubjects = nil
+	delete(m.clearedFields, bibrecord.FieldSubjects)
+}
+
+// SetOtherIsbns sets the "other_isbns" field.
+func (m *BibRecordMutation) SetOtherIsbns(s []string) {
+	m.other_isbns = &s
+	m.appendother_isbns = nil
+}
+
+// OtherIsbns returns the value of the "other_isbns" field in the mutation.
+func (m *BibRecordMutation) OtherIsbns() (r []string, exists bool) {
+	v := m.other_isbns
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldOtherIsbns returns the old "other_isbns" field's value of the BibRecord entity.
+// If the BibRecord object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BibRecordMutation) OldOtherIsbns(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldOtherIsbns is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldOtherIsbns requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldOtherIsbns: %w", err)
+	}
+	return oldValue.OtherIsbns, nil
+}
+
+// AppendOtherIsbns adds s to the "other_isbns" field.
+func (m *BibRecordMutation) AppendOtherIsbns(s []string) {
+	m.appendother_isbns = append(m.appendother_isbns, s...)
+}
+
+// AppendedOtherIsbns returns the list of values that were appended to the "other_isbns" field in this mutation.
+func (m *BibRecordMutation) AppendedOtherIsbns() ([]string, bool) {
+	if len(m.appendother_isbns) == 0 {
+		return nil, false
+	}
+	return m.appendother_isbns, true
+}
+
+// ClearOtherIsbns clears the value of the "other_isbns" field.
+func (m *BibRecordMutation) ClearOtherIsbns() {
+	m.other_isbns = nil
+	m.appendother_isbns = nil
+	m.clearedFields[bibrecord.FieldOtherIsbns] = struct{}{}
+}
+
+// OtherIsbnsCleared returns if the "other_isbns" field was cleared in this mutation.
+func (m *BibRecordMutation) OtherIsbnsCleared() bool {
+	_, ok := m.clearedFields[bibrecord.FieldOtherIsbns]
+	return ok
+}
+
+// ResetOtherIsbns resets all changes to the "other_isbns" field.
+func (m *BibRecordMutation) ResetOtherIsbns() {
+	m.other_isbns = nil
+	m.appendother_isbns = nil
+	delete(m.clearedFields, bibrecord.FieldOtherIsbns)
 }
 
 // SetDublinCore sets the "dublin_core" field.
@@ -3036,7 +3270,7 @@ func (m *BibRecordMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BibRecordMutation) Fields() []string {
-	fields := make([]string, 0, 27)
+	fields := make([]string, 0, 31)
 	if m.created_at != nil {
 		fields = append(fields, bibrecord.FieldCreatedAt)
 	}
@@ -3079,6 +3313,9 @@ func (m *BibRecordMutation) Fields() []string {
 	if m.publication_year != nil {
 		fields = append(fields, bibrecord.FieldPublicationYear)
 	}
+	if m.publication_place != nil {
+		fields = append(fields, bibrecord.FieldPublicationPlace)
+	}
 	if m.page_count != nil {
 		fields = append(fields, bibrecord.FieldPageCount)
 	}
@@ -3106,8 +3343,17 @@ func (m *BibRecordMutation) Fields() []string {
 	if m.cover_image_url != nil {
 		fields = append(fields, bibrecord.FieldCoverImageURL)
 	}
+	if m.cover_back_image_url != nil {
+		fields = append(fields, bibrecord.FieldCoverBackImageURL)
+	}
 	if m.authors != nil {
 		fields = append(fields, bibrecord.FieldAuthors)
+	}
+	if m.subjects != nil {
+		fields = append(fields, bibrecord.FieldSubjects)
+	}
+	if m.other_isbns != nil {
+		fields = append(fields, bibrecord.FieldOtherIsbns)
 	}
 	if m.dublin_core != nil {
 		fields = append(fields, bibrecord.FieldDublinCore)
@@ -3154,6 +3400,8 @@ func (m *BibRecordMutation) Field(name string) (ent.Value, bool) {
 		return m.LcCallNumber()
 	case bibrecord.FieldPublicationYear:
 		return m.PublicationYear()
+	case bibrecord.FieldPublicationPlace:
+		return m.PublicationPlace()
 	case bibrecord.FieldPageCount:
 		return m.PageCount()
 	case bibrecord.FieldPublisherName:
@@ -3172,8 +3420,14 @@ func (m *BibRecordMutation) Field(name string) (ent.Value, bool) {
 		return m.Summary()
 	case bibrecord.FieldCoverImageURL:
 		return m.CoverImageURL()
+	case bibrecord.FieldCoverBackImageURL:
+		return m.CoverBackImageURL()
 	case bibrecord.FieldAuthors:
 		return m.Authors()
+	case bibrecord.FieldSubjects:
+		return m.Subjects()
+	case bibrecord.FieldOtherIsbns:
+		return m.OtherIsbns()
 	case bibrecord.FieldDublinCore:
 		return m.DublinCore()
 	case bibrecord.FieldMarc:
@@ -3217,6 +3471,8 @@ func (m *BibRecordMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldLcCallNumber(ctx)
 	case bibrecord.FieldPublicationYear:
 		return m.OldPublicationYear(ctx)
+	case bibrecord.FieldPublicationPlace:
+		return m.OldPublicationPlace(ctx)
 	case bibrecord.FieldPageCount:
 		return m.OldPageCount(ctx)
 	case bibrecord.FieldPublisherName:
@@ -3235,8 +3491,14 @@ func (m *BibRecordMutation) OldField(ctx context.Context, name string) (ent.Valu
 		return m.OldSummary(ctx)
 	case bibrecord.FieldCoverImageURL:
 		return m.OldCoverImageURL(ctx)
+	case bibrecord.FieldCoverBackImageURL:
+		return m.OldCoverBackImageURL(ctx)
 	case bibrecord.FieldAuthors:
 		return m.OldAuthors(ctx)
+	case bibrecord.FieldSubjects:
+		return m.OldSubjects(ctx)
+	case bibrecord.FieldOtherIsbns:
+		return m.OldOtherIsbns(ctx)
 	case bibrecord.FieldDublinCore:
 		return m.OldDublinCore(ctx)
 	case bibrecord.FieldMarc:
@@ -3350,6 +3612,13 @@ func (m *BibRecordMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetPublicationYear(v)
 		return nil
+	case bibrecord.FieldPublicationPlace:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPublicationPlace(v)
+		return nil
 	case bibrecord.FieldPageCount:
 		v, ok := value.(int)
 		if !ok {
@@ -3413,12 +3682,33 @@ func (m *BibRecordMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCoverImageURL(v)
 		return nil
+	case bibrecord.FieldCoverBackImageURL:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCoverBackImageURL(v)
+		return nil
 	case bibrecord.FieldAuthors:
 		v, ok := value.([]string)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetAuthors(v)
+		return nil
+	case bibrecord.FieldSubjects:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubjects(v)
+		return nil
+	case bibrecord.FieldOtherIsbns:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetOtherIsbns(v)
 		return nil
 	case bibrecord.FieldDublinCore:
 		v, ok := value.(map[string]interface{})
@@ -3525,6 +3815,9 @@ func (m *BibRecordMutation) ClearedFields() []string {
 	if m.FieldCleared(bibrecord.FieldPublicationYear) {
 		fields = append(fields, bibrecord.FieldPublicationYear)
 	}
+	if m.FieldCleared(bibrecord.FieldPublicationPlace) {
+		fields = append(fields, bibrecord.FieldPublicationPlace)
+	}
 	if m.FieldCleared(bibrecord.FieldPageCount) {
 		fields = append(fields, bibrecord.FieldPageCount)
 	}
@@ -3546,8 +3839,17 @@ func (m *BibRecordMutation) ClearedFields() []string {
 	if m.FieldCleared(bibrecord.FieldCoverImageURL) {
 		fields = append(fields, bibrecord.FieldCoverImageURL)
 	}
+	if m.FieldCleared(bibrecord.FieldCoverBackImageURL) {
+		fields = append(fields, bibrecord.FieldCoverBackImageURL)
+	}
 	if m.FieldCleared(bibrecord.FieldAuthors) {
 		fields = append(fields, bibrecord.FieldAuthors)
+	}
+	if m.FieldCleared(bibrecord.FieldSubjects) {
+		fields = append(fields, bibrecord.FieldSubjects)
+	}
+	if m.FieldCleared(bibrecord.FieldOtherIsbns) {
+		fields = append(fields, bibrecord.FieldOtherIsbns)
 	}
 	if m.FieldCleared(bibrecord.FieldDublinCore) {
 		fields = append(fields, bibrecord.FieldDublinCore)
@@ -3599,6 +3901,9 @@ func (m *BibRecordMutation) ClearField(name string) error {
 	case bibrecord.FieldPublicationYear:
 		m.ClearPublicationYear()
 		return nil
+	case bibrecord.FieldPublicationPlace:
+		m.ClearPublicationPlace()
+		return nil
 	case bibrecord.FieldPageCount:
 		m.ClearPageCount()
 		return nil
@@ -3620,8 +3925,17 @@ func (m *BibRecordMutation) ClearField(name string) error {
 	case bibrecord.FieldCoverImageURL:
 		m.ClearCoverImageURL()
 		return nil
+	case bibrecord.FieldCoverBackImageURL:
+		m.ClearCoverBackImageURL()
+		return nil
 	case bibrecord.FieldAuthors:
 		m.ClearAuthors()
+		return nil
+	case bibrecord.FieldSubjects:
+		m.ClearSubjects()
+		return nil
+	case bibrecord.FieldOtherIsbns:
+		m.ClearOtherIsbns()
 		return nil
 	case bibrecord.FieldDublinCore:
 		m.ClearDublinCore()
@@ -3682,6 +3996,9 @@ func (m *BibRecordMutation) ResetField(name string) error {
 	case bibrecord.FieldPublicationYear:
 		m.ResetPublicationYear()
 		return nil
+	case bibrecord.FieldPublicationPlace:
+		m.ResetPublicationPlace()
+		return nil
 	case bibrecord.FieldPageCount:
 		m.ResetPageCount()
 		return nil
@@ -3709,8 +4026,17 @@ func (m *BibRecordMutation) ResetField(name string) error {
 	case bibrecord.FieldCoverImageURL:
 		m.ResetCoverImageURL()
 		return nil
+	case bibrecord.FieldCoverBackImageURL:
+		m.ResetCoverBackImageURL()
+		return nil
 	case bibrecord.FieldAuthors:
 		m.ResetAuthors()
+		return nil
+	case bibrecord.FieldSubjects:
+		m.ResetSubjects()
+		return nil
+	case bibrecord.FieldOtherIsbns:
+		m.ResetOtherIsbns()
 		return nil
 	case bibrecord.FieldDublinCore:
 		m.ResetDublinCore()

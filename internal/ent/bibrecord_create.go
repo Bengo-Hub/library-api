@@ -204,6 +204,20 @@ func (_c *BibRecordCreate) SetNillablePublicationYear(v *int) *BibRecordCreate {
 	return _c
 }
 
+// SetPublicationPlace sets the "publication_place" field.
+func (_c *BibRecordCreate) SetPublicationPlace(v string) *BibRecordCreate {
+	_c.mutation.SetPublicationPlace(v)
+	return _c
+}
+
+// SetNillablePublicationPlace sets the "publication_place" field if the given value is not nil.
+func (_c *BibRecordCreate) SetNillablePublicationPlace(v *string) *BibRecordCreate {
+	if v != nil {
+		_c.SetPublicationPlace(*v)
+	}
+	return _c
+}
+
 // SetPageCount sets the "page_count" field.
 func (_c *BibRecordCreate) SetPageCount(v int) *BibRecordCreate {
 	_c.mutation.SetPageCount(v)
@@ -330,9 +344,35 @@ func (_c *BibRecordCreate) SetNillableCoverImageURL(v *string) *BibRecordCreate 
 	return _c
 }
 
+// SetCoverBackImageURL sets the "cover_back_image_url" field.
+func (_c *BibRecordCreate) SetCoverBackImageURL(v string) *BibRecordCreate {
+	_c.mutation.SetCoverBackImageURL(v)
+	return _c
+}
+
+// SetNillableCoverBackImageURL sets the "cover_back_image_url" field if the given value is not nil.
+func (_c *BibRecordCreate) SetNillableCoverBackImageURL(v *string) *BibRecordCreate {
+	if v != nil {
+		_c.SetCoverBackImageURL(*v)
+	}
+	return _c
+}
+
 // SetAuthors sets the "authors" field.
 func (_c *BibRecordCreate) SetAuthors(v []string) *BibRecordCreate {
 	_c.mutation.SetAuthors(v)
+	return _c
+}
+
+// SetSubjects sets the "subjects" field.
+func (_c *BibRecordCreate) SetSubjects(v []string) *BibRecordCreate {
+	_c.mutation.SetSubjects(v)
+	return _c
+}
+
+// SetOtherIsbns sets the "other_isbns" field.
+func (_c *BibRecordCreate) SetOtherIsbns(v []string) *BibRecordCreate {
+	_c.mutation.SetOtherIsbns(v)
 	return _c
 }
 
@@ -567,6 +607,10 @@ func (_c *BibRecordCreate) createSpec() (*BibRecord, *sqlgraph.CreateSpec) {
 		_spec.SetField(bibrecord.FieldPublicationYear, field.TypeInt, value)
 		_node.PublicationYear = value
 	}
+	if value, ok := _c.mutation.PublicationPlace(); ok {
+		_spec.SetField(bibrecord.FieldPublicationPlace, field.TypeString, value)
+		_node.PublicationPlace = value
+	}
 	if value, ok := _c.mutation.PageCount(); ok {
 		_spec.SetField(bibrecord.FieldPageCount, field.TypeInt, value)
 		_node.PageCount = value
@@ -603,9 +647,21 @@ func (_c *BibRecordCreate) createSpec() (*BibRecord, *sqlgraph.CreateSpec) {
 		_spec.SetField(bibrecord.FieldCoverImageURL, field.TypeString, value)
 		_node.CoverImageURL = value
 	}
+	if value, ok := _c.mutation.CoverBackImageURL(); ok {
+		_spec.SetField(bibrecord.FieldCoverBackImageURL, field.TypeString, value)
+		_node.CoverBackImageURL = value
+	}
 	if value, ok := _c.mutation.Authors(); ok {
 		_spec.SetField(bibrecord.FieldAuthors, field.TypeJSON, value)
 		_node.Authors = value
+	}
+	if value, ok := _c.mutation.Subjects(); ok {
+		_spec.SetField(bibrecord.FieldSubjects, field.TypeJSON, value)
+		_node.Subjects = value
+	}
+	if value, ok := _c.mutation.OtherIsbns(); ok {
+		_spec.SetField(bibrecord.FieldOtherIsbns, field.TypeJSON, value)
+		_node.OtherIsbns = value
 	}
 	if value, ok := _c.mutation.DublinCore(); ok {
 		_spec.SetField(bibrecord.FieldDublinCore, field.TypeJSON, value)
@@ -887,6 +943,24 @@ func (u *BibRecordUpsert) ClearPublicationYear() *BibRecordUpsert {
 	return u
 }
 
+// SetPublicationPlace sets the "publication_place" field.
+func (u *BibRecordUpsert) SetPublicationPlace(v string) *BibRecordUpsert {
+	u.Set(bibrecord.FieldPublicationPlace, v)
+	return u
+}
+
+// UpdatePublicationPlace sets the "publication_place" field to the value that was provided on create.
+func (u *BibRecordUpsert) UpdatePublicationPlace() *BibRecordUpsert {
+	u.SetExcluded(bibrecord.FieldPublicationPlace)
+	return u
+}
+
+// ClearPublicationPlace clears the value of the "publication_place" field.
+func (u *BibRecordUpsert) ClearPublicationPlace() *BibRecordUpsert {
+	u.SetNull(bibrecord.FieldPublicationPlace)
+	return u
+}
+
 // SetPageCount sets the "page_count" field.
 func (u *BibRecordUpsert) SetPageCount(v int) *BibRecordUpsert {
 	u.Set(bibrecord.FieldPageCount, v)
@@ -1043,6 +1117,24 @@ func (u *BibRecordUpsert) ClearCoverImageURL() *BibRecordUpsert {
 	return u
 }
 
+// SetCoverBackImageURL sets the "cover_back_image_url" field.
+func (u *BibRecordUpsert) SetCoverBackImageURL(v string) *BibRecordUpsert {
+	u.Set(bibrecord.FieldCoverBackImageURL, v)
+	return u
+}
+
+// UpdateCoverBackImageURL sets the "cover_back_image_url" field to the value that was provided on create.
+func (u *BibRecordUpsert) UpdateCoverBackImageURL() *BibRecordUpsert {
+	u.SetExcluded(bibrecord.FieldCoverBackImageURL)
+	return u
+}
+
+// ClearCoverBackImageURL clears the value of the "cover_back_image_url" field.
+func (u *BibRecordUpsert) ClearCoverBackImageURL() *BibRecordUpsert {
+	u.SetNull(bibrecord.FieldCoverBackImageURL)
+	return u
+}
+
 // SetAuthors sets the "authors" field.
 func (u *BibRecordUpsert) SetAuthors(v []string) *BibRecordUpsert {
 	u.Set(bibrecord.FieldAuthors, v)
@@ -1058,6 +1150,42 @@ func (u *BibRecordUpsert) UpdateAuthors() *BibRecordUpsert {
 // ClearAuthors clears the value of the "authors" field.
 func (u *BibRecordUpsert) ClearAuthors() *BibRecordUpsert {
 	u.SetNull(bibrecord.FieldAuthors)
+	return u
+}
+
+// SetSubjects sets the "subjects" field.
+func (u *BibRecordUpsert) SetSubjects(v []string) *BibRecordUpsert {
+	u.Set(bibrecord.FieldSubjects, v)
+	return u
+}
+
+// UpdateSubjects sets the "subjects" field to the value that was provided on create.
+func (u *BibRecordUpsert) UpdateSubjects() *BibRecordUpsert {
+	u.SetExcluded(bibrecord.FieldSubjects)
+	return u
+}
+
+// ClearSubjects clears the value of the "subjects" field.
+func (u *BibRecordUpsert) ClearSubjects() *BibRecordUpsert {
+	u.SetNull(bibrecord.FieldSubjects)
+	return u
+}
+
+// SetOtherIsbns sets the "other_isbns" field.
+func (u *BibRecordUpsert) SetOtherIsbns(v []string) *BibRecordUpsert {
+	u.Set(bibrecord.FieldOtherIsbns, v)
+	return u
+}
+
+// UpdateOtherIsbns sets the "other_isbns" field to the value that was provided on create.
+func (u *BibRecordUpsert) UpdateOtherIsbns() *BibRecordUpsert {
+	u.SetExcluded(bibrecord.FieldOtherIsbns)
+	return u
+}
+
+// ClearOtherIsbns clears the value of the "other_isbns" field.
+func (u *BibRecordUpsert) ClearOtherIsbns() *BibRecordUpsert {
+	u.SetNull(bibrecord.FieldOtherIsbns)
 	return u
 }
 
@@ -1418,6 +1546,27 @@ func (u *BibRecordUpsertOne) ClearPublicationYear() *BibRecordUpsertOne {
 	})
 }
 
+// SetPublicationPlace sets the "publication_place" field.
+func (u *BibRecordUpsertOne) SetPublicationPlace(v string) *BibRecordUpsertOne {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.SetPublicationPlace(v)
+	})
+}
+
+// UpdatePublicationPlace sets the "publication_place" field to the value that was provided on create.
+func (u *BibRecordUpsertOne) UpdatePublicationPlace() *BibRecordUpsertOne {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.UpdatePublicationPlace()
+	})
+}
+
+// ClearPublicationPlace clears the value of the "publication_place" field.
+func (u *BibRecordUpsertOne) ClearPublicationPlace() *BibRecordUpsertOne {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.ClearPublicationPlace()
+	})
+}
+
 // SetPageCount sets the "page_count" field.
 func (u *BibRecordUpsertOne) SetPageCount(v int) *BibRecordUpsertOne {
 	return u.Update(func(s *BibRecordUpsert) {
@@ -1600,6 +1749,27 @@ func (u *BibRecordUpsertOne) ClearCoverImageURL() *BibRecordUpsertOne {
 	})
 }
 
+// SetCoverBackImageURL sets the "cover_back_image_url" field.
+func (u *BibRecordUpsertOne) SetCoverBackImageURL(v string) *BibRecordUpsertOne {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.SetCoverBackImageURL(v)
+	})
+}
+
+// UpdateCoverBackImageURL sets the "cover_back_image_url" field to the value that was provided on create.
+func (u *BibRecordUpsertOne) UpdateCoverBackImageURL() *BibRecordUpsertOne {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.UpdateCoverBackImageURL()
+	})
+}
+
+// ClearCoverBackImageURL clears the value of the "cover_back_image_url" field.
+func (u *BibRecordUpsertOne) ClearCoverBackImageURL() *BibRecordUpsertOne {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.ClearCoverBackImageURL()
+	})
+}
+
 // SetAuthors sets the "authors" field.
 func (u *BibRecordUpsertOne) SetAuthors(v []string) *BibRecordUpsertOne {
 	return u.Update(func(s *BibRecordUpsert) {
@@ -1618,6 +1788,48 @@ func (u *BibRecordUpsertOne) UpdateAuthors() *BibRecordUpsertOne {
 func (u *BibRecordUpsertOne) ClearAuthors() *BibRecordUpsertOne {
 	return u.Update(func(s *BibRecordUpsert) {
 		s.ClearAuthors()
+	})
+}
+
+// SetSubjects sets the "subjects" field.
+func (u *BibRecordUpsertOne) SetSubjects(v []string) *BibRecordUpsertOne {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.SetSubjects(v)
+	})
+}
+
+// UpdateSubjects sets the "subjects" field to the value that was provided on create.
+func (u *BibRecordUpsertOne) UpdateSubjects() *BibRecordUpsertOne {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.UpdateSubjects()
+	})
+}
+
+// ClearSubjects clears the value of the "subjects" field.
+func (u *BibRecordUpsertOne) ClearSubjects() *BibRecordUpsertOne {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.ClearSubjects()
+	})
+}
+
+// SetOtherIsbns sets the "other_isbns" field.
+func (u *BibRecordUpsertOne) SetOtherIsbns(v []string) *BibRecordUpsertOne {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.SetOtherIsbns(v)
+	})
+}
+
+// UpdateOtherIsbns sets the "other_isbns" field to the value that was provided on create.
+func (u *BibRecordUpsertOne) UpdateOtherIsbns() *BibRecordUpsertOne {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.UpdateOtherIsbns()
+	})
+}
+
+// ClearOtherIsbns clears the value of the "other_isbns" field.
+func (u *BibRecordUpsertOne) ClearOtherIsbns() *BibRecordUpsertOne {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.ClearOtherIsbns()
 	})
 }
 
@@ -2154,6 +2366,27 @@ func (u *BibRecordUpsertBulk) ClearPublicationYear() *BibRecordUpsertBulk {
 	})
 }
 
+// SetPublicationPlace sets the "publication_place" field.
+func (u *BibRecordUpsertBulk) SetPublicationPlace(v string) *BibRecordUpsertBulk {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.SetPublicationPlace(v)
+	})
+}
+
+// UpdatePublicationPlace sets the "publication_place" field to the value that was provided on create.
+func (u *BibRecordUpsertBulk) UpdatePublicationPlace() *BibRecordUpsertBulk {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.UpdatePublicationPlace()
+	})
+}
+
+// ClearPublicationPlace clears the value of the "publication_place" field.
+func (u *BibRecordUpsertBulk) ClearPublicationPlace() *BibRecordUpsertBulk {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.ClearPublicationPlace()
+	})
+}
+
 // SetPageCount sets the "page_count" field.
 func (u *BibRecordUpsertBulk) SetPageCount(v int) *BibRecordUpsertBulk {
 	return u.Update(func(s *BibRecordUpsert) {
@@ -2336,6 +2569,27 @@ func (u *BibRecordUpsertBulk) ClearCoverImageURL() *BibRecordUpsertBulk {
 	})
 }
 
+// SetCoverBackImageURL sets the "cover_back_image_url" field.
+func (u *BibRecordUpsertBulk) SetCoverBackImageURL(v string) *BibRecordUpsertBulk {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.SetCoverBackImageURL(v)
+	})
+}
+
+// UpdateCoverBackImageURL sets the "cover_back_image_url" field to the value that was provided on create.
+func (u *BibRecordUpsertBulk) UpdateCoverBackImageURL() *BibRecordUpsertBulk {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.UpdateCoverBackImageURL()
+	})
+}
+
+// ClearCoverBackImageURL clears the value of the "cover_back_image_url" field.
+func (u *BibRecordUpsertBulk) ClearCoverBackImageURL() *BibRecordUpsertBulk {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.ClearCoverBackImageURL()
+	})
+}
+
 // SetAuthors sets the "authors" field.
 func (u *BibRecordUpsertBulk) SetAuthors(v []string) *BibRecordUpsertBulk {
 	return u.Update(func(s *BibRecordUpsert) {
@@ -2354,6 +2608,48 @@ func (u *BibRecordUpsertBulk) UpdateAuthors() *BibRecordUpsertBulk {
 func (u *BibRecordUpsertBulk) ClearAuthors() *BibRecordUpsertBulk {
 	return u.Update(func(s *BibRecordUpsert) {
 		s.ClearAuthors()
+	})
+}
+
+// SetSubjects sets the "subjects" field.
+func (u *BibRecordUpsertBulk) SetSubjects(v []string) *BibRecordUpsertBulk {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.SetSubjects(v)
+	})
+}
+
+// UpdateSubjects sets the "subjects" field to the value that was provided on create.
+func (u *BibRecordUpsertBulk) UpdateSubjects() *BibRecordUpsertBulk {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.UpdateSubjects()
+	})
+}
+
+// ClearSubjects clears the value of the "subjects" field.
+func (u *BibRecordUpsertBulk) ClearSubjects() *BibRecordUpsertBulk {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.ClearSubjects()
+	})
+}
+
+// SetOtherIsbns sets the "other_isbns" field.
+func (u *BibRecordUpsertBulk) SetOtherIsbns(v []string) *BibRecordUpsertBulk {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.SetOtherIsbns(v)
+	})
+}
+
+// UpdateOtherIsbns sets the "other_isbns" field to the value that was provided on create.
+func (u *BibRecordUpsertBulk) UpdateOtherIsbns() *BibRecordUpsertBulk {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.UpdateOtherIsbns()
+	})
+}
+
+// ClearOtherIsbns clears the value of the "other_isbns" field.
+func (u *BibRecordUpsertBulk) ClearOtherIsbns() *BibRecordUpsertBulk {
+	return u.Update(func(s *BibRecordUpsert) {
+		s.ClearOtherIsbns()
 	})
 }
 

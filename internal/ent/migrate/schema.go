@@ -89,6 +89,7 @@ var (
 		{Name: "ddc_classification", Type: field.TypeString, Nullable: true},
 		{Name: "lc_call_number", Type: field.TypeString, Nullable: true},
 		{Name: "publication_year", Type: field.TypeInt, Nullable: true},
+		{Name: "publication_place", Type: field.TypeString, Nullable: true},
 		{Name: "page_count", Type: field.TypeInt, Nullable: true},
 		{Name: "publisher_name", Type: field.TypeString, Nullable: true},
 		{Name: "publisher_id", Type: field.TypeUUID, Nullable: true},
@@ -98,7 +99,10 @@ var (
 		{Name: "record_status", Type: field.TypeEnum, Enums: []string{"DRAFT", "ACTIVE", "ARCHIVED", "WITHDRAWN"}, Default: "ACTIVE"},
 		{Name: "summary", Type: field.TypeString, Nullable: true, Size: 2147483647},
 		{Name: "cover_image_url", Type: field.TypeString, Nullable: true},
+		{Name: "cover_back_image_url", Type: field.TypeString, Nullable: true},
 		{Name: "authors", Type: field.TypeJSON, Nullable: true},
+		{Name: "subjects", Type: field.TypeJSON, Nullable: true},
+		{Name: "other_isbns", Type: field.TypeJSON, Nullable: true},
 		{Name: "dublin_core", Type: field.TypeJSON, Nullable: true},
 		{Name: "marc", Type: field.TypeJSON, Nullable: true},
 		{Name: "default_loan_policy_id", Type: field.TypeUUID, Nullable: true},
@@ -127,7 +131,7 @@ var (
 			{
 				Name:    "bibrecord_tenant_id_format",
 				Unique:  false,
-				Columns: []*schema.Column{BibRecordsColumns[3], BibRecordsColumns[20]},
+				Columns: []*schema.Column{BibRecordsColumns[3], BibRecordsColumns[21]},
 			},
 			{
 				Name:    "bibrecord_tenant_id_title",

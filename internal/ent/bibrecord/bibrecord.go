@@ -43,6 +43,8 @@ const (
 	FieldLcCallNumber = "lc_call_number"
 	// FieldPublicationYear holds the string denoting the publication_year field in the database.
 	FieldPublicationYear = "publication_year"
+	// FieldPublicationPlace holds the string denoting the publication_place field in the database.
+	FieldPublicationPlace = "publication_place"
 	// FieldPageCount holds the string denoting the page_count field in the database.
 	FieldPageCount = "page_count"
 	// FieldPublisherName holds the string denoting the publisher_name field in the database.
@@ -61,8 +63,14 @@ const (
 	FieldSummary = "summary"
 	// FieldCoverImageURL holds the string denoting the cover_image_url field in the database.
 	FieldCoverImageURL = "cover_image_url"
+	// FieldCoverBackImageURL holds the string denoting the cover_back_image_url field in the database.
+	FieldCoverBackImageURL = "cover_back_image_url"
 	// FieldAuthors holds the string denoting the authors field in the database.
 	FieldAuthors = "authors"
+	// FieldSubjects holds the string denoting the subjects field in the database.
+	FieldSubjects = "subjects"
+	// FieldOtherIsbns holds the string denoting the other_isbns field in the database.
+	FieldOtherIsbns = "other_isbns"
 	// FieldDublinCore holds the string denoting the dublin_core field in the database.
 	FieldDublinCore = "dublin_core"
 	// FieldMarc holds the string denoting the marc field in the database.
@@ -90,6 +98,7 @@ var Columns = []string{
 	FieldDdcClassification,
 	FieldLcCallNumber,
 	FieldPublicationYear,
+	FieldPublicationPlace,
 	FieldPageCount,
 	FieldPublisherName,
 	FieldPublisherID,
@@ -99,7 +108,10 @@ var Columns = []string{
 	FieldRecordStatus,
 	FieldSummary,
 	FieldCoverImageURL,
+	FieldCoverBackImageURL,
 	FieldAuthors,
+	FieldSubjects,
+	FieldOtherIsbns,
 	FieldDublinCore,
 	FieldMarc,
 	FieldDefaultLoanPolicyID,
@@ -264,6 +276,11 @@ func ByPublicationYear(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPublicationYear, opts...).ToFunc()
 }
 
+// ByPublicationPlace orders the results by the publication_place field.
+func ByPublicationPlace(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPublicationPlace, opts...).ToFunc()
+}
+
 // ByPageCount orders the results by the page_count field.
 func ByPageCount(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPageCount, opts...).ToFunc()
@@ -307,6 +324,11 @@ func BySummary(opts ...sql.OrderTermOption) OrderOption {
 // ByCoverImageURL orders the results by the cover_image_url field.
 func ByCoverImageURL(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCoverImageURL, opts...).ToFunc()
+}
+
+// ByCoverBackImageURL orders the results by the cover_back_image_url field.
+func ByCoverBackImageURL(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCoverBackImageURL, opts...).ToFunc()
 }
 
 // ByDefaultLoanPolicyID orders the results by the default_loan_policy_id field.

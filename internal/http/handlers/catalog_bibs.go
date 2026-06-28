@@ -14,19 +14,22 @@ import (
 	"github.com/bengobox/library-service/internal/ent/collection"
 	"github.com/bengobox/library-service/internal/ent/subject"
 	"github.com/bengobox/library-service/internal/events"
+	"github.com/bengobox/library-service/internal/modules/refdata"
 	"github.com/bengobox/library-service/internal/platform/secrets"
 )
 
 // CatalogHandler serves bibliographic + copy endpoints.
 type CatalogHandler struct {
-	db      *ent.Client
-	secrets *secrets.Store // platform secret store; supplies the optional ISBNdb key for lookups
-	log     *zap.Logger
+	db        *ent.Client
+	secrets   *secrets.Store // platform secret store; supplies the optional ISBNdb key for lookups
+	mediaRoot string         // on-disk media root (cover uploads); "" disables uploads
+	log       *zap.Logger
 }
 
-// NewCatalogHandler builds the catalog handler. secretStore may be nil (ISBNdb enrichment off).
-func NewCatalogHandler(db *ent.Client, secretStore *secrets.Store, log *zap.Logger) *CatalogHandler {
-	return &CatalogHandler{db: db, secrets: secretStore, log: log}
+// NewCatalogHandler builds the catalog handler. secretStore may be nil (ISBNdb enrichment off);
+// mediaRoot may be "" (cover upload disabled).
+func NewCatalogHandler(db *ent.Client, secretStore *secrets.Store, mediaRoot string, log *zap.Logger) *CatalogHandler {
+	return &CatalogHandler{db: db, secrets: secretStore, mediaRoot: mediaRoot, log: log}
 }
 
 // bibRequest is the create/update payload for a bibliographic record.
@@ -43,11 +46,15 @@ type bibRequest struct {
 	CallNumber    string   `json:"lc_call_number"`
 	PublishYear   int      `json:"publication_year"`
 	PageCount     int      `json:"page_count"`
-	Summary       string   `json:"summary"`
-	CoverImageURL string   `json:"cover_image_url"`
-	Edition       string   `json:"edition"`
-	ISSN          string   `json:"issn"`
-	CollectionID  string   `json:"collection_id"`
+	Summary           string   `json:"summary"`
+	CoverImageURL     string   `json:"cover_image_url"`
+	CoverBackImageURL string   `json:"cover_back_image_url"`
+	Edition           string   `json:"edition"`
+	ISSN              string   `json:"issn"`
+	CollectionID      string   `json:"collection_id"`
+	PublicationPlace  string   `json:"publication_place"`
+	Subjects          []string `json:"subjects"`
+	OtherISBNs        []string `json:"other_isbns"`
 }
 
 // ListBibs godoc
@@ -291,7 +298,9 @@ func (h *CatalogHandler) Facets(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := TenantUUID(r)
 	ctx := r.Context()
 	subjects, _ := h.db.Subject.Query().Where(subject.TenantID(tenantID)).All(ctx)
-	collections, _ := h.db.Collection.Query().Where(collection.TenantID(tenantID)).All(ctx)
+	collections, _ := h.db.Collection.Query().
+		Where(collection.Or(collection.TenantID(tenantID), collection.TenantID(refdata.GlobalTenantID))).
+		Order(ent.Asc(collection.FieldName)).All(ctx)
 	branches, _ := h.db.Branch.Query().Where(branch.TenantID(tenantID)).All(ctx)
 	languages, _ := h.db.BibRecord.Query().Where(bibrecord.TenantID(tenantID)).
 		GroupBy(bibrecord.FieldLanguage).Strings(ctx)
@@ -347,11 +356,23 @@ func applyBibFields(c *ent.BibRecordCreate, req bibRequest) {
 	if req.CoverImageURL != "" {
 		c.SetCoverImageURL(req.CoverImageURL)
 	}
+	if req.CoverBackImageURL != "" {
+		c.SetCoverBackImageURL(req.CoverBackImageURL)
+	}
 	if req.Edition != "" {
 		c.SetEdition(req.Edition)
 	}
 	if req.ISSN != "" {
 		c.SetIssn(req.ISSN)
+	}
+	if req.PublicationPlace != "" {
+		c.SetPublicationPlace(req.PublicationPlace)
+	}
+	if len(req.Subjects) > 0 {
+		c.SetSubjects(req.Subjects)
+	}
+	if len(req.OtherISBNs) > 0 {
+		c.SetOtherIsbns(req.OtherISBNs)
 	}
 	if id, ok := parseOptionalUUID(req.CollectionID); ok {
 		c.SetCollectionID(id)
@@ -400,11 +421,23 @@ func applyBibUpdate(u *ent.BibRecordUpdateOne, req bibRequest) {
 	if req.CoverImageURL != "" {
 		u.SetCoverImageURL(req.CoverImageURL)
 	}
+	if req.CoverBackImageURL != "" {
+		u.SetCoverBackImageURL(req.CoverBackImageURL)
+	}
 	if req.Edition != "" {
 		u.SetEdition(req.Edition)
 	}
 	if req.ISSN != "" {
 		u.SetIssn(req.ISSN)
+	}
+	if req.PublicationPlace != "" {
+		u.SetPublicationPlace(req.PublicationPlace)
+	}
+	if len(req.Subjects) > 0 {
+		u.SetSubjects(req.Subjects)
+	}
+	if len(req.OtherISBNs) > 0 {
+		u.SetOtherIsbns(req.OtherISBNs)
 	}
 	if id, ok := parseOptionalUUID(req.CollectionID); ok {
 		u.SetCollectionID(id)

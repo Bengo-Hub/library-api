@@ -29,6 +29,7 @@ import (
 	"github.com/bengobox/library-service/internal/modules/consumers"
 	"github.com/bengobox/library-service/internal/modules/membership"
 	"github.com/bengobox/library-service/internal/modules/rbac"
+	"github.com/bengobox/library-service/internal/modules/refdata"
 	"github.com/bengobox/library-service/internal/platform/cache"
 	"github.com/bengobox/library-service/internal/platform/database"
 	"github.com/bengobox/library-service/internal/platform/events"
@@ -119,6 +120,10 @@ func New(ctx context.Context) (*App, error) {
 	if err := rbacService.SeedGlobalRoles(ctx); err != nil {
 		log.Warn("seed global roles failed", zap.Error(err))
 	}
+	// Seed the shared global default collections (idempotent, nil-tenant).
+	if err := refdata.SeedGlobalCollections(ctx, ormClient, log); err != nil {
+		log.Warn("seed global collections failed", zap.Error(err))
+	}
 	// Push the library role catalogue to the auth registry (idempotent; best-effort) so
 	// auth-ui can assign service-level library roles. Runs off the request path.
 	go func() {
@@ -143,7 +148,7 @@ func New(ctx context.Context) (*App, error) {
 		Log:            log,
 		Health:         healthHandler,
 		Auth:           handlers.NewAuthHandler(rbacService, log),
-		Catalog:        handlers.NewCatalogHandler(ormClient, secretStore, log),
+		Catalog:        handlers.NewCatalogHandler(ormClient, secretStore, cfg.Media.Root, log),
 		Branch:         handlers.NewBranchHandler(ormClient, log),
 		Member:         handlers.NewMemberHandler(ormClient, log),
 		Circulation:    handlers.NewCirculationHandler(ormClient, circulationSvc, log),
