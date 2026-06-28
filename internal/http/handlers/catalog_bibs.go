@@ -43,6 +43,9 @@ type bibRequest struct {
 	PageCount     int      `json:"page_count"`
 	Summary       string   `json:"summary"`
 	CoverImageURL string   `json:"cover_image_url"`
+	Edition       string   `json:"edition"`
+	ISSN          string   `json:"issn"`
+	CollectionID  string   `json:"collection_id"`
 }
 
 // ListBibs godoc
@@ -342,8 +345,19 @@ func applyBibFields(c *ent.BibRecordCreate, req bibRequest) {
 	if req.CoverImageURL != "" {
 		c.SetCoverImageURL(req.CoverImageURL)
 	}
+	if req.Edition != "" {
+		c.SetEdition(req.Edition)
+	}
+	if req.ISSN != "" {
+		c.SetIssn(req.ISSN)
+	}
+	if id, ok := parseOptionalUUID(req.CollectionID); ok {
+		c.SetCollectionID(id)
+	}
 }
 
+// applyBibUpdate mirrors applyBibFields for the update builder so editing a title can change
+// any field the create form sets (previously it silently ignored year/pages/ddc/call-number/etc).
 func applyBibUpdate(u *ent.BibRecordUpdateOne, req bibRequest) {
 	if req.Subtitle != "" {
 		u.SetSubtitle(req.Subtitle)
@@ -363,10 +377,46 @@ func applyBibUpdate(u *ent.BibRecordUpdateOne, req bibRequest) {
 	if req.Format != "" {
 		u.SetFormat(bibrecord.Format(req.Format))
 	}
+	if req.Language != "" {
+		u.SetLanguage(req.Language)
+	}
+	if req.DDC != "" {
+		u.SetDdcClassification(req.DDC)
+	}
+	if req.CallNumber != "" {
+		u.SetLcCallNumber(req.CallNumber)
+	}
+	if req.PublishYear > 0 {
+		u.SetPublicationYear(req.PublishYear)
+	}
+	if req.PageCount > 0 {
+		u.SetPageCount(req.PageCount)
+	}
 	if req.Summary != "" {
 		u.SetSummary(req.Summary)
 	}
 	if req.CoverImageURL != "" {
 		u.SetCoverImageURL(req.CoverImageURL)
 	}
+	if req.Edition != "" {
+		u.SetEdition(req.Edition)
+	}
+	if req.ISSN != "" {
+		u.SetIssn(req.ISSN)
+	}
+	if id, ok := parseOptionalUUID(req.CollectionID); ok {
+		u.SetCollectionID(id)
+	}
+}
+
+// parseOptionalUUID parses a non-empty UUID string, returning ok=false for empty/invalid input.
+func parseOptionalUUID(s string) (uuid.UUID, bool) {
+	if s == "" {
+		return uuid.Nil, false
+	}
+	id, err := uuid.Parse(s)
+	if err != nil {
+		return uuid.Nil, false
+	}
+	return id, true
 }
