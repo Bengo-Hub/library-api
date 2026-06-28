@@ -127,11 +127,16 @@ func (h *PINAuthHandler) terminalClaimsFor(ctx context.Context, t *ent.Tenant, u
 		Permissions:        h.rbac.ListPermissions(ctx, t.ID, u.UserID),
 		SubscriptionStatus: "active",
 	}
+	// Baseline demo/platform bypass from the tenant slug (mirrors pos-api): the demo tenant and
+	// the platform owner are gating-exempt even if the subscriptions S2S call is unavailable, so
+	// PIN/terminal sessions can use feature-gated routes without a fragile dependency.
+	tc.IsDemo = t.Slug == "codevertex-demo"
+	tc.IsPlatformOwner = t.Slug == "codevertex"
 	if e := h.subs.GetEntitlements(ctx, t.ID.String()); e != nil {
 		tc.SubscriptionStatus = e.Status
 		tc.SubscriptionFeatures = e.Features
 		tc.BillingMode = e.BillingMode
-		tc.IsDemo = e.IsDemoBypass
+		tc.IsDemo = tc.IsDemo || e.IsDemoBypass
 	}
 	return tc
 }
