@@ -225,6 +225,7 @@ func New(d Deps) http.Handler {
 		lib.Group(func(f chi.Router) {
 			f.Use(libmw.RequireFeature("library_fines"))
 			f.With(view("fines")).Get("/fines", d.Fine.List)
+			f.With(act("membership_fees", "add")).Post("/fines/membership", d.Fine.AssessMembershipFee)
 			f.With(act("fines", "waive")).Post("/fines/{id}/waive", d.Fine.Waive)
 			f.With(act("fines", "pay")).Post("/fines/{id}/pay", d.Fine.Pay)
 		})
