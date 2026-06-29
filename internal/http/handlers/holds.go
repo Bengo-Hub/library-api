@@ -14,6 +14,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
 	"github.com/bengobox/library-service/internal/ent/hold"
 	"github.com/bengobox/library-service/internal/ent/member"
+	"github.com/bengobox/library-service/internal/events"
 )
 
 // HoldHandler serves the holds/reservations endpoints.
@@ -225,5 +226,9 @@ func (h *HoldHandler) MarkReady(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err.Error(), "update_failed")
 		return
 	}
+	// Emit hold.ready on the shared outbox so notifications can alert the patron for pickup.
+	_ = events.Publish(r.Context(), h.db.OutboxEvent, tenantID, id.String(), events.EventHoldReady, map[string]any{
+		"hold_id": id, "member_id": hd.MemberID, "bib_record_id": hd.BibRecordID, "expires_at": now.AddDate(0, 0, 3),
+	})
 	respondJSON(w, http.StatusOK, map[string]any{"ready": true})
 }

@@ -146,6 +146,10 @@ func (h *FineHandler) AssessMembershipFee(w http.ResponseWriter, r *http.Request
 		respondError(w, http.StatusInternalServerError, err.Error(), "create_failed")
 		return
 	}
+	// Emit fine.assessed on the shared outbox (uniform {aggregate}.{event} subject).
+	_ = events.Publish(r.Context(), h.db.OutboxEvent, tenantID, row.ID.String(), events.EventFineAssessed, map[string]any{
+		"fine_id": row.ID, "member_id": memberID, "amount": req.Amount, "reason": "membership",
+	})
 	respondJSON(w, http.StatusCreated, h.buildFineResponses(r, tenantID, []*ent.Fine{row})[0])
 }
 
