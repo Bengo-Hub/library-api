@@ -106,6 +106,48 @@ func (_c *DocumentSequenceCreate) SetNillablePadWidth(v *int) *DocumentSequenceC
 	return _c
 }
 
+// SetFormat sets the "format" field.
+func (_c *DocumentSequenceCreate) SetFormat(v string) *DocumentSequenceCreate {
+	_c.mutation.SetFormat(v)
+	return _c
+}
+
+// SetNillableFormat sets the "format" field if the given value is not nil.
+func (_c *DocumentSequenceCreate) SetNillableFormat(v *string) *DocumentSequenceCreate {
+	if v != nil {
+		_c.SetFormat(*v)
+	}
+	return _c
+}
+
+// SetResetPeriod sets the "reset_period" field.
+func (_c *DocumentSequenceCreate) SetResetPeriod(v string) *DocumentSequenceCreate {
+	_c.mutation.SetResetPeriod(v)
+	return _c
+}
+
+// SetNillableResetPeriod sets the "reset_period" field if the given value is not nil.
+func (_c *DocumentSequenceCreate) SetNillableResetPeriod(v *string) *DocumentSequenceCreate {
+	if v != nil {
+		_c.SetResetPeriod(*v)
+	}
+	return _c
+}
+
+// SetPeriodKey sets the "period_key" field.
+func (_c *DocumentSequenceCreate) SetPeriodKey(v string) *DocumentSequenceCreate {
+	_c.mutation.SetPeriodKey(v)
+	return _c
+}
+
+// SetNillablePeriodKey sets the "period_key" field if the given value is not nil.
+func (_c *DocumentSequenceCreate) SetNillablePeriodKey(v *string) *DocumentSequenceCreate {
+	if v != nil {
+		_c.SetPeriodKey(*v)
+	}
+	return _c
+}
+
 // SetID sets the "id" field.
 func (_c *DocumentSequenceCreate) SetID(v uuid.UUID) *DocumentSequenceCreate {
 	_c.mutation.SetID(v)
@@ -171,6 +213,10 @@ func (_c *DocumentSequenceCreate) defaults() {
 		v := documentsequence.DefaultPadWidth
 		_c.mutation.SetPadWidth(v)
 	}
+	if _, ok := _c.mutation.ResetPeriod(); !ok {
+		v := documentsequence.DefaultResetPeriod
+		_c.mutation.SetResetPeriod(v)
+	}
 	if _, ok := _c.mutation.ID(); !ok {
 		v := documentsequence.DefaultID()
 		_c.mutation.SetID(v)
@@ -201,6 +247,9 @@ func (_c *DocumentSequenceCreate) check() error {
 	}
 	if _, ok := _c.mutation.PadWidth(); !ok {
 		return &ValidationError{Name: "pad_width", err: errors.New(`ent: missing required field "DocumentSequence.pad_width"`)}
+	}
+	if _, ok := _c.mutation.ResetPeriod(); !ok {
+		return &ValidationError{Name: "reset_period", err: errors.New(`ent: missing required field "DocumentSequence.reset_period"`)}
 	}
 	return nil
 }
@@ -265,6 +314,18 @@ func (_c *DocumentSequenceCreate) createSpec() (*DocumentSequence, *sqlgraph.Cre
 	if value, ok := _c.mutation.PadWidth(); ok {
 		_spec.SetField(documentsequence.FieldPadWidth, field.TypeInt, value)
 		_node.PadWidth = value
+	}
+	if value, ok := _c.mutation.Format(); ok {
+		_spec.SetField(documentsequence.FieldFormat, field.TypeString, value)
+		_node.Format = value
+	}
+	if value, ok := _c.mutation.ResetPeriod(); ok {
+		_spec.SetField(documentsequence.FieldResetPeriod, field.TypeString, value)
+		_node.ResetPeriod = value
+	}
+	if value, ok := _c.mutation.PeriodKey(); ok {
+		_spec.SetField(documentsequence.FieldPeriodKey, field.TypeString, value)
+		_node.PeriodKey = value
 	}
 	return _node, _spec
 }
@@ -405,6 +466,54 @@ func (u *DocumentSequenceUpsert) UpdatePadWidth() *DocumentSequenceUpsert {
 // AddPadWidth adds v to the "pad_width" field.
 func (u *DocumentSequenceUpsert) AddPadWidth(v int) *DocumentSequenceUpsert {
 	u.Add(documentsequence.FieldPadWidth, v)
+	return u
+}
+
+// SetFormat sets the "format" field.
+func (u *DocumentSequenceUpsert) SetFormat(v string) *DocumentSequenceUpsert {
+	u.Set(documentsequence.FieldFormat, v)
+	return u
+}
+
+// UpdateFormat sets the "format" field to the value that was provided on create.
+func (u *DocumentSequenceUpsert) UpdateFormat() *DocumentSequenceUpsert {
+	u.SetExcluded(documentsequence.FieldFormat)
+	return u
+}
+
+// ClearFormat clears the value of the "format" field.
+func (u *DocumentSequenceUpsert) ClearFormat() *DocumentSequenceUpsert {
+	u.SetNull(documentsequence.FieldFormat)
+	return u
+}
+
+// SetResetPeriod sets the "reset_period" field.
+func (u *DocumentSequenceUpsert) SetResetPeriod(v string) *DocumentSequenceUpsert {
+	u.Set(documentsequence.FieldResetPeriod, v)
+	return u
+}
+
+// UpdateResetPeriod sets the "reset_period" field to the value that was provided on create.
+func (u *DocumentSequenceUpsert) UpdateResetPeriod() *DocumentSequenceUpsert {
+	u.SetExcluded(documentsequence.FieldResetPeriod)
+	return u
+}
+
+// SetPeriodKey sets the "period_key" field.
+func (u *DocumentSequenceUpsert) SetPeriodKey(v string) *DocumentSequenceUpsert {
+	u.Set(documentsequence.FieldPeriodKey, v)
+	return u
+}
+
+// UpdatePeriodKey sets the "period_key" field to the value that was provided on create.
+func (u *DocumentSequenceUpsert) UpdatePeriodKey() *DocumentSequenceUpsert {
+	u.SetExcluded(documentsequence.FieldPeriodKey)
+	return u
+}
+
+// ClearPeriodKey clears the value of the "period_key" field.
+func (u *DocumentSequenceUpsert) ClearPeriodKey() *DocumentSequenceUpsert {
+	u.SetNull(documentsequence.FieldPeriodKey)
 	return u
 }
 
@@ -561,6 +670,62 @@ func (u *DocumentSequenceUpsertOne) AddPadWidth(v int) *DocumentSequenceUpsertOn
 func (u *DocumentSequenceUpsertOne) UpdatePadWidth() *DocumentSequenceUpsertOne {
 	return u.Update(func(s *DocumentSequenceUpsert) {
 		s.UpdatePadWidth()
+	})
+}
+
+// SetFormat sets the "format" field.
+func (u *DocumentSequenceUpsertOne) SetFormat(v string) *DocumentSequenceUpsertOne {
+	return u.Update(func(s *DocumentSequenceUpsert) {
+		s.SetFormat(v)
+	})
+}
+
+// UpdateFormat sets the "format" field to the value that was provided on create.
+func (u *DocumentSequenceUpsertOne) UpdateFormat() *DocumentSequenceUpsertOne {
+	return u.Update(func(s *DocumentSequenceUpsert) {
+		s.UpdateFormat()
+	})
+}
+
+// ClearFormat clears the value of the "format" field.
+func (u *DocumentSequenceUpsertOne) ClearFormat() *DocumentSequenceUpsertOne {
+	return u.Update(func(s *DocumentSequenceUpsert) {
+		s.ClearFormat()
+	})
+}
+
+// SetResetPeriod sets the "reset_period" field.
+func (u *DocumentSequenceUpsertOne) SetResetPeriod(v string) *DocumentSequenceUpsertOne {
+	return u.Update(func(s *DocumentSequenceUpsert) {
+		s.SetResetPeriod(v)
+	})
+}
+
+// UpdateResetPeriod sets the "reset_period" field to the value that was provided on create.
+func (u *DocumentSequenceUpsertOne) UpdateResetPeriod() *DocumentSequenceUpsertOne {
+	return u.Update(func(s *DocumentSequenceUpsert) {
+		s.UpdateResetPeriod()
+	})
+}
+
+// SetPeriodKey sets the "period_key" field.
+func (u *DocumentSequenceUpsertOne) SetPeriodKey(v string) *DocumentSequenceUpsertOne {
+	return u.Update(func(s *DocumentSequenceUpsert) {
+		s.SetPeriodKey(v)
+	})
+}
+
+// UpdatePeriodKey sets the "period_key" field to the value that was provided on create.
+func (u *DocumentSequenceUpsertOne) UpdatePeriodKey() *DocumentSequenceUpsertOne {
+	return u.Update(func(s *DocumentSequenceUpsert) {
+		s.UpdatePeriodKey()
+	})
+}
+
+// ClearPeriodKey clears the value of the "period_key" field.
+func (u *DocumentSequenceUpsertOne) ClearPeriodKey() *DocumentSequenceUpsertOne {
+	return u.Update(func(s *DocumentSequenceUpsert) {
+		s.ClearPeriodKey()
 	})
 }
 
@@ -884,6 +1049,62 @@ func (u *DocumentSequenceUpsertBulk) AddPadWidth(v int) *DocumentSequenceUpsertB
 func (u *DocumentSequenceUpsertBulk) UpdatePadWidth() *DocumentSequenceUpsertBulk {
 	return u.Update(func(s *DocumentSequenceUpsert) {
 		s.UpdatePadWidth()
+	})
+}
+
+// SetFormat sets the "format" field.
+func (u *DocumentSequenceUpsertBulk) SetFormat(v string) *DocumentSequenceUpsertBulk {
+	return u.Update(func(s *DocumentSequenceUpsert) {
+		s.SetFormat(v)
+	})
+}
+
+// UpdateFormat sets the "format" field to the value that was provided on create.
+func (u *DocumentSequenceUpsertBulk) UpdateFormat() *DocumentSequenceUpsertBulk {
+	return u.Update(func(s *DocumentSequenceUpsert) {
+		s.UpdateFormat()
+	})
+}
+
+// ClearFormat clears the value of the "format" field.
+func (u *DocumentSequenceUpsertBulk) ClearFormat() *DocumentSequenceUpsertBulk {
+	return u.Update(func(s *DocumentSequenceUpsert) {
+		s.ClearFormat()
+	})
+}
+
+// SetResetPeriod sets the "reset_period" field.
+func (u *DocumentSequenceUpsertBulk) SetResetPeriod(v string) *DocumentSequenceUpsertBulk {
+	return u.Update(func(s *DocumentSequenceUpsert) {
+		s.SetResetPeriod(v)
+	})
+}
+
+// UpdateResetPeriod sets the "reset_period" field to the value that was provided on create.
+func (u *DocumentSequenceUpsertBulk) UpdateResetPeriod() *DocumentSequenceUpsertBulk {
+	return u.Update(func(s *DocumentSequenceUpsert) {
+		s.UpdateResetPeriod()
+	})
+}
+
+// SetPeriodKey sets the "period_key" field.
+func (u *DocumentSequenceUpsertBulk) SetPeriodKey(v string) *DocumentSequenceUpsertBulk {
+	return u.Update(func(s *DocumentSequenceUpsert) {
+		s.SetPeriodKey(v)
+	})
+}
+
+// UpdatePeriodKey sets the "period_key" field to the value that was provided on create.
+func (u *DocumentSequenceUpsertBulk) UpdatePeriodKey() *DocumentSequenceUpsertBulk {
+	return u.Update(func(s *DocumentSequenceUpsert) {
+		s.UpdatePeriodKey()
+	})
+}
+
+// ClearPeriodKey clears the value of the "period_key" field.
+func (u *DocumentSequenceUpsertBulk) ClearPeriodKey() *DocumentSequenceUpsertBulk {
+	return u.Update(func(s *DocumentSequenceUpsert) {
+		s.ClearPeriodKey()
 	})
 }
 

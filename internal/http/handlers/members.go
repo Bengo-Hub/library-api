@@ -12,6 +12,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/loan"
 	"github.com/bengobox/library-service/internal/ent/member"
 	"github.com/bengobox/library-service/internal/ent/membertier"
+	"github.com/bengobox/library-service/internal/modules/refdata"
 	"github.com/bengobox/library-service/internal/events"
 	"github.com/bengobox/library-service/internal/modules/sequence"
 )
@@ -229,19 +230,24 @@ func (h *MemberHandler) MemberFines(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
 }
 
-// resolveTier returns the explicit tier or the tenant's default tier id.
+// resolveTier returns the explicit tier or a default: tenant default → global default → any
+// tenant tier → any global tier (so a member always lands on a sensible tier).
 func (h *MemberHandler) resolveTier(r *http.Request, tenantID uuid.UUID, explicit string) (uuid.UUID, error) {
 	if explicit != "" {
 		return uuid.Parse(explicit)
 	}
-	t, err := h.db.MemberTier.Query().
-		Where(membertier.TenantID(tenantID), membertier.IsDefault(true)).First(r.Context())
+	ctx := r.Context()
+	tenantOrGlobal := membertier.Or(membertier.TenantID(tenantID), membertier.TenantID(refdata.GlobalTenantID))
+	// Prefer the tenant's own default, then the global default, then any tier (tenant or global).
+	if t, err := h.db.MemberTier.Query().Where(membertier.TenantID(tenantID), membertier.IsDefault(true)).First(ctx); err == nil {
+		return t.ID, nil
+	}
+	if t, err := h.db.MemberTier.Query().Where(membertier.TenantID(refdata.GlobalTenantID), membertier.IsDefault(true)).First(ctx); err == nil {
+		return t.ID, nil
+	}
+	t, err := h.db.MemberTier.Query().Where(tenantOrGlobal).First(ctx)
 	if err != nil {
-		// fall back to any tier
-		t, err = h.db.MemberTier.Query().Where(membertier.TenantID(tenantID)).First(r.Context())
-		if err != nil {
-			return uuid.Nil, err
-		}
+		return uuid.Nil, err
 	}
 	return t.ID, nil
 }

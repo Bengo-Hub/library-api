@@ -32,6 +32,7 @@ type Deps struct {
 	Reports        *handlers.ReportsHandler
 	RBACHandler    *handlers.RBACHandler
 	Membership     *handlers.MembershipHandler
+	Sequence       *handlers.SequenceHandler
 	PINAuth        *handlers.PINAuthHandler
 	PlatformConfig *handlers.PlatformConfigHandler
 	AuthMiddleware *authclient.AuthMiddleware
@@ -244,6 +245,12 @@ func New(d Deps) http.Handler {
 		lib.With(view("team")).Get("/team", d.RBACHandler.ListTeam)
 		lib.With(act("team", "manage")).Put("/team/{user_id}/roles", d.RBACHandler.AssignRoles)
 		lib.With(act("team", "manage")).Put("/team/{user_id}/branches", d.RBACHandler.AssignBranches)
+
+		// Settings — document-sequence configuration (membership_no, accession_no, …).
+		if d.Sequence != nil {
+			lib.With(view("settings")).Get("/settings/sequences", d.Sequence.List)
+			lib.With(act("settings", "manage")).Put("/settings/sequences/{kind}", d.Sequence.Update)
+		}
 	})
 
 	return r

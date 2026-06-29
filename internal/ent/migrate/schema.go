@@ -157,6 +157,7 @@ var (
 		{Name: "is_reference_only", Type: field.TypeBool, Default: false},
 		{Name: "acquisition_cost", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
 		{Name: "acquisition_date", Type: field.TypeTime, Nullable: true},
+		{Name: "notes", Type: field.TypeString, Nullable: true},
 		{Name: "loan_policy_id", Type: field.TypeUUID, Nullable: true},
 	}
 	// BookCopiesTable holds the schema information for the "book_copies" table.
@@ -303,6 +304,9 @@ var (
 		{Name: "prefix", Type: field.TypeString, Nullable: true},
 		{Name: "next_value", Type: field.TypeInt64, Default: 1},
 		{Name: "pad_width", Type: field.TypeInt, Default: 5},
+		{Name: "format", Type: field.TypeString, Nullable: true},
+		{Name: "reset_period", Type: field.TypeString, Default: "none"},
+		{Name: "period_key", Type: field.TypeString, Nullable: true},
 	}
 	// DocumentSequencesTable holds the schema information for the "document_sequences" table.
 	DocumentSequencesTable = &schema.Table{

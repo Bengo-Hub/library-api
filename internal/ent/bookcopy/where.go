@@ -121,6 +121,11 @@ func AcquisitionDate(v time.Time) predicate.BookCopy {
 	return predicate.BookCopy(sql.FieldEQ(FieldAcquisitionDate, v))
 }
 
+// Notes applies equality check predicate on the "notes" field. It's identical to NotesEQ.
+func Notes(v string) predicate.BookCopy {
+	return predicate.BookCopy(sql.FieldEQ(FieldNotes, v))
+}
+
 // LoanPolicyID applies equality check predicate on the "loan_policy_id" field. It's identical to LoanPolicyIDEQ.
 func LoanPolicyID(v uuid.UUID) predicate.BookCopy {
 	return predicate.BookCopy(sql.FieldEQ(FieldLoanPolicyID, v))
@@ -809,6 +814,81 @@ func AcquisitionDateIsNil() predicate.BookCopy {
 // AcquisitionDateNotNil applies the NotNil predicate on the "acquisition_date" field.
 func AcquisitionDateNotNil() predicate.BookCopy {
 	return predicate.BookCopy(sql.FieldNotNull(FieldAcquisitionDate))
+}
+
+// NotesEQ applies the EQ predicate on the "notes" field.
+func NotesEQ(v string) predicate.BookCopy {
+	return predicate.BookCopy(sql.FieldEQ(FieldNotes, v))
+}
+
+// NotesNEQ applies the NEQ predicate on the "notes" field.
+func NotesNEQ(v string) predicate.BookCopy {
+	return predicate.BookCopy(sql.FieldNEQ(FieldNotes, v))
+}
+
+// NotesIn applies the In predicate on the "notes" field.
+func NotesIn(vs ...string) predicate.BookCopy {
+	return predicate.BookCopy(sql.FieldIn(FieldNotes, vs...))
+}
+
+// NotesNotIn applies the NotIn predicate on the "notes" field.
+func NotesNotIn(vs ...string) predicate.BookCopy {
+	return predicate.BookCopy(sql.FieldNotIn(FieldNotes, vs...))
+}
+
+// NotesGT applies the GT predicate on the "notes" field.
+func NotesGT(v string) predicate.BookCopy {
+	return predicate.BookCopy(sql.FieldGT(FieldNotes, v))
+}
+
+// NotesGTE applies the GTE predicate on the "notes" field.
+func NotesGTE(v string) predicate.BookCopy {
+	return predicate.BookCopy(sql.FieldGTE(FieldNotes, v))
+}
+
+// NotesLT applies the LT predicate on the "notes" field.
+func NotesLT(v string) predicate.BookCopy {
+	return predicate.BookCopy(sql.FieldLT(FieldNotes, v))
+}
+
+// NotesLTE applies the LTE predicate on the "notes" field.
+func NotesLTE(v string) predicate.BookCopy {
+	return predicate.BookCopy(sql.FieldLTE(FieldNotes, v))
+}
+
+// NotesContains applies the Contains predicate on the "notes" field.
+func NotesContains(v string) predicate.BookCopy {
+	return predicate.BookCopy(sql.FieldContains(FieldNotes, v))
+}
+
+// NotesHasPrefix applies the HasPrefix predicate on the "notes" field.
+func NotesHasPrefix(v string) predicate.BookCopy {
+	return predicate.BookCopy(sql.FieldHasPrefix(FieldNotes, v))
+}
+
+// NotesHasSuffix applies the HasSuffix predicate on the "notes" field.
+func NotesHasSuffix(v string) predicate.BookCopy {
+	return predicate.BookCopy(sql.FieldHasSuffix(FieldNotes, v))
+}
+
+// NotesIsNil applies the IsNil predicate on the "notes" field.
+func NotesIsNil() predicate.BookCopy {
+	return predicate.BookCopy(sql.FieldIsNull(FieldNotes))
+}
+
+// NotesNotNil applies the NotNil predicate on the "notes" field.
+func NotesNotNil() predicate.BookCopy {
+	return predicate.BookCopy(sql.FieldNotNull(FieldNotes))
+}
+
+// NotesEqualFold applies the EqualFold predicate on the "notes" field.
+func NotesEqualFold(v string) predicate.BookCopy {
+	return predicate.BookCopy(sql.FieldEqualFold(FieldNotes, v))
+}
+
+// NotesContainsFold applies the ContainsFold predicate on the "notes" field.
+func NotesContainsFold(v string) predicate.BookCopy {
+	return predicate.BookCopy(sql.FieldContainsFold(FieldNotes, v))
 }
 
 // LoanPolicyIDEQ applies the EQ predicate on the "loan_policy_id" field.

@@ -154,7 +154,7 @@ func (h *PINAuthHandler) loginResponse(ctx context.Context, t *ent.Tenant, u *en
 		"name":         u.DisplayName,
 		"roles":        u.Roles,
 		"is_admin":     isLibraryAdmin(u.Roles),
-		"expires_in":   8 * 3600,
+		"expires_in":   int(terminalTokenTTL.Seconds()),
 	}
 	if br != nil {
 		body["branch_id"] = br.ID.String()

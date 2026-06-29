@@ -28,6 +28,12 @@ const (
 	FieldNextValue = "next_value"
 	// FieldPadWidth holds the string denoting the pad_width field in the database.
 	FieldPadWidth = "pad_width"
+	// FieldFormat holds the string denoting the format field in the database.
+	FieldFormat = "format"
+	// FieldResetPeriod holds the string denoting the reset_period field in the database.
+	FieldResetPeriod = "reset_period"
+	// FieldPeriodKey holds the string denoting the period_key field in the database.
+	FieldPeriodKey = "period_key"
 	// Table holds the table name of the documentsequence in the database.
 	Table = "document_sequences"
 )
@@ -42,6 +48,9 @@ var Columns = []string{
 	FieldPrefix,
 	FieldNextValue,
 	FieldPadWidth,
+	FieldFormat,
+	FieldResetPeriod,
+	FieldPeriodKey,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -67,6 +76,8 @@ var (
 	DefaultNextValue int64
 	// DefaultPadWidth holds the default value on creation for the "pad_width" field.
 	DefaultPadWidth int
+	// DefaultResetPeriod holds the default value on creation for the "reset_period" field.
+	DefaultResetPeriod string
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )
@@ -112,4 +123,19 @@ func ByNextValue(opts ...sql.OrderTermOption) OrderOption {
 // ByPadWidth orders the results by the pad_width field.
 func ByPadWidth(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPadWidth, opts...).ToFunc()
+}
+
+// ByFormat orders the results by the format field.
+func ByFormat(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFormat, opts...).ToFunc()
+}
+
+// ByResetPeriod orders the results by the reset_period field.
+func ByResetPeriod(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldResetPeriod, opts...).ToFunc()
+}
+
+// ByPeriodKey orders the results by the period_key field.
+func ByPeriodKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldPeriodKey, opts...).ToFunc()
 }

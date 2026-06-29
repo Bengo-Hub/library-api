@@ -189,6 +189,20 @@ func (_c *BookCopyCreate) SetNillableAcquisitionDate(v *time.Time) *BookCopyCrea
 	return _c
 }
 
+// SetNotes sets the "notes" field.
+func (_c *BookCopyCreate) SetNotes(v string) *BookCopyCreate {
+	_c.mutation.SetNotes(v)
+	return _c
+}
+
+// SetNillableNotes sets the "notes" field if the given value is not nil.
+func (_c *BookCopyCreate) SetNillableNotes(v *string) *BookCopyCreate {
+	if v != nil {
+		_c.SetNotes(*v)
+	}
+	return _c
+}
+
 // SetLoanPolicyID sets the "loan_policy_id" field.
 func (_c *BookCopyCreate) SetLoanPolicyID(v uuid.UUID) *BookCopyCreate {
 	_c.mutation.SetLoanPolicyID(v)
@@ -408,6 +422,10 @@ func (_c *BookCopyCreate) createSpec() (*BookCopy, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.AcquisitionDate(); ok {
 		_spec.SetField(bookcopy.FieldAcquisitionDate, field.TypeTime, value)
 		_node.AcquisitionDate = &value
+	}
+	if value, ok := _c.mutation.Notes(); ok {
+		_spec.SetField(bookcopy.FieldNotes, field.TypeString, value)
+		_node.Notes = value
 	}
 	if value, ok := _c.mutation.LoanPolicyID(); ok {
 		_spec.SetField(bookcopy.FieldLoanPolicyID, field.TypeUUID, value)
@@ -648,6 +666,24 @@ func (u *BookCopyUpsert) UpdateAcquisitionDate() *BookCopyUpsert {
 // ClearAcquisitionDate clears the value of the "acquisition_date" field.
 func (u *BookCopyUpsert) ClearAcquisitionDate() *BookCopyUpsert {
 	u.SetNull(bookcopy.FieldAcquisitionDate)
+	return u
+}
+
+// SetNotes sets the "notes" field.
+func (u *BookCopyUpsert) SetNotes(v string) *BookCopyUpsert {
+	u.Set(bookcopy.FieldNotes, v)
+	return u
+}
+
+// UpdateNotes sets the "notes" field to the value that was provided on create.
+func (u *BookCopyUpsert) UpdateNotes() *BookCopyUpsert {
+	u.SetExcluded(bookcopy.FieldNotes)
+	return u
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (u *BookCopyUpsert) ClearNotes() *BookCopyUpsert {
+	u.SetNull(bookcopy.FieldNotes)
 	return u
 }
 
@@ -934,6 +970,27 @@ func (u *BookCopyUpsertOne) UpdateAcquisitionDate() *BookCopyUpsertOne {
 func (u *BookCopyUpsertOne) ClearAcquisitionDate() *BookCopyUpsertOne {
 	return u.Update(func(s *BookCopyUpsert) {
 		s.ClearAcquisitionDate()
+	})
+}
+
+// SetNotes sets the "notes" field.
+func (u *BookCopyUpsertOne) SetNotes(v string) *BookCopyUpsertOne {
+	return u.Update(func(s *BookCopyUpsert) {
+		s.SetNotes(v)
+	})
+}
+
+// UpdateNotes sets the "notes" field to the value that was provided on create.
+func (u *BookCopyUpsertOne) UpdateNotes() *BookCopyUpsertOne {
+	return u.Update(func(s *BookCopyUpsert) {
+		s.UpdateNotes()
+	})
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (u *BookCopyUpsertOne) ClearNotes() *BookCopyUpsertOne {
+	return u.Update(func(s *BookCopyUpsert) {
+		s.ClearNotes()
 	})
 }
 
@@ -1390,6 +1447,27 @@ func (u *BookCopyUpsertBulk) UpdateAcquisitionDate() *BookCopyUpsertBulk {
 func (u *BookCopyUpsertBulk) ClearAcquisitionDate() *BookCopyUpsertBulk {
 	return u.Update(func(s *BookCopyUpsert) {
 		s.ClearAcquisitionDate()
+	})
+}
+
+// SetNotes sets the "notes" field.
+func (u *BookCopyUpsertBulk) SetNotes(v string) *BookCopyUpsertBulk {
+	return u.Update(func(s *BookCopyUpsert) {
+		s.SetNotes(v)
+	})
+}
+
+// UpdateNotes sets the "notes" field to the value that was provided on create.
+func (u *BookCopyUpsertBulk) UpdateNotes() *BookCopyUpsertBulk {
+	return u.Update(func(s *BookCopyUpsert) {
+		s.UpdateNotes()
+	})
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (u *BookCopyUpsertBulk) ClearNotes() *BookCopyUpsertBulk {
+	return u.Update(func(s *BookCopyUpsert) {
+		s.ClearNotes()
 	})
 }
 

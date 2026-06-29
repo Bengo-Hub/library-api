@@ -134,6 +134,10 @@ func New(ctx context.Context) (*App, error) {
 	if err := refdata.SeedGlobalCollections(ctx, ormClient, log); err != nil {
 		log.Warn("seed global collections failed", zap.Error(err))
 	}
+	// Seed shared global member tiers + loan policies (idempotent, nil-tenant).
+	if err := refdata.SeedGlobalTiersPolicies(ctx, ormClient, log); err != nil {
+		log.Warn("seed global tiers/policies failed", zap.Error(err))
+	}
 	// Seed demo desk PINs for the sandbox tenant (idempotent; no-op for other tenants).
 	if err := refdata.SeedDemoStaff(ctx, ormClient, log); err != nil {
 		log.Warn("seed demo staff failed", zap.Error(err))
@@ -141,6 +145,10 @@ func New(ctx context.Context) (*App, error) {
 	// Top demo physical titles up to 5 copies each (idempotent; no-op for other tenants).
 	if err := refdata.SeedDemoCopies(ctx, ormClient, log); err != nil {
 		log.Warn("seed demo copies failed", zap.Error(err))
+	}
+	// Seed demo patrons (incl. member-role staff) so the Members list isn't empty (idempotent).
+	if err := refdata.SeedDemoMembers(ctx, ormClient, log); err != nil {
+		log.Warn("seed demo members failed", zap.Error(err))
 	}
 	// Push the library role catalogue to the auth registry (idempotent; best-effort) so
 	// auth-ui can assign service-level library roles. Runs off the request path.
@@ -176,6 +184,7 @@ func New(ctx context.Context) (*App, error) {
 		Reports:        handlers.NewReportsHandler(ormClient, log),
 		RBACHandler:    handlers.NewRBACHandler(rbacService, log),
 		Membership:     handlers.NewMembershipHandler(ormClient, membershipSvc, treasuryClient, log),
+		Sequence:       handlers.NewSequenceHandler(ormClient, log),
 		PINAuth:        handlers.NewPINAuthHandler(ormClient, rbacService, subsClient, terminalJWTSecret(cfg), log),
 		PlatformConfig: handlers.NewPlatformConfigHandler(secretStore, log),
 		RBAC:           rbacService,

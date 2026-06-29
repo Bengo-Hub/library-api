@@ -30,6 +30,7 @@ func (BookCopy) Fields() []ent.Field {
 		field.Bool("is_reference_only").Default(false).Comment("Reference/in-house reading only — never leaves the building"),
 		moneyFieldOptional("acquisition_cost"),
 		field.Time("acquisition_date").Optional().Nillable(),
+		field.String("notes").Optional().Comment("Free-text notes about this physical copy"),
 		field.UUID("loan_policy_id", uuidType()).Optional().Nillable().Comment("Per-copy policy override"),
 	}
 }

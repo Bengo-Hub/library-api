@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
 	"github.com/bengobox/library-service/internal/ent"
@@ -45,13 +46,29 @@ func SeedDemoCopies(ctx context.Context, client *ent.Client, log *zap.Logger) er
 		}
 		have, _ := client.BookCopy.Query().
 			Where(bookcopy.TenantID(t.ID), bookcopy.BibRecordID(b.ID)).Count(ctx)
+		// Shelf + call number derived from the bib so holdings look real on the demo.
+		callNo := b.LcCallNumber
+		if callNo == "" {
+			callNo = b.DdcClassification
+		}
+		shelf := "GEN"
+		if callNo != "" {
+			shelf = "GEN " + callNo
+		}
 		for n := have + 1; n <= demoCopiesPerTitle; n++ {
 			barcode := fmt.Sprintf("DEMO-%s-%02d", strings.ToUpper(b.ID.String()[:8]), n)
-			if _, cerr := client.BookCopy.Create().
+			c := client.BookCopy.Create().
 				SetTenantID(t.ID).SetBibRecordID(b.ID).SetBranchID(br.ID).
 				SetBarcode(barcode).SetAccessionNo(barcode).
 				SetStatus(bookcopy.StatusAVAILABLE).SetCondition("good").
-				SetAcquisitionDate(time.Now()).Save(ctx); cerr != nil {
+				SetShelfLocation(shelf).
+				SetAcquisitionCost(decimal.NewFromInt(1500)).
+				SetNotes("Seeded demo copy").
+				SetAcquisitionDate(time.Now())
+			if callNo != "" {
+				c.SetCallNumber(callNo)
+			}
+			if _, cerr := c.Save(ctx); cerr != nil {
 				log.Warn("demo seed: create copy failed", zap.String("barcode", barcode), zap.Error(cerr))
 				continue
 			}

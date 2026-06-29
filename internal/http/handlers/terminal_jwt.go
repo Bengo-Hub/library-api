@@ -12,6 +12,10 @@ import (
 
 const terminalIssuer = "library-terminal"
 
+// terminalTokenTTL is how long a desk/kiosk PIN session lasts before requiring a re-PIN. Sized
+// to a full working day so the desk isn't logged out mid-shift (was 8h — expired too soon).
+const terminalTokenTTL = 12 * time.Hour
+
 // terminalClaims are embedded in short-lived HMAC JWTs issued after a library PIN login.
 // They mirror the SSO JWT shape so the same downstream middleware (JIT, subscription gate,
 // RBAC) treats a PIN/terminal session exactly like an SSO session.
@@ -39,7 +43,7 @@ func issueTerminalJWT(secret []byte, tc terminalClaims) (string, error) {
 		Subject:   tc.UserID,
 		Issuer:    terminalIssuer,
 		IssuedAt:  jwt.NewNumericDate(now),
-		ExpiresAt: jwt.NewNumericDate(now.Add(8 * time.Hour)),
+		ExpiresAt: jwt.NewNumericDate(now.Add(terminalTokenTTL)),
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, tc).SignedString(secret)
 }

@@ -47,6 +47,8 @@ type BookCopy struct {
 	AcquisitionCost *decimal.Decimal `json:"acquisition_cost,omitempty"`
 	// AcquisitionDate holds the value of the "acquisition_date" field.
 	AcquisitionDate *time.Time `json:"acquisition_date,omitempty"`
+	// Free-text notes about this physical copy
+	Notes string `json:"notes,omitempty"`
 	// Per-copy policy override
 	LoanPolicyID *uuid.UUID `json:"loan_policy_id,omitempty"`
 	selectValues sql.SelectValues
@@ -63,7 +65,7 @@ func (*BookCopy) scanValues(columns []string) ([]any, error) {
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		case bookcopy.FieldIsReferenceOnly:
 			values[i] = new(sql.NullBool)
-		case bookcopy.FieldBarcode, bookcopy.FieldAccessionNo, bookcopy.FieldCallNumber, bookcopy.FieldShelfLocation, bookcopy.FieldStatus, bookcopy.FieldCondition:
+		case bookcopy.FieldBarcode, bookcopy.FieldAccessionNo, bookcopy.FieldCallNumber, bookcopy.FieldShelfLocation, bookcopy.FieldStatus, bookcopy.FieldCondition, bookcopy.FieldNotes:
 			values[i] = new(sql.NullString)
 		case bookcopy.FieldCreatedAt, bookcopy.FieldUpdatedAt, bookcopy.FieldAcquisitionDate:
 			values[i] = new(sql.NullTime)
@@ -176,6 +178,12 @@ func (_m *BookCopy) assignValues(columns []string, values []any) error {
 				_m.AcquisitionDate = new(time.Time)
 				*_m.AcquisitionDate = value.Time
 			}
+		case bookcopy.FieldNotes:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field notes", values[i])
+			} else if value.Valid {
+				_m.Notes = value.String
+			}
 		case bookcopy.FieldLoanPolicyID:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
 				return fmt.Errorf("unexpected type %T for field loan_policy_id", values[i])
@@ -264,6 +272,9 @@ func (_m *BookCopy) String() string {
 		builder.WriteString("acquisition_date=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
+	builder.WriteString(", ")
+	builder.WriteString("notes=")
+	builder.WriteString(_m.Notes)
 	builder.WriteString(", ")
 	if v := _m.LoanPolicyID; v != nil {
 		builder.WriteString("loan_policy_id=")

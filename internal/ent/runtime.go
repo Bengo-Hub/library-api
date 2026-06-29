@@ -256,6 +256,10 @@ func init() {
 	documentsequenceDescPadWidth := documentsequenceFields[3].Descriptor()
 	// documentsequence.DefaultPadWidth holds the default value on creation for the pad_width field.
 	documentsequence.DefaultPadWidth = documentsequenceDescPadWidth.Default.(int)
+	// documentsequenceDescResetPeriod is the schema descriptor for reset_period field.
+	documentsequenceDescResetPeriod := documentsequenceFields[5].Descriptor()
+	// documentsequence.DefaultResetPeriod holds the default value on creation for the reset_period field.
+	documentsequence.DefaultResetPeriod = documentsequenceDescResetPeriod.Default.(string)
 	// documentsequenceDescID is the schema descriptor for id field.
 	documentsequenceDescID := documentsequenceMixinFields0[0].Descriptor()
 	// documentsequence.DefaultID holds the default value on creation for the id field.

@@ -43,6 +43,8 @@ const (
 	FieldAcquisitionCost = "acquisition_cost"
 	// FieldAcquisitionDate holds the string denoting the acquisition_date field in the database.
 	FieldAcquisitionDate = "acquisition_date"
+	// FieldNotes holds the string denoting the notes field in the database.
+	FieldNotes = "notes"
 	// FieldLoanPolicyID holds the string denoting the loan_policy_id field in the database.
 	FieldLoanPolicyID = "loan_policy_id"
 	// Table holds the table name of the bookcopy in the database.
@@ -66,6 +68,7 @@ var Columns = []string{
 	FieldIsReferenceOnly,
 	FieldAcquisitionCost,
 	FieldAcquisitionDate,
+	FieldNotes,
 	FieldLoanPolicyID,
 }
 
@@ -205,6 +208,11 @@ func ByAcquisitionCost(opts ...sql.OrderTermOption) OrderOption {
 // ByAcquisitionDate orders the results by the acquisition_date field.
 func ByAcquisitionDate(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldAcquisitionDate, opts...).ToFunc()
+}
+
+// ByNotes orders the results by the notes field.
+func ByNotes(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNotes, opts...).ToFunc()
 }
 
 // ByLoanPolicyID orders the results by the loan_policy_id field.

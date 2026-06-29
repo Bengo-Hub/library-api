@@ -23,6 +23,12 @@ func (DocumentSequence) Fields() []ent.Field {
 		field.String("prefix").Optional(),
 		field.Int64("next_value").Default(1),
 		field.Int("pad_width").Default(5),
+		field.String("format").Optional().
+			Comment("Template: {prefix} {seq} {yy} {yyyy} {mm}. Empty = {prefix}{seq}."),
+		field.String("reset_period").Default("none").
+			Comment("none | yearly | monthly — when the counter restarts at 1"),
+		field.String("period_key").Optional().
+			Comment("Current period marker (e.g. 2026 or 2026-06); a change triggers a reset"),
 	}
 }
 

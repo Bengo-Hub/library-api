@@ -6,8 +6,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
 
+	"github.com/bengobox/library-service/internal/ent"
 	"github.com/bengobox/library-service/internal/ent/loanpolicy"
 	"github.com/bengobox/library-service/internal/ent/membertier"
+	"github.com/bengobox/library-service/internal/modules/refdata"
 )
 
 type tierRequest struct {
@@ -27,7 +29,9 @@ type tierRequest struct {
 // @Router /{tenant}/library/member-tiers [get]
 func (h *MemberHandler) ListTiers(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := TenantUUID(r)
-	rows, err := h.db.MemberTier.Query().Where(membertier.TenantID(tenantID)).All(r.Context())
+	rows, err := h.db.MemberTier.Query().
+		Where(membertier.Or(membertier.TenantID(tenantID), membertier.TenantID(refdata.GlobalTenantID))).
+		Order(ent.Asc(membertier.FieldName)).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
@@ -142,7 +146,9 @@ type policyRequest struct {
 // @Router /{tenant}/library/loan-policies [get]
 func (h *MemberHandler) ListPolicies(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := TenantUUID(r)
-	rows, err := h.db.LoanPolicy.Query().Where(loanpolicy.TenantID(tenantID)).All(r.Context())
+	rows, err := h.db.LoanPolicy.Query().
+		Where(loanpolicy.Or(loanpolicy.TenantID(tenantID), loanpolicy.TenantID(refdata.GlobalTenantID))).
+		Order(ent.Asc(loanpolicy.FieldName)).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return

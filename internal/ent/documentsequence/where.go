@@ -90,6 +90,21 @@ func PadWidth(v int) predicate.DocumentSequence {
 	return predicate.DocumentSequence(sql.FieldEQ(FieldPadWidth, v))
 }
 
+// Format applies equality check predicate on the "format" field. It's identical to FormatEQ.
+func Format(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldEQ(FieldFormat, v))
+}
+
+// ResetPeriod applies equality check predicate on the "reset_period" field. It's identical to ResetPeriodEQ.
+func ResetPeriod(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldEQ(FieldResetPeriod, v))
+}
+
+// PeriodKey applies equality check predicate on the "period_key" field. It's identical to PeriodKeyEQ.
+func PeriodKey(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldEQ(FieldPeriodKey, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.DocumentSequence {
 	return predicate.DocumentSequence(sql.FieldEQ(FieldCreatedAt, v))
@@ -428,6 +443,221 @@ func PadWidthLT(v int) predicate.DocumentSequence {
 // PadWidthLTE applies the LTE predicate on the "pad_width" field.
 func PadWidthLTE(v int) predicate.DocumentSequence {
 	return predicate.DocumentSequence(sql.FieldLTE(FieldPadWidth, v))
+}
+
+// FormatEQ applies the EQ predicate on the "format" field.
+func FormatEQ(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldEQ(FieldFormat, v))
+}
+
+// FormatNEQ applies the NEQ predicate on the "format" field.
+func FormatNEQ(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldNEQ(FieldFormat, v))
+}
+
+// FormatIn applies the In predicate on the "format" field.
+func FormatIn(vs ...string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldIn(FieldFormat, vs...))
+}
+
+// FormatNotIn applies the NotIn predicate on the "format" field.
+func FormatNotIn(vs ...string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldNotIn(FieldFormat, vs...))
+}
+
+// FormatGT applies the GT predicate on the "format" field.
+func FormatGT(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldGT(FieldFormat, v))
+}
+
+// FormatGTE applies the GTE predicate on the "format" field.
+func FormatGTE(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldGTE(FieldFormat, v))
+}
+
+// FormatLT applies the LT predicate on the "format" field.
+func FormatLT(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldLT(FieldFormat, v))
+}
+
+// FormatLTE applies the LTE predicate on the "format" field.
+func FormatLTE(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldLTE(FieldFormat, v))
+}
+
+// FormatContains applies the Contains predicate on the "format" field.
+func FormatContains(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldContains(FieldFormat, v))
+}
+
+// FormatHasPrefix applies the HasPrefix predicate on the "format" field.
+func FormatHasPrefix(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldHasPrefix(FieldFormat, v))
+}
+
+// FormatHasSuffix applies the HasSuffix predicate on the "format" field.
+func FormatHasSuffix(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldHasSuffix(FieldFormat, v))
+}
+
+// FormatIsNil applies the IsNil predicate on the "format" field.
+func FormatIsNil() predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldIsNull(FieldFormat))
+}
+
+// FormatNotNil applies the NotNil predicate on the "format" field.
+func FormatNotNil() predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldNotNull(FieldFormat))
+}
+
+// FormatEqualFold applies the EqualFold predicate on the "format" field.
+func FormatEqualFold(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldEqualFold(FieldFormat, v))
+}
+
+// FormatContainsFold applies the ContainsFold predicate on the "format" field.
+func FormatContainsFold(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldContainsFold(FieldFormat, v))
+}
+
+// ResetPeriodEQ applies the EQ predicate on the "reset_period" field.
+func ResetPeriodEQ(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldEQ(FieldResetPeriod, v))
+}
+
+// ResetPeriodNEQ applies the NEQ predicate on the "reset_period" field.
+func ResetPeriodNEQ(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldNEQ(FieldResetPeriod, v))
+}
+
+// ResetPeriodIn applies the In predicate on the "reset_period" field.
+func ResetPeriodIn(vs ...string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldIn(FieldResetPeriod, vs...))
+}
+
+// ResetPeriodNotIn applies the NotIn predicate on the "reset_period" field.
+func ResetPeriodNotIn(vs ...string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldNotIn(FieldResetPeriod, vs...))
+}
+
+// ResetPeriodGT applies the GT predicate on the "reset_period" field.
+func ResetPeriodGT(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldGT(FieldResetPeriod, v))
+}
+
+// ResetPeriodGTE applies the GTE predicate on the "reset_period" field.
+func ResetPeriodGTE(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldGTE(FieldResetPeriod, v))
+}
+
+// ResetPeriodLT applies the LT predicate on the "reset_period" field.
+func ResetPeriodLT(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldLT(FieldResetPeriod, v))
+}
+
+// ResetPeriodLTE applies the LTE predicate on the "reset_period" field.
+func ResetPeriodLTE(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldLTE(FieldResetPeriod, v))
+}
+
+// ResetPeriodContains applies the Contains predicate on the "reset_period" field.
+func ResetPeriodContains(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldContains(FieldResetPeriod, v))
+}
+
+// ResetPeriodHasPrefix applies the HasPrefix predicate on the "reset_period" field.
+func ResetPeriodHasPrefix(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldHasPrefix(FieldResetPeriod, v))
+}
+
+// ResetPeriodHasSuffix applies the HasSuffix predicate on the "reset_period" field.
+func ResetPeriodHasSuffix(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldHasSuffix(FieldResetPeriod, v))
+}
+
+// ResetPeriodEqualFold applies the EqualFold predicate on the "reset_period" field.
+func ResetPeriodEqualFold(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldEqualFold(FieldResetPeriod, v))
+}
+
+// ResetPeriodContainsFold applies the ContainsFold predicate on the "reset_period" field.
+func ResetPeriodContainsFold(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldContainsFold(FieldResetPeriod, v))
+}
+
+// PeriodKeyEQ applies the EQ predicate on the "period_key" field.
+func PeriodKeyEQ(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldEQ(FieldPeriodKey, v))
+}
+
+// PeriodKeyNEQ applies the NEQ predicate on the "period_key" field.
+func PeriodKeyNEQ(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldNEQ(FieldPeriodKey, v))
+}
+
+// PeriodKeyIn applies the In predicate on the "period_key" field.
+func PeriodKeyIn(vs ...string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldIn(FieldPeriodKey, vs...))
+}
+
+// PeriodKeyNotIn applies the NotIn predicate on the "period_key" field.
+func PeriodKeyNotIn(vs ...string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldNotIn(FieldPeriodKey, vs...))
+}
+
+// PeriodKeyGT applies the GT predicate on the "period_key" field.
+func PeriodKeyGT(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldGT(FieldPeriodKey, v))
+}
+
+// PeriodKeyGTE applies the GTE predicate on the "period_key" field.
+func PeriodKeyGTE(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldGTE(FieldPeriodKey, v))
+}
+
+// PeriodKeyLT applies the LT predicate on the "period_key" field.
+func PeriodKeyLT(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldLT(FieldPeriodKey, v))
+}
+
+// PeriodKeyLTE applies the LTE predicate on the "period_key" field.
+func PeriodKeyLTE(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldLTE(FieldPeriodKey, v))
+}
+
+// PeriodKeyContains applies the Contains predicate on the "period_key" field.
+func PeriodKeyContains(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldContains(FieldPeriodKey, v))
+}
+
+// PeriodKeyHasPrefix applies the HasPrefix predicate on the "period_key" field.
+func PeriodKeyHasPrefix(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldHasPrefix(FieldPeriodKey, v))
+}
+
+// PeriodKeyHasSuffix applies the HasSuffix predicate on the "period_key" field.
+func PeriodKeyHasSuffix(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldHasSuffix(FieldPeriodKey, v))
+}
+
+// PeriodKeyIsNil applies the IsNil predicate on the "period_key" field.
+func PeriodKeyIsNil() predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldIsNull(FieldPeriodKey))
+}
+
+// PeriodKeyNotNil applies the NotNil predicate on the "period_key" field.
+func PeriodKeyNotNil() predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldNotNull(FieldPeriodKey))
+}
+
+// PeriodKeyEqualFold applies the EqualFold predicate on the "period_key" field.
+func PeriodKeyEqualFold(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldEqualFold(FieldPeriodKey, v))
+}
+
+// PeriodKeyContainsFold applies the ContainsFold predicate on the "period_key" field.
+func PeriodKeyContainsFold(v string) predicate.DocumentSequence {
+	return predicate.DocumentSequence(sql.FieldContainsFold(FieldPeriodKey, v))
 }
 
 // And groups predicates with the AND operator between them.

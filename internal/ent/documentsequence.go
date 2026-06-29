@@ -31,7 +31,13 @@ type DocumentSequence struct {
 	// NextValue holds the value of the "next_value" field.
 	NextValue int64 `json:"next_value,omitempty"`
 	// PadWidth holds the value of the "pad_width" field.
-	PadWidth     int `json:"pad_width,omitempty"`
+	PadWidth int `json:"pad_width,omitempty"`
+	// Template: {prefix} {seq} {yy} {yyyy} {mm}. Empty = {prefix}{seq}.
+	Format string `json:"format,omitempty"`
+	// none | yearly | monthly — when the counter restarts at 1
+	ResetPeriod string `json:"reset_period,omitempty"`
+	// Current period marker (e.g. 2026 or 2026-06); a change triggers a reset
+	PeriodKey    string `json:"period_key,omitempty"`
 	selectValues sql.SelectValues
 }
 
@@ -42,7 +48,7 @@ func (*DocumentSequence) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case documentsequence.FieldNextValue, documentsequence.FieldPadWidth:
 			values[i] = new(sql.NullInt64)
-		case documentsequence.FieldKind, documentsequence.FieldPrefix:
+		case documentsequence.FieldKind, documentsequence.FieldPrefix, documentsequence.FieldFormat, documentsequence.FieldResetPeriod, documentsequence.FieldPeriodKey:
 			values[i] = new(sql.NullString)
 		case documentsequence.FieldCreatedAt, documentsequence.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -111,6 +117,24 @@ func (_m *DocumentSequence) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.PadWidth = int(value.Int64)
 			}
+		case documentsequence.FieldFormat:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field format", values[i])
+			} else if value.Valid {
+				_m.Format = value.String
+			}
+		case documentsequence.FieldResetPeriod:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field reset_period", values[i])
+			} else if value.Valid {
+				_m.ResetPeriod = value.String
+			}
+		case documentsequence.FieldPeriodKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field period_key", values[i])
+			} else if value.Valid {
+				_m.PeriodKey = value.String
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -167,6 +191,15 @@ func (_m *DocumentSequence) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("pad_width=")
 	builder.WriteString(fmt.Sprintf("%v", _m.PadWidth))
+	builder.WriteString(", ")
+	builder.WriteString("format=")
+	builder.WriteString(_m.Format)
+	builder.WriteString(", ")
+	builder.WriteString("reset_period=")
+	builder.WriteString(_m.ResetPeriod)
+	builder.WriteString(", ")
+	builder.WriteString("period_key=")
+	builder.WriteString(_m.PeriodKey)
 	builder.WriteByte(')')
 	return builder.String()
 }

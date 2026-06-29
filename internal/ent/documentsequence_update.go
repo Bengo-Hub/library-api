@@ -125,6 +125,60 @@ func (_u *DocumentSequenceUpdate) AddPadWidth(v int) *DocumentSequenceUpdate {
 	return _u
 }
 
+// SetFormat sets the "format" field.
+func (_u *DocumentSequenceUpdate) SetFormat(v string) *DocumentSequenceUpdate {
+	_u.mutation.SetFormat(v)
+	return _u
+}
+
+// SetNillableFormat sets the "format" field if the given value is not nil.
+func (_u *DocumentSequenceUpdate) SetNillableFormat(v *string) *DocumentSequenceUpdate {
+	if v != nil {
+		_u.SetFormat(*v)
+	}
+	return _u
+}
+
+// ClearFormat clears the value of the "format" field.
+func (_u *DocumentSequenceUpdate) ClearFormat() *DocumentSequenceUpdate {
+	_u.mutation.ClearFormat()
+	return _u
+}
+
+// SetResetPeriod sets the "reset_period" field.
+func (_u *DocumentSequenceUpdate) SetResetPeriod(v string) *DocumentSequenceUpdate {
+	_u.mutation.SetResetPeriod(v)
+	return _u
+}
+
+// SetNillableResetPeriod sets the "reset_period" field if the given value is not nil.
+func (_u *DocumentSequenceUpdate) SetNillableResetPeriod(v *string) *DocumentSequenceUpdate {
+	if v != nil {
+		_u.SetResetPeriod(*v)
+	}
+	return _u
+}
+
+// SetPeriodKey sets the "period_key" field.
+func (_u *DocumentSequenceUpdate) SetPeriodKey(v string) *DocumentSequenceUpdate {
+	_u.mutation.SetPeriodKey(v)
+	return _u
+}
+
+// SetNillablePeriodKey sets the "period_key" field if the given value is not nil.
+func (_u *DocumentSequenceUpdate) SetNillablePeriodKey(v *string) *DocumentSequenceUpdate {
+	if v != nil {
+		_u.SetPeriodKey(*v)
+	}
+	return _u
+}
+
+// ClearPeriodKey clears the value of the "period_key" field.
+func (_u *DocumentSequenceUpdate) ClearPeriodKey() *DocumentSequenceUpdate {
+	_u.mutation.ClearPeriodKey()
+	return _u
+}
+
 // Mutation returns the DocumentSequenceMutation object of the builder.
 func (_u *DocumentSequenceUpdate) Mutation() *DocumentSequenceMutation {
 	return _u.mutation
@@ -214,6 +268,21 @@ func (_u *DocumentSequenceUpdate) sqlSave(ctx context.Context) (_node int, err e
 	}
 	if value, ok := _u.mutation.AddedPadWidth(); ok {
 		_spec.AddField(documentsequence.FieldPadWidth, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.Format(); ok {
+		_spec.SetField(documentsequence.FieldFormat, field.TypeString, value)
+	}
+	if _u.mutation.FormatCleared() {
+		_spec.ClearField(documentsequence.FieldFormat, field.TypeString)
+	}
+	if value, ok := _u.mutation.ResetPeriod(); ok {
+		_spec.SetField(documentsequence.FieldResetPeriod, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.PeriodKey(); ok {
+		_spec.SetField(documentsequence.FieldPeriodKey, field.TypeString, value)
+	}
+	if _u.mutation.PeriodKeyCleared() {
+		_spec.ClearField(documentsequence.FieldPeriodKey, field.TypeString)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -328,6 +397,60 @@ func (_u *DocumentSequenceUpdateOne) SetNillablePadWidth(v *int) *DocumentSequen
 // AddPadWidth adds value to the "pad_width" field.
 func (_u *DocumentSequenceUpdateOne) AddPadWidth(v int) *DocumentSequenceUpdateOne {
 	_u.mutation.AddPadWidth(v)
+	return _u
+}
+
+// SetFormat sets the "format" field.
+func (_u *DocumentSequenceUpdateOne) SetFormat(v string) *DocumentSequenceUpdateOne {
+	_u.mutation.SetFormat(v)
+	return _u
+}
+
+// SetNillableFormat sets the "format" field if the given value is not nil.
+func (_u *DocumentSequenceUpdateOne) SetNillableFormat(v *string) *DocumentSequenceUpdateOne {
+	if v != nil {
+		_u.SetFormat(*v)
+	}
+	return _u
+}
+
+// ClearFormat clears the value of the "format" field.
+func (_u *DocumentSequenceUpdateOne) ClearFormat() *DocumentSequenceUpdateOne {
+	_u.mutation.ClearFormat()
+	return _u
+}
+
+// SetResetPeriod sets the "reset_period" field.
+func (_u *DocumentSequenceUpdateOne) SetResetPeriod(v string) *DocumentSequenceUpdateOne {
+	_u.mutation.SetResetPeriod(v)
+	return _u
+}
+
+// SetNillableResetPeriod sets the "reset_period" field if the given value is not nil.
+func (_u *DocumentSequenceUpdateOne) SetNillableResetPeriod(v *string) *DocumentSequenceUpdateOne {
+	if v != nil {
+		_u.SetResetPeriod(*v)
+	}
+	return _u
+}
+
+// SetPeriodKey sets the "period_key" field.
+func (_u *DocumentSequenceUpdateOne) SetPeriodKey(v string) *DocumentSequenceUpdateOne {
+	_u.mutation.SetPeriodKey(v)
+	return _u
+}
+
+// SetNillablePeriodKey sets the "period_key" field if the given value is not nil.
+func (_u *DocumentSequenceUpdateOne) SetNillablePeriodKey(v *string) *DocumentSequenceUpdateOne {
+	if v != nil {
+		_u.SetPeriodKey(*v)
+	}
+	return _u
+}
+
+// ClearPeriodKey clears the value of the "period_key" field.
+func (_u *DocumentSequenceUpdateOne) ClearPeriodKey() *DocumentSequenceUpdateOne {
+	_u.mutation.ClearPeriodKey()
 	return _u
 }
 
@@ -450,6 +573,21 @@ func (_u *DocumentSequenceUpdateOne) sqlSave(ctx context.Context) (_node *Docume
 	}
 	if value, ok := _u.mutation.AddedPadWidth(); ok {
 		_spec.AddField(documentsequence.FieldPadWidth, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.Format(); ok {
+		_spec.SetField(documentsequence.FieldFormat, field.TypeString, value)
+	}
+	if _u.mutation.FormatCleared() {
+		_spec.ClearField(documentsequence.FieldFormat, field.TypeString)
+	}
+	if value, ok := _u.mutation.ResetPeriod(); ok {
+		_spec.SetField(documentsequence.FieldResetPeriod, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.PeriodKey(); ok {
+		_spec.SetField(documentsequence.FieldPeriodKey, field.TypeString, value)
+	}
+	if _u.mutation.PeriodKeyCleared() {
+		_spec.ClearField(documentsequence.FieldPeriodKey, field.TypeString)
 	}
 	_node = &DocumentSequence{config: _u.config}
 	_spec.Assign = _node.assignValues

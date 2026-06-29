@@ -4119,6 +4119,7 @@ type BookCopyMutation struct {
 	is_reference_only *bool
 	acquisition_cost  *decimal.Decimal
 	acquisition_date  *time.Time
+	notes             *string
 	loan_policy_id    *uuid.UUID
 	clearedFields     map[string]struct{}
 	done              bool
@@ -4799,6 +4800,55 @@ func (m *BookCopyMutation) ResetAcquisitionDate() {
 	delete(m.clearedFields, bookcopy.FieldAcquisitionDate)
 }
 
+// SetNotes sets the "notes" field.
+func (m *BookCopyMutation) SetNotes(s string) {
+	m.notes = &s
+}
+
+// Notes returns the value of the "notes" field in the mutation.
+func (m *BookCopyMutation) Notes() (r string, exists bool) {
+	v := m.notes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNotes returns the old "notes" field's value of the BookCopy entity.
+// If the BookCopy object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *BookCopyMutation) OldNotes(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNotes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNotes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNotes: %w", err)
+	}
+	return oldValue.Notes, nil
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (m *BookCopyMutation) ClearNotes() {
+	m.notes = nil
+	m.clearedFields[bookcopy.FieldNotes] = struct{}{}
+}
+
+// NotesCleared returns if the "notes" field was cleared in this mutation.
+func (m *BookCopyMutation) NotesCleared() bool {
+	_, ok := m.clearedFields[bookcopy.FieldNotes]
+	return ok
+}
+
+// ResetNotes resets all changes to the "notes" field.
+func (m *BookCopyMutation) ResetNotes() {
+	m.notes = nil
+	delete(m.clearedFields, bookcopy.FieldNotes)
+}
+
 // SetLoanPolicyID sets the "loan_policy_id" field.
 func (m *BookCopyMutation) SetLoanPolicyID(u uuid.UUID) {
 	m.loan_policy_id = &u
@@ -4882,7 +4932,7 @@ func (m *BookCopyMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *BookCopyMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 16)
 	if m.created_at != nil {
 		fields = append(fields, bookcopy.FieldCreatedAt)
 	}
@@ -4925,6 +4975,9 @@ func (m *BookCopyMutation) Fields() []string {
 	if m.acquisition_date != nil {
 		fields = append(fields, bookcopy.FieldAcquisitionDate)
 	}
+	if m.notes != nil {
+		fields = append(fields, bookcopy.FieldNotes)
+	}
 	if m.loan_policy_id != nil {
 		fields = append(fields, bookcopy.FieldLoanPolicyID)
 	}
@@ -4964,6 +5017,8 @@ func (m *BookCopyMutation) Field(name string) (ent.Value, bool) {
 		return m.AcquisitionCost()
 	case bookcopy.FieldAcquisitionDate:
 		return m.AcquisitionDate()
+	case bookcopy.FieldNotes:
+		return m.Notes()
 	case bookcopy.FieldLoanPolicyID:
 		return m.LoanPolicyID()
 	}
@@ -5003,6 +5058,8 @@ func (m *BookCopyMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldAcquisitionCost(ctx)
 	case bookcopy.FieldAcquisitionDate:
 		return m.OldAcquisitionDate(ctx)
+	case bookcopy.FieldNotes:
+		return m.OldNotes(ctx)
 	case bookcopy.FieldLoanPolicyID:
 		return m.OldLoanPolicyID(ctx)
 	}
@@ -5112,6 +5169,13 @@ func (m *BookCopyMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetAcquisitionDate(v)
 		return nil
+	case bookcopy.FieldNotes:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNotes(v)
+		return nil
 	case bookcopy.FieldLoanPolicyID:
 		v, ok := value.(uuid.UUID)
 		if !ok {
@@ -5164,6 +5228,9 @@ func (m *BookCopyMutation) ClearedFields() []string {
 	if m.FieldCleared(bookcopy.FieldAcquisitionDate) {
 		fields = append(fields, bookcopy.FieldAcquisitionDate)
 	}
+	if m.FieldCleared(bookcopy.FieldNotes) {
+		fields = append(fields, bookcopy.FieldNotes)
+	}
 	if m.FieldCleared(bookcopy.FieldLoanPolicyID) {
 		fields = append(fields, bookcopy.FieldLoanPolicyID)
 	}
@@ -5195,6 +5262,9 @@ func (m *BookCopyMutation) ClearField(name string) error {
 		return nil
 	case bookcopy.FieldAcquisitionDate:
 		m.ClearAcquisitionDate()
+		return nil
+	case bookcopy.FieldNotes:
+		m.ClearNotes()
 		return nil
 	case bookcopy.FieldLoanPolicyID:
 		m.ClearLoanPolicyID()
@@ -5248,6 +5318,9 @@ func (m *BookCopyMutation) ResetField(name string) error {
 		return nil
 	case bookcopy.FieldAcquisitionDate:
 		m.ResetAcquisitionDate()
+		return nil
+	case bookcopy.FieldNotes:
+		m.ResetNotes()
 		return nil
 	case bookcopy.FieldLoanPolicyID:
 		m.ResetLoanPolicyID()
@@ -8062,6 +8135,9 @@ type DocumentSequenceMutation struct {
 	addnext_value *int64
 	pad_width     *int
 	addpad_width  *int
+	format        *string
+	reset_period  *string
+	period_key    *string
 	clearedFields map[string]struct{}
 	done          bool
 	oldValue      func(context.Context) (*DocumentSequence, error)
@@ -8477,6 +8553,140 @@ func (m *DocumentSequenceMutation) ResetPadWidth() {
 	m.addpad_width = nil
 }
 
+// SetFormat sets the "format" field.
+func (m *DocumentSequenceMutation) SetFormat(s string) {
+	m.format = &s
+}
+
+// Format returns the value of the "format" field in the mutation.
+func (m *DocumentSequenceMutation) Format() (r string, exists bool) {
+	v := m.format
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFormat returns the old "format" field's value of the DocumentSequence entity.
+// If the DocumentSequence object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DocumentSequenceMutation) OldFormat(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFormat is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFormat requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFormat: %w", err)
+	}
+	return oldValue.Format, nil
+}
+
+// ClearFormat clears the value of the "format" field.
+func (m *DocumentSequenceMutation) ClearFormat() {
+	m.format = nil
+	m.clearedFields[documentsequence.FieldFormat] = struct{}{}
+}
+
+// FormatCleared returns if the "format" field was cleared in this mutation.
+func (m *DocumentSequenceMutation) FormatCleared() bool {
+	_, ok := m.clearedFields[documentsequence.FieldFormat]
+	return ok
+}
+
+// ResetFormat resets all changes to the "format" field.
+func (m *DocumentSequenceMutation) ResetFormat() {
+	m.format = nil
+	delete(m.clearedFields, documentsequence.FieldFormat)
+}
+
+// SetResetPeriod sets the "reset_period" field.
+func (m *DocumentSequenceMutation) SetResetPeriod(s string) {
+	m.reset_period = &s
+}
+
+// ResetPeriod returns the value of the "reset_period" field in the mutation.
+func (m *DocumentSequenceMutation) ResetPeriod() (r string, exists bool) {
+	v := m.reset_period
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResetPeriod returns the old "reset_period" field's value of the DocumentSequence entity.
+// If the DocumentSequence object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DocumentSequenceMutation) OldResetPeriod(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResetPeriod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResetPeriod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResetPeriod: %w", err)
+	}
+	return oldValue.ResetPeriod, nil
+}
+
+// ResetResetPeriod resets all changes to the "reset_period" field.
+func (m *DocumentSequenceMutation) ResetResetPeriod() {
+	m.reset_period = nil
+}
+
+// SetPeriodKey sets the "period_key" field.
+func (m *DocumentSequenceMutation) SetPeriodKey(s string) {
+	m.period_key = &s
+}
+
+// PeriodKey returns the value of the "period_key" field in the mutation.
+func (m *DocumentSequenceMutation) PeriodKey() (r string, exists bool) {
+	v := m.period_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPeriodKey returns the old "period_key" field's value of the DocumentSequence entity.
+// If the DocumentSequence object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *DocumentSequenceMutation) OldPeriodKey(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPeriodKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPeriodKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPeriodKey: %w", err)
+	}
+	return oldValue.PeriodKey, nil
+}
+
+// ClearPeriodKey clears the value of the "period_key" field.
+func (m *DocumentSequenceMutation) ClearPeriodKey() {
+	m.period_key = nil
+	m.clearedFields[documentsequence.FieldPeriodKey] = struct{}{}
+}
+
+// PeriodKeyCleared returns if the "period_key" field was cleared in this mutation.
+func (m *DocumentSequenceMutation) PeriodKeyCleared() bool {
+	_, ok := m.clearedFields[documentsequence.FieldPeriodKey]
+	return ok
+}
+
+// ResetPeriodKey resets all changes to the "period_key" field.
+func (m *DocumentSequenceMutation) ResetPeriodKey() {
+	m.period_key = nil
+	delete(m.clearedFields, documentsequence.FieldPeriodKey)
+}
+
 // Where appends a list predicates to the DocumentSequenceMutation builder.
 func (m *DocumentSequenceMutation) Where(ps ...predicate.DocumentSequence) {
 	m.predicates = append(m.predicates, ps...)
@@ -8511,7 +8721,7 @@ func (m *DocumentSequenceMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *DocumentSequenceMutation) Fields() []string {
-	fields := make([]string, 0, 7)
+	fields := make([]string, 0, 10)
 	if m.created_at != nil {
 		fields = append(fields, documentsequence.FieldCreatedAt)
 	}
@@ -8532,6 +8742,15 @@ func (m *DocumentSequenceMutation) Fields() []string {
 	}
 	if m.pad_width != nil {
 		fields = append(fields, documentsequence.FieldPadWidth)
+	}
+	if m.format != nil {
+		fields = append(fields, documentsequence.FieldFormat)
+	}
+	if m.reset_period != nil {
+		fields = append(fields, documentsequence.FieldResetPeriod)
+	}
+	if m.period_key != nil {
+		fields = append(fields, documentsequence.FieldPeriodKey)
 	}
 	return fields
 }
@@ -8555,6 +8774,12 @@ func (m *DocumentSequenceMutation) Field(name string) (ent.Value, bool) {
 		return m.NextValue()
 	case documentsequence.FieldPadWidth:
 		return m.PadWidth()
+	case documentsequence.FieldFormat:
+		return m.Format()
+	case documentsequence.FieldResetPeriod:
+		return m.ResetPeriod()
+	case documentsequence.FieldPeriodKey:
+		return m.PeriodKey()
 	}
 	return nil, false
 }
@@ -8578,6 +8803,12 @@ func (m *DocumentSequenceMutation) OldField(ctx context.Context, name string) (e
 		return m.OldNextValue(ctx)
 	case documentsequence.FieldPadWidth:
 		return m.OldPadWidth(ctx)
+	case documentsequence.FieldFormat:
+		return m.OldFormat(ctx)
+	case documentsequence.FieldResetPeriod:
+		return m.OldResetPeriod(ctx)
+	case documentsequence.FieldPeriodKey:
+		return m.OldPeriodKey(ctx)
 	}
 	return nil, fmt.Errorf("unknown DocumentSequence field %s", name)
 }
@@ -8635,6 +8866,27 @@ func (m *DocumentSequenceMutation) SetField(name string, value ent.Value) error 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPadWidth(v)
+		return nil
+	case documentsequence.FieldFormat:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFormat(v)
+		return nil
+	case documentsequence.FieldResetPeriod:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResetPeriod(v)
+		return nil
+	case documentsequence.FieldPeriodKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPeriodKey(v)
 		return nil
 	}
 	return fmt.Errorf("unknown DocumentSequence field %s", name)
@@ -8696,6 +8948,12 @@ func (m *DocumentSequenceMutation) ClearedFields() []string {
 	if m.FieldCleared(documentsequence.FieldPrefix) {
 		fields = append(fields, documentsequence.FieldPrefix)
 	}
+	if m.FieldCleared(documentsequence.FieldFormat) {
+		fields = append(fields, documentsequence.FieldFormat)
+	}
+	if m.FieldCleared(documentsequence.FieldPeriodKey) {
+		fields = append(fields, documentsequence.FieldPeriodKey)
+	}
 	return fields
 }
 
@@ -8712,6 +8970,12 @@ func (m *DocumentSequenceMutation) ClearField(name string) error {
 	switch name {
 	case documentsequence.FieldPrefix:
 		m.ClearPrefix()
+		return nil
+	case documentsequence.FieldFormat:
+		m.ClearFormat()
+		return nil
+	case documentsequence.FieldPeriodKey:
+		m.ClearPeriodKey()
 		return nil
 	}
 	return fmt.Errorf("unknown DocumentSequence nullable field %s", name)
@@ -8741,6 +9005,15 @@ func (m *DocumentSequenceMutation) ResetField(name string) error {
 		return nil
 	case documentsequence.FieldPadWidth:
 		m.ResetPadWidth()
+		return nil
+	case documentsequence.FieldFormat:
+		m.ResetFormat()
+		return nil
+	case documentsequence.FieldResetPeriod:
+		m.ResetResetPeriod()
+		return nil
+	case documentsequence.FieldPeriodKey:
+		m.ResetPeriodKey()
 		return nil
 	}
 	return fmt.Errorf("unknown DocumentSequence field %s", name)

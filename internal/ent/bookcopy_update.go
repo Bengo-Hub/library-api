@@ -234,6 +234,26 @@ func (_u *BookCopyUpdate) ClearAcquisitionDate() *BookCopyUpdate {
 	return _u
 }
 
+// SetNotes sets the "notes" field.
+func (_u *BookCopyUpdate) SetNotes(v string) *BookCopyUpdate {
+	_u.mutation.SetNotes(v)
+	return _u
+}
+
+// SetNillableNotes sets the "notes" field if the given value is not nil.
+func (_u *BookCopyUpdate) SetNillableNotes(v *string) *BookCopyUpdate {
+	if v != nil {
+		_u.SetNotes(*v)
+	}
+	return _u
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (_u *BookCopyUpdate) ClearNotes() *BookCopyUpdate {
+	_u.mutation.ClearNotes()
+	return _u
+}
+
 // SetLoanPolicyID sets the "loan_policy_id" field.
 func (_u *BookCopyUpdate) SetLoanPolicyID(v uuid.UUID) *BookCopyUpdate {
 	_u.mutation.SetLoanPolicyID(v)
@@ -375,6 +395,12 @@ func (_u *BookCopyUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.AcquisitionDateCleared() {
 		_spec.ClearField(bookcopy.FieldAcquisitionDate, field.TypeTime)
+	}
+	if value, ok := _u.mutation.Notes(); ok {
+		_spec.SetField(bookcopy.FieldNotes, field.TypeString, value)
+	}
+	if _u.mutation.NotesCleared() {
+		_spec.ClearField(bookcopy.FieldNotes, field.TypeString)
 	}
 	if value, ok := _u.mutation.LoanPolicyID(); ok {
 		_spec.SetField(bookcopy.FieldLoanPolicyID, field.TypeUUID, value)
@@ -606,6 +632,26 @@ func (_u *BookCopyUpdateOne) ClearAcquisitionDate() *BookCopyUpdateOne {
 	return _u
 }
 
+// SetNotes sets the "notes" field.
+func (_u *BookCopyUpdateOne) SetNotes(v string) *BookCopyUpdateOne {
+	_u.mutation.SetNotes(v)
+	return _u
+}
+
+// SetNillableNotes sets the "notes" field if the given value is not nil.
+func (_u *BookCopyUpdateOne) SetNillableNotes(v *string) *BookCopyUpdateOne {
+	if v != nil {
+		_u.SetNotes(*v)
+	}
+	return _u
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (_u *BookCopyUpdateOne) ClearNotes() *BookCopyUpdateOne {
+	_u.mutation.ClearNotes()
+	return _u
+}
+
 // SetLoanPolicyID sets the "loan_policy_id" field.
 func (_u *BookCopyUpdateOne) SetLoanPolicyID(v uuid.UUID) *BookCopyUpdateOne {
 	_u.mutation.SetLoanPolicyID(v)
@@ -777,6 +823,12 @@ func (_u *BookCopyUpdateOne) sqlSave(ctx context.Context) (_node *BookCopy, err 
 	}
 	if _u.mutation.AcquisitionDateCleared() {
 		_spec.ClearField(bookcopy.FieldAcquisitionDate, field.TypeTime)
+	}
+	if value, ok := _u.mutation.Notes(); ok {
+		_spec.SetField(bookcopy.FieldNotes, field.TypeString, value)
+	}
+	if _u.mutation.NotesCleared() {
+		_spec.ClearField(bookcopy.FieldNotes, field.TypeString)
 	}
 	if value, ok := _u.mutation.LoanPolicyID(); ok {
 		_spec.SetField(bookcopy.FieldLoanPolicyID, field.TypeUUID, value)
