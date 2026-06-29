@@ -2,11 +2,14 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
+
+	"github.com/bengobox/library-service/internal/modules/barcode"
 
 	"github.com/bengobox/library-service/internal/ent"
 	"github.com/bengobox/library-service/internal/ent/fine"
@@ -351,6 +354,45 @@ func (h *MemberHandler) DeleteMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, http.StatusOK, map[string]any{"deleted": true})
+}
+
+// MemberCard renders a printable membership card (PDF) with a scannable CODE128 barcode of the
+// membership number — used at the self-checkout kiosk to resolve the member.
+// @Router /{tenant}/library/members/{id}/card.pdf [get]
+func (h *MemberHandler) MemberCard(w http.ResponseWriter, r *http.Request) {
+	tenantID, _ := TenantUUID(r)
+	id, err := ParseUUIDParam(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "bad id", "invalid_request")
+		return
+	}
+	m, err := h.db.Member.Query().Where(member.IDEQ(id), member.TenantID(tenantID)).Only(r.Context())
+	if ent.IsNotFound(err) {
+		respondError(w, http.StatusNotFound, "not found", "not_found")
+		return
+	} else if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "load_failed")
+		return
+	}
+	card := barcode.MemberCard{Name: m.DisplayName, MembershipNo: m.MembershipNo}
+	if t, terr := h.db.Tenant.Get(r.Context(), tenantID); terr == nil {
+		card.Org = t.Name
+	}
+	if tier, terr := h.db.MemberTier.Get(r.Context(), m.TierID); terr == nil {
+		card.Tier = tier.Name
+	}
+	if m.ExpiresAt != nil {
+		card.ExpiresAt = m.ExpiresAt.Format("Jan 2006")
+	}
+	pdf, err := barcode.RenderMemberCard(card)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "render_failed")
+		return
+	}
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", "inline; filename=\"member-card-"+m.MembershipNo+".pdf\"")
+	w.Header().Set("Content-Length", strconv.Itoa(len(pdf)))
+	_, _ = w.Write(pdf)
 }
 
 // MemberLoans lists a member's loans.

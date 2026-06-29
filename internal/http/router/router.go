@@ -80,6 +80,7 @@ func New(d Deps) http.Handler {
 	if d.PINAuth != nil {
 		r.Post("/api/v1/{tenant}/library/auth/pin", d.PINAuth.Login)
 		r.Post("/api/v1/{tenant}/library/auth/pin/identify", d.PINAuth.IdentifyByPIN)
+		r.Post("/api/v1/{tenant}/library/auth/pin/card", d.PINAuth.IdentifyByCard)
 		r.Get("/api/v1/{tenant}/library/auth/pin/profiles", d.PINAuth.StaffProfiles)
 		r.Get("/api/v1/{tenant}/library/auth/pin/branches", d.PINAuth.PINBranches)
 	}
@@ -110,6 +111,7 @@ func New(d Deps) http.Handler {
 		lib.Get("/auth/me", d.Auth.Me)
 		if d.PINAuth != nil {
 			lib.Post("/auth/pin/set", d.PINAuth.SetPIN)
+			lib.Get("/auth/me/card.pdf", d.PINAuth.MyCard) // staff prints their own card
 		}
 
 		// Platform-owner-only configuration (credential-encryption key + integration secrets
@@ -191,6 +193,7 @@ func New(d Deps) http.Handler {
 			m.With(view("members")).Get("/members/{id}", d.Member.GetMember)
 			m.With(act("members", "change")).Put("/members/{id}", d.Member.UpdateMember)
 			m.With(act("members", "delete")).Delete("/members/{id}", d.Member.DeleteMember)
+			m.With(view("members")).Get("/members/{id}/card.pdf", d.Member.MemberCard)
 			m.With(view("members")).Get("/members/{id}/loans", d.Member.MemberLoans)
 			m.With(view("members")).Get("/members/{id}/fines", d.Member.MemberFines)
 			m.With(view("member_tiers")).Get("/member-tiers", d.Member.ListTiers)
@@ -250,6 +253,9 @@ func New(d Deps) http.Handler {
 		lib.With(act("team", "manage")).Delete("/rbac/roles/{id}", d.RBACHandler.DeleteRole)
 		lib.With(view("team")).Get("/rbac/permissions", d.RBACHandler.ListPermissions)
 		lib.With(view("team")).Get("/team", d.RBACHandler.ListTeam)
+		if d.PINAuth != nil {
+			lib.With(view("team")).Get("/team/{user_id}/card.pdf", d.PINAuth.StaffCard)
+		}
 		lib.With(act("team", "manage")).Put("/team/{user_id}/roles", d.RBACHandler.AssignRoles)
 		lib.With(act("team", "manage")).Put("/team/{user_id}/branches", d.RBACHandler.AssignBranches)
 

@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -16,6 +18,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/branch"
 	"github.com/bengobox/library-service/internal/ent/libraryuser"
 	"github.com/bengobox/library-service/internal/ent/tenant"
+	"github.com/bengobox/library-service/internal/modules/barcode"
 	"github.com/bengobox/library-service/internal/modules/rbac"
 	"github.com/bengobox/library-service/internal/platform/subscriptions"
 )
@@ -331,6 +334,104 @@ func (h *PINAuthHandler) IdentifyByPIN(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, http.StatusOK, resp)
+}
+
+// IdentifyByCard resolves a staff member from a scanned staff-card serial (the LibraryUser UserID,
+// encoded in the card barcode) and issues a terminal JWT — badge login for the desk/kiosk. Branch
+// scoping (admins → any branch) is enforced exactly like PIN login.
+// @Router /{tenant}/library/auth/pin/card [post]
+func (h *PINAuthHandler) IdentifyByCard(w http.ResponseWriter, r *http.Request) {
+	if len(h.jwtSecret) == 0 {
+		respondError(w, http.StatusServiceUnavailable, "PIN auth not configured", "pin_unconfigured")
+		return
+	}
+	t, ok := h.tenantBySlug(r)
+	if !ok {
+		respondError(w, http.StatusNotFound, "unknown tenant", "not_found")
+		return
+	}
+	var body struct {
+		Card     string `json:"card"`
+		BranchID string `json:"branch_id"`
+	}
+	if err := Decode(r, &body); err != nil || strings.TrimSpace(body.Card) == "" || body.BranchID == "" {
+		respondError(w, http.StatusBadRequest, "card and branch_id are required", "invalid_request")
+		return
+	}
+	br, err := h.db.Branch.Query().Where(branch.IDEQ(uuid.MustParse(orZeroUUID(body.BranchID))), branch.TenantID(t.ID)).Only(r.Context())
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "unknown branch", "invalid_request")
+		return
+	}
+	u, err := h.db.LibraryUser.Query().
+		Where(libraryuser.TenantID(t.ID), libraryuser.UserID(strings.TrimSpace(body.Card)), libraryuser.IsActive(true)).Only(r.Context())
+	if ent.IsNotFound(err) {
+		respondError(w, http.StatusUnauthorized, "card not recognised", "invalid_card")
+		return
+	} else if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "lookup_failed")
+		return
+	}
+	if !branchAllowed(u, br.ID.String()) {
+		respondError(w, http.StatusForbidden, "you are not assigned to this branch", "branch_forbidden")
+		return
+	}
+	resp, err := h.loginResponse(r.Context(), t, u, br)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "token_failed")
+		return
+	}
+	respondJSON(w, http.StatusOK, resp)
+}
+
+// MyCard renders the authenticated staff member's own card (PDF) — "print my card" from the profile.
+// @Router /{tenant}/library/auth/me/card.pdf [get]
+func (h *PINAuthHandler) MyCard(w http.ResponseWriter, r *http.Request) {
+	tenantID, _ := TenantUUID(r)
+	uid := UserIDFrom(r)
+	if uid == "" {
+		respondError(w, http.StatusUnauthorized, "no user", "unauthorized")
+		return
+	}
+	u, err := h.db.LibraryUser.Query().Where(libraryuser.TenantID(tenantID), libraryuser.UserID(uid)).Only(r.Context())
+	if err != nil {
+		respondError(w, http.StatusNotFound, "staff record not found", "not_found")
+		return
+	}
+	h.writeStaffCard(w, r, tenantID, u)
+}
+
+// StaffCard renders a given staff member's card (PDF) — admin prints it from Team & Roles.
+// @Router /{tenant}/library/team/{user_id}/card.pdf [get]
+func (h *PINAuthHandler) StaffCard(w http.ResponseWriter, r *http.Request) {
+	tenantID, _ := TenantUUID(r)
+	uid := chi.URLParam(r, "user_id")
+	u, err := h.db.LibraryUser.Query().Where(libraryuser.TenantID(tenantID), libraryuser.UserID(uid)).Only(r.Context())
+	if err != nil {
+		respondError(w, http.StatusNotFound, "staff record not found", "not_found")
+		return
+	}
+	h.writeStaffCard(w, r, tenantID, u)
+}
+
+func (h *PINAuthHandler) writeStaffCard(w http.ResponseWriter, r *http.Request, tenantID uuid.UUID, u *ent.LibraryUser) {
+	role := ""
+	if len(u.Roles) > 0 {
+		role = strings.ToUpper(strings.ReplaceAll(u.Roles[0], "library_", ""))
+	}
+	card := barcode.MemberCard{Kind: "STAFF CARD", Name: u.DisplayName, MembershipNo: u.UserID, Tier: role}
+	if t, terr := h.db.Tenant.Get(r.Context(), tenantID); terr == nil {
+		card.Org = t.Name
+	}
+	pdf, err := barcode.RenderMemberCard(card)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "render_failed")
+		return
+	}
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", "inline; filename=\"staff-card-"+u.UserID+".pdf\"")
+	w.Header().Set("Content-Length", strconv.Itoa(len(pdf)))
+	_, _ = w.Write(pdf)
 }
 
 // orZeroUUID returns s if it's a valid UUID, else the nil UUID string (so MustParse never panics).
