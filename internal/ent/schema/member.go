@@ -26,8 +26,10 @@ func (Member) Fields() []ent.Field {
 		field.String("display_name").Optional().Comment("Cache for desk UX; SoT is auth/CRM"),
 		field.String("contact_phone").Optional(),
 		field.String("contact_email").Optional(),
+		field.String("address").Optional(),
+		field.String("notes").Optional(),
 		field.Enum("status").
-			Values("ACTIVE", "SUSPENDED", "EXPIRED", "BLOCKED").
+			Values("ACTIVE", "SUSPENDED", "EXPIRED", "BLOCKED", "PENDING").
 			Default("ACTIVE"),
 		field.Bool("is_walk_in").Default(false),
 		field.Time("joined_at").Optional().Nillable(),

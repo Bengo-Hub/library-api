@@ -197,6 +197,46 @@ func (_u *MemberUpdate) ClearContactEmail() *MemberUpdate {
 	return _u
 }
 
+// SetAddress sets the "address" field.
+func (_u *MemberUpdate) SetAddress(v string) *MemberUpdate {
+	_u.mutation.SetAddress(v)
+	return _u
+}
+
+// SetNillableAddress sets the "address" field if the given value is not nil.
+func (_u *MemberUpdate) SetNillableAddress(v *string) *MemberUpdate {
+	if v != nil {
+		_u.SetAddress(*v)
+	}
+	return _u
+}
+
+// ClearAddress clears the value of the "address" field.
+func (_u *MemberUpdate) ClearAddress() *MemberUpdate {
+	_u.mutation.ClearAddress()
+	return _u
+}
+
+// SetNotes sets the "notes" field.
+func (_u *MemberUpdate) SetNotes(v string) *MemberUpdate {
+	_u.mutation.SetNotes(v)
+	return _u
+}
+
+// SetNillableNotes sets the "notes" field if the given value is not nil.
+func (_u *MemberUpdate) SetNillableNotes(v *string) *MemberUpdate {
+	if v != nil {
+		_u.SetNotes(*v)
+	}
+	return _u
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (_u *MemberUpdate) ClearNotes() *MemberUpdate {
+	_u.mutation.ClearNotes()
+	return _u
+}
+
 // SetStatus sets the "status" field.
 func (_u *MemberUpdate) SetStatus(v member.Status) *MemberUpdate {
 	_u.mutation.SetStatus(v)
@@ -380,6 +420,18 @@ func (_u *MemberUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.ContactEmailCleared() {
 		_spec.ClearField(member.FieldContactEmail, field.TypeString)
+	}
+	if value, ok := _u.mutation.Address(); ok {
+		_spec.SetField(member.FieldAddress, field.TypeString, value)
+	}
+	if _u.mutation.AddressCleared() {
+		_spec.ClearField(member.FieldAddress, field.TypeString)
+	}
+	if value, ok := _u.mutation.Notes(); ok {
+		_spec.SetField(member.FieldNotes, field.TypeString, value)
+	}
+	if _u.mutation.NotesCleared() {
+		_spec.ClearField(member.FieldNotes, field.TypeString)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(member.FieldStatus, field.TypeEnum, value)
@@ -584,6 +636,46 @@ func (_u *MemberUpdateOne) SetNillableContactEmail(v *string) *MemberUpdateOne {
 // ClearContactEmail clears the value of the "contact_email" field.
 func (_u *MemberUpdateOne) ClearContactEmail() *MemberUpdateOne {
 	_u.mutation.ClearContactEmail()
+	return _u
+}
+
+// SetAddress sets the "address" field.
+func (_u *MemberUpdateOne) SetAddress(v string) *MemberUpdateOne {
+	_u.mutation.SetAddress(v)
+	return _u
+}
+
+// SetNillableAddress sets the "address" field if the given value is not nil.
+func (_u *MemberUpdateOne) SetNillableAddress(v *string) *MemberUpdateOne {
+	if v != nil {
+		_u.SetAddress(*v)
+	}
+	return _u
+}
+
+// ClearAddress clears the value of the "address" field.
+func (_u *MemberUpdateOne) ClearAddress() *MemberUpdateOne {
+	_u.mutation.ClearAddress()
+	return _u
+}
+
+// SetNotes sets the "notes" field.
+func (_u *MemberUpdateOne) SetNotes(v string) *MemberUpdateOne {
+	_u.mutation.SetNotes(v)
+	return _u
+}
+
+// SetNillableNotes sets the "notes" field if the given value is not nil.
+func (_u *MemberUpdateOne) SetNillableNotes(v *string) *MemberUpdateOne {
+	if v != nil {
+		_u.SetNotes(*v)
+	}
+	return _u
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (_u *MemberUpdateOne) ClearNotes() *MemberUpdateOne {
+	_u.mutation.ClearNotes()
 	return _u
 }
 
@@ -800,6 +892,18 @@ func (_u *MemberUpdateOne) sqlSave(ctx context.Context) (_node *Member, err erro
 	}
 	if _u.mutation.ContactEmailCleared() {
 		_spec.ClearField(member.FieldContactEmail, field.TypeString)
+	}
+	if value, ok := _u.mutation.Address(); ok {
+		_spec.SetField(member.FieldAddress, field.TypeString, value)
+	}
+	if _u.mutation.AddressCleared() {
+		_spec.ClearField(member.FieldAddress, field.TypeString)
+	}
+	if value, ok := _u.mutation.Notes(); ok {
+		_spec.SetField(member.FieldNotes, field.TypeString, value)
+	}
+	if _u.mutation.NotesCleared() {
+		_spec.ClearField(member.FieldNotes, field.TypeString)
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(member.FieldStatus, field.TypeEnum, value)

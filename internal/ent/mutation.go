@@ -18927,6 +18927,8 @@ type MemberMutation struct {
 	display_name   *string
 	contact_phone  *string
 	contact_email  *string
+	address        *string
+	notes          *string
 	status         *member.Status
 	is_walk_in     *bool
 	joined_at      *time.Time
@@ -19515,6 +19517,104 @@ func (m *MemberMutation) ResetContactEmail() {
 	delete(m.clearedFields, member.FieldContactEmail)
 }
 
+// SetAddress sets the "address" field.
+func (m *MemberMutation) SetAddress(s string) {
+	m.address = &s
+}
+
+// Address returns the value of the "address" field in the mutation.
+func (m *MemberMutation) Address() (r string, exists bool) {
+	v := m.address
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAddress returns the old "address" field's value of the Member entity.
+// If the Member object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MemberMutation) OldAddress(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAddress is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAddress requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAddress: %w", err)
+	}
+	return oldValue.Address, nil
+}
+
+// ClearAddress clears the value of the "address" field.
+func (m *MemberMutation) ClearAddress() {
+	m.address = nil
+	m.clearedFields[member.FieldAddress] = struct{}{}
+}
+
+// AddressCleared returns if the "address" field was cleared in this mutation.
+func (m *MemberMutation) AddressCleared() bool {
+	_, ok := m.clearedFields[member.FieldAddress]
+	return ok
+}
+
+// ResetAddress resets all changes to the "address" field.
+func (m *MemberMutation) ResetAddress() {
+	m.address = nil
+	delete(m.clearedFields, member.FieldAddress)
+}
+
+// SetNotes sets the "notes" field.
+func (m *MemberMutation) SetNotes(s string) {
+	m.notes = &s
+}
+
+// Notes returns the value of the "notes" field in the mutation.
+func (m *MemberMutation) Notes() (r string, exists bool) {
+	v := m.notes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNotes returns the old "notes" field's value of the Member entity.
+// If the Member object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MemberMutation) OldNotes(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNotes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNotes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNotes: %w", err)
+	}
+	return oldValue.Notes, nil
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (m *MemberMutation) ClearNotes() {
+	m.notes = nil
+	m.clearedFields[member.FieldNotes] = struct{}{}
+}
+
+// NotesCleared returns if the "notes" field was cleared in this mutation.
+func (m *MemberMutation) NotesCleared() bool {
+	_, ok := m.clearedFields[member.FieldNotes]
+	return ok
+}
+
+// ResetNotes resets all changes to the "notes" field.
+func (m *MemberMutation) ResetNotes() {
+	m.notes = nil
+	delete(m.clearedFields, member.FieldNotes)
+}
+
 // SetStatus sets the "status" field.
 func (m *MemberMutation) SetStatus(value member.Status) {
 	m.status = &value
@@ -19719,7 +19819,7 @@ func (m *MemberMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MemberMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 17)
 	if m.created_at != nil {
 		fields = append(fields, member.FieldCreatedAt)
 	}
@@ -19752,6 +19852,12 @@ func (m *MemberMutation) Fields() []string {
 	}
 	if m.contact_email != nil {
 		fields = append(fields, member.FieldContactEmail)
+	}
+	if m.address != nil {
+		fields = append(fields, member.FieldAddress)
+	}
+	if m.notes != nil {
+		fields = append(fields, member.FieldNotes)
 	}
 	if m.status != nil {
 		fields = append(fields, member.FieldStatus)
@@ -19795,6 +19901,10 @@ func (m *MemberMutation) Field(name string) (ent.Value, bool) {
 		return m.ContactPhone()
 	case member.FieldContactEmail:
 		return m.ContactEmail()
+	case member.FieldAddress:
+		return m.Address()
+	case member.FieldNotes:
+		return m.Notes()
 	case member.FieldStatus:
 		return m.Status()
 	case member.FieldIsWalkIn:
@@ -19834,6 +19944,10 @@ func (m *MemberMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldContactPhone(ctx)
 	case member.FieldContactEmail:
 		return m.OldContactEmail(ctx)
+	case member.FieldAddress:
+		return m.OldAddress(ctx)
+	case member.FieldNotes:
+		return m.OldNotes(ctx)
 	case member.FieldStatus:
 		return m.OldStatus(ctx)
 	case member.FieldIsWalkIn:
@@ -19928,6 +20042,20 @@ func (m *MemberMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetContactEmail(v)
 		return nil
+	case member.FieldAddress:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAddress(v)
+		return nil
+	case member.FieldNotes:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNotes(v)
+		return nil
 	case member.FieldStatus:
 		v, ok := value.(member.Status)
 		if !ok {
@@ -20004,6 +20132,12 @@ func (m *MemberMutation) ClearedFields() []string {
 	if m.FieldCleared(member.FieldContactEmail) {
 		fields = append(fields, member.FieldContactEmail)
 	}
+	if m.FieldCleared(member.FieldAddress) {
+		fields = append(fields, member.FieldAddress)
+	}
+	if m.FieldCleared(member.FieldNotes) {
+		fields = append(fields, member.FieldNotes)
+	}
 	if m.FieldCleared(member.FieldJoinedAt) {
 		fields = append(fields, member.FieldJoinedAt)
 	}
@@ -20041,6 +20175,12 @@ func (m *MemberMutation) ClearField(name string) error {
 		return nil
 	case member.FieldContactEmail:
 		m.ClearContactEmail()
+		return nil
+	case member.FieldAddress:
+		m.ClearAddress()
+		return nil
+	case member.FieldNotes:
+		m.ClearNotes()
 		return nil
 	case member.FieldJoinedAt:
 		m.ClearJoinedAt()
@@ -20088,6 +20228,12 @@ func (m *MemberMutation) ResetField(name string) error {
 		return nil
 	case member.FieldContactEmail:
 		m.ResetContactEmail()
+		return nil
+	case member.FieldAddress:
+		m.ResetAddress()
+		return nil
+	case member.FieldNotes:
+		m.ResetNotes()
 		return nil
 	case member.FieldStatus:
 		m.ResetStatus()

@@ -22,26 +22,33 @@ func SeedGlobalTiersPolicies(ctx context.Context, client *ent.Client, log *zap.L
 		isDefault                                                  bool
 	}
 	tiers := []tier{
-		{"Standard", 3, 14, 2, 5, 3, "10", "1000", "500", true},
-		{"Student", 5, 21, 3, 8, 5, "5", "500", "200", false},
-		{"Senior Citizen", 5, 28, 3, 8, 5, "5", "500", "0", false},
-		{"Staff", 10, 30, 5, 15, 10, "0", "2000", "0", false},
+		{"Standard", 3, 14, 2, 5, 3, "10", "2000", "1000", true},
+		{"Student", 5, 21, 3, 8, 5, "5", "1000", "500", false},
+		{"Senior Citizen", 5, 28, 3, 8, 5, "5", "1000", "200", false},
+		{"Staff", 10, 30, 5, 15, 10, "0", "5000", "0", false},
 	}
 	for _, t := range tiers {
-		exists, err := client.MemberTier.Query().
-			Where(membertier.TenantID(GlobalTenantID), membertier.Name(t.name)).Exist(ctx)
-		if err != nil || exists {
+		existing, err := client.MemberTier.Query().
+			Where(membertier.TenantID(GlobalTenantID), membertier.Name(t.name)).First(ctx)
+		if ent.IsNotFound(err) {
+			if _, cerr := client.MemberTier.Create().
+				SetTenantID(GlobalTenantID).SetName(t.name).
+				SetMaxConcurrentLoans(t.loans).SetLoanPeriodDays(t.period).SetMaxRenewals(t.renewals).
+				SetHoldLimit(t.holds).SetEbookConcurrentLimit(t.ebooks).
+				SetDailyFineRate(decimal.RequireFromString(t.fineRate)).
+				SetMaxFineBeforeBlock(decimal.RequireFromString(t.maxFine)).
+				SetAnnualFee(decimal.RequireFromString(t.annual)).
+				SetIsDefault(t.isDefault).Save(ctx); cerr != nil {
+				log.Warn("seed global tier failed", zap.String("name", t.name), zap.Error(cerr))
+			}
+			continue
+		} else if err != nil {
 			continue
 		}
-		if _, err := client.MemberTier.Create().
-			SetTenantID(GlobalTenantID).SetName(t.name).
-			SetMaxConcurrentLoans(t.loans).SetLoanPeriodDays(t.period).SetMaxRenewals(t.renewals).
-			SetHoldLimit(t.holds).SetEbookConcurrentLimit(t.ebooks).
-			SetDailyFineRate(decimal.RequireFromString(t.fineRate)).
-			SetMaxFineBeforeBlock(decimal.RequireFromString(t.maxFine)).
-			SetAnnualFee(decimal.RequireFromString(t.annual)).
-			SetIsDefault(t.isDefault).Save(ctx); err != nil {
-			log.Warn("seed global tier failed", zap.String("name", t.name), zap.Error(err))
+		// Heal: ensure the seeded default fee is set (earlier seeds shipped with 0 fees).
+		if existing.AnnualFee.IsZero() && t.annual != "0" {
+			_, _ = client.MemberTier.UpdateOne(existing).
+				SetAnnualFee(decimal.RequireFromString(t.annual)).Save(ctx)
 		}
 	}
 

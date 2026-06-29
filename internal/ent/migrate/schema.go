@@ -707,7 +707,9 @@ var (
 		{Name: "display_name", Type: field.TypeString, Nullable: true},
 		{Name: "contact_phone", Type: field.TypeString, Nullable: true},
 		{Name: "contact_email", Type: field.TypeString, Nullable: true},
-		{Name: "status", Type: field.TypeEnum, Enums: []string{"ACTIVE", "SUSPENDED", "EXPIRED", "BLOCKED"}, Default: "ACTIVE"},
+		{Name: "address", Type: field.TypeString, Nullable: true},
+		{Name: "notes", Type: field.TypeString, Nullable: true},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"ACTIVE", "SUSPENDED", "EXPIRED", "BLOCKED", "PENDING"}, Default: "ACTIVE"},
 		{Name: "is_walk_in", Type: field.TypeBool, Default: false},
 		{Name: "joined_at", Type: field.TypeTime, Nullable: true},
 		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
@@ -741,7 +743,7 @@ var (
 			{
 				Name:    "member_tenant_id_status",
 				Unique:  false,
-				Columns: []*schema.Column{MembersColumns[3], MembersColumns[12]},
+				Columns: []*schema.Column{MembersColumns[3], MembersColumns[14]},
 			},
 		},
 	}

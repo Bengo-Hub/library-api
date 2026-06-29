@@ -37,6 +37,10 @@ const (
 	FieldContactPhone = "contact_phone"
 	// FieldContactEmail holds the string denoting the contact_email field in the database.
 	FieldContactEmail = "contact_email"
+	// FieldAddress holds the string denoting the address field in the database.
+	FieldAddress = "address"
+	// FieldNotes holds the string denoting the notes field in the database.
+	FieldNotes = "notes"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldIsWalkIn holds the string denoting the is_walk_in field in the database.
@@ -63,6 +67,8 @@ var Columns = []string{
 	FieldDisplayName,
 	FieldContactPhone,
 	FieldContactEmail,
+	FieldAddress,
+	FieldNotes,
 	FieldStatus,
 	FieldIsWalkIn,
 	FieldJoinedAt,
@@ -106,6 +112,7 @@ const (
 	StatusSUSPENDED Status = "SUSPENDED"
 	StatusEXPIRED   Status = "EXPIRED"
 	StatusBLOCKED   Status = "BLOCKED"
+	StatusPENDING   Status = "PENDING"
 )
 
 func (s Status) String() string {
@@ -115,7 +122,7 @@ func (s Status) String() string {
 // StatusValidator is a validator for the "status" field enum values. It is called by the builders before save.
 func StatusValidator(s Status) error {
 	switch s {
-	case StatusACTIVE, StatusSUSPENDED, StatusEXPIRED, StatusBLOCKED:
+	case StatusACTIVE, StatusSUSPENDED, StatusEXPIRED, StatusBLOCKED, StatusPENDING:
 		return nil
 	default:
 		return fmt.Errorf("member: invalid enum value for status field: %q", s)
@@ -183,6 +190,16 @@ func ByContactPhone(opts ...sql.OrderTermOption) OrderOption {
 // ByContactEmail orders the results by the contact_email field.
 func ByContactEmail(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldContactEmail, opts...).ToFunc()
+}
+
+// ByAddress orders the results by the address field.
+func ByAddress(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAddress, opts...).ToFunc()
+}
+
+// ByNotes orders the results by the notes field.
+func ByNotes(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNotes, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

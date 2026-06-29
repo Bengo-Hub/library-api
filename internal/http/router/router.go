@@ -197,6 +197,7 @@ func New(d Deps) http.Handler {
 			m.With(act("member_tiers", "change")).Put("/member-tiers/{id}", d.Member.UpdateTier)
 			m.With(view("loan_policies")).Get("/loan-policies", d.Member.ListPolicies)
 			m.With(act("loan_policies", "add")).Post("/loan-policies", d.Member.CreatePolicy)
+			m.With(act("loan_policies", "change")).Put("/loan-policies/{id}", d.Member.UpdatePolicy)
 			m.With(view("membership_fees")).Get("/membership-fees", d.Membership.List)
 			m.With(act("membership_fees", "add")).Post("/members/{id}/membership-fee", d.Membership.Issue)
 			m.With(act("membership_fees", "pay")).Post("/membership-fees/{id}/pay", d.Membership.Pay)

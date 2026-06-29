@@ -579,7 +579,7 @@ func init() {
 	// member.MembershipNoValidator is a validator for the "membership_no" field. It is called by the builders before save.
 	member.MembershipNoValidator = memberDescMembershipNo.Validators[0].(func(string) error)
 	// memberDescIsWalkIn is the schema descriptor for is_walk_in field.
-	memberDescIsWalkIn := memberFields[9].Descriptor()
+	memberDescIsWalkIn := memberFields[11].Descriptor()
 	// member.DefaultIsWalkIn holds the default value on creation for the is_walk_in field.
 	member.DefaultIsWalkIn = memberDescIsWalkIn.Default.(bool)
 	// memberDescID is the schema descriptor for id field.

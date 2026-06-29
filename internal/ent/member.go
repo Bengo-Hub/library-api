@@ -40,6 +40,10 @@ type Member struct {
 	ContactPhone string `json:"contact_phone,omitempty"`
 	// ContactEmail holds the value of the "contact_email" field.
 	ContactEmail string `json:"contact_email,omitempty"`
+	// Address holds the value of the "address" field.
+	Address string `json:"address,omitempty"`
+	// Notes holds the value of the "notes" field.
+	Notes string `json:"notes,omitempty"`
 	// Status holds the value of the "status" field.
 	Status member.Status `json:"status,omitempty"`
 	// IsWalkIn holds the value of the "is_walk_in" field.
@@ -60,7 +64,7 @@ func (*Member) scanValues(columns []string) ([]any, error) {
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		case member.FieldIsWalkIn:
 			values[i] = new(sql.NullBool)
-		case member.FieldMembershipNo, member.FieldDisplayName, member.FieldContactPhone, member.FieldContactEmail, member.FieldStatus:
+		case member.FieldMembershipNo, member.FieldDisplayName, member.FieldContactPhone, member.FieldContactEmail, member.FieldAddress, member.FieldNotes, member.FieldStatus:
 			values[i] = new(sql.NullString)
 		case member.FieldCreatedAt, member.FieldUpdatedAt, member.FieldJoinedAt, member.FieldExpiresAt:
 			values[i] = new(sql.NullTime)
@@ -155,6 +159,18 @@ func (_m *Member) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field contact_email", values[i])
 			} else if value.Valid {
 				_m.ContactEmail = value.String
+			}
+		case member.FieldAddress:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field address", values[i])
+			} else if value.Valid {
+				_m.Address = value.String
+			}
+		case member.FieldNotes:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field notes", values[i])
+			} else if value.Valid {
+				_m.Notes = value.String
 			}
 		case member.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -256,6 +272,12 @@ func (_m *Member) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("contact_email=")
 	builder.WriteString(_m.ContactEmail)
+	builder.WriteString(", ")
+	builder.WriteString("address=")
+	builder.WriteString(_m.Address)
+	builder.WriteString(", ")
+	builder.WriteString("notes=")
+	builder.WriteString(_m.Notes)
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Status))

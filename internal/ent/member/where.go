@@ -110,6 +110,16 @@ func ContactEmail(v string) predicate.Member {
 	return predicate.Member(sql.FieldEQ(FieldContactEmail, v))
 }
 
+// Address applies equality check predicate on the "address" field. It's identical to AddressEQ.
+func Address(v string) predicate.Member {
+	return predicate.Member(sql.FieldEQ(FieldAddress, v))
+}
+
+// Notes applies equality check predicate on the "notes" field. It's identical to NotesEQ.
+func Notes(v string) predicate.Member {
+	return predicate.Member(sql.FieldEQ(FieldNotes, v))
+}
+
 // IsWalkIn applies equality check predicate on the "is_walk_in" field. It's identical to IsWalkInEQ.
 func IsWalkIn(v bool) predicate.Member {
 	return predicate.Member(sql.FieldEQ(FieldIsWalkIn, v))
@@ -723,6 +733,156 @@ func ContactEmailEqualFold(v string) predicate.Member {
 // ContactEmailContainsFold applies the ContainsFold predicate on the "contact_email" field.
 func ContactEmailContainsFold(v string) predicate.Member {
 	return predicate.Member(sql.FieldContainsFold(FieldContactEmail, v))
+}
+
+// AddressEQ applies the EQ predicate on the "address" field.
+func AddressEQ(v string) predicate.Member {
+	return predicate.Member(sql.FieldEQ(FieldAddress, v))
+}
+
+// AddressNEQ applies the NEQ predicate on the "address" field.
+func AddressNEQ(v string) predicate.Member {
+	return predicate.Member(sql.FieldNEQ(FieldAddress, v))
+}
+
+// AddressIn applies the In predicate on the "address" field.
+func AddressIn(vs ...string) predicate.Member {
+	return predicate.Member(sql.FieldIn(FieldAddress, vs...))
+}
+
+// AddressNotIn applies the NotIn predicate on the "address" field.
+func AddressNotIn(vs ...string) predicate.Member {
+	return predicate.Member(sql.FieldNotIn(FieldAddress, vs...))
+}
+
+// AddressGT applies the GT predicate on the "address" field.
+func AddressGT(v string) predicate.Member {
+	return predicate.Member(sql.FieldGT(FieldAddress, v))
+}
+
+// AddressGTE applies the GTE predicate on the "address" field.
+func AddressGTE(v string) predicate.Member {
+	return predicate.Member(sql.FieldGTE(FieldAddress, v))
+}
+
+// AddressLT applies the LT predicate on the "address" field.
+func AddressLT(v string) predicate.Member {
+	return predicate.Member(sql.FieldLT(FieldAddress, v))
+}
+
+// AddressLTE applies the LTE predicate on the "address" field.
+func AddressLTE(v string) predicate.Member {
+	return predicate.Member(sql.FieldLTE(FieldAddress, v))
+}
+
+// AddressContains applies the Contains predicate on the "address" field.
+func AddressContains(v string) predicate.Member {
+	return predicate.Member(sql.FieldContains(FieldAddress, v))
+}
+
+// AddressHasPrefix applies the HasPrefix predicate on the "address" field.
+func AddressHasPrefix(v string) predicate.Member {
+	return predicate.Member(sql.FieldHasPrefix(FieldAddress, v))
+}
+
+// AddressHasSuffix applies the HasSuffix predicate on the "address" field.
+func AddressHasSuffix(v string) predicate.Member {
+	return predicate.Member(sql.FieldHasSuffix(FieldAddress, v))
+}
+
+// AddressIsNil applies the IsNil predicate on the "address" field.
+func AddressIsNil() predicate.Member {
+	return predicate.Member(sql.FieldIsNull(FieldAddress))
+}
+
+// AddressNotNil applies the NotNil predicate on the "address" field.
+func AddressNotNil() predicate.Member {
+	return predicate.Member(sql.FieldNotNull(FieldAddress))
+}
+
+// AddressEqualFold applies the EqualFold predicate on the "address" field.
+func AddressEqualFold(v string) predicate.Member {
+	return predicate.Member(sql.FieldEqualFold(FieldAddress, v))
+}
+
+// AddressContainsFold applies the ContainsFold predicate on the "address" field.
+func AddressContainsFold(v string) predicate.Member {
+	return predicate.Member(sql.FieldContainsFold(FieldAddress, v))
+}
+
+// NotesEQ applies the EQ predicate on the "notes" field.
+func NotesEQ(v string) predicate.Member {
+	return predicate.Member(sql.FieldEQ(FieldNotes, v))
+}
+
+// NotesNEQ applies the NEQ predicate on the "notes" field.
+func NotesNEQ(v string) predicate.Member {
+	return predicate.Member(sql.FieldNEQ(FieldNotes, v))
+}
+
+// NotesIn applies the In predicate on the "notes" field.
+func NotesIn(vs ...string) predicate.Member {
+	return predicate.Member(sql.FieldIn(FieldNotes, vs...))
+}
+
+// NotesNotIn applies the NotIn predicate on the "notes" field.
+func NotesNotIn(vs ...string) predicate.Member {
+	return predicate.Member(sql.FieldNotIn(FieldNotes, vs...))
+}
+
+// NotesGT applies the GT predicate on the "notes" field.
+func NotesGT(v string) predicate.Member {
+	return predicate.Member(sql.FieldGT(FieldNotes, v))
+}
+
+// NotesGTE applies the GTE predicate on the "notes" field.
+func NotesGTE(v string) predicate.Member {
+	return predicate.Member(sql.FieldGTE(FieldNotes, v))
+}
+
+// NotesLT applies the LT predicate on the "notes" field.
+func NotesLT(v string) predicate.Member {
+	return predicate.Member(sql.FieldLT(FieldNotes, v))
+}
+
+// NotesLTE applies the LTE predicate on the "notes" field.
+func NotesLTE(v string) predicate.Member {
+	return predicate.Member(sql.FieldLTE(FieldNotes, v))
+}
+
+// NotesContains applies the Contains predicate on the "notes" field.
+func NotesContains(v string) predicate.Member {
+	return predicate.Member(sql.FieldContains(FieldNotes, v))
+}
+
+// NotesHasPrefix applies the HasPrefix predicate on the "notes" field.
+func NotesHasPrefix(v string) predicate.Member {
+	return predicate.Member(sql.FieldHasPrefix(FieldNotes, v))
+}
+
+// NotesHasSuffix applies the HasSuffix predicate on the "notes" field.
+func NotesHasSuffix(v string) predicate.Member {
+	return predicate.Member(sql.FieldHasSuffix(FieldNotes, v))
+}
+
+// NotesIsNil applies the IsNil predicate on the "notes" field.
+func NotesIsNil() predicate.Member {
+	return predicate.Member(sql.FieldIsNull(FieldNotes))
+}
+
+// NotesNotNil applies the NotNil predicate on the "notes" field.
+func NotesNotNil() predicate.Member {
+	return predicate.Member(sql.FieldNotNull(FieldNotes))
+}
+
+// NotesEqualFold applies the EqualFold predicate on the "notes" field.
+func NotesEqualFold(v string) predicate.Member {
+	return predicate.Member(sql.FieldEqualFold(FieldNotes, v))
+}
+
+// NotesContainsFold applies the ContainsFold predicate on the "notes" field.
+func NotesContainsFold(v string) predicate.Member {
+	return predicate.Member(sql.FieldContainsFold(FieldNotes, v))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

@@ -154,6 +154,34 @@ func (_c *MemberCreate) SetNillableContactEmail(v *string) *MemberCreate {
 	return _c
 }
 
+// SetAddress sets the "address" field.
+func (_c *MemberCreate) SetAddress(v string) *MemberCreate {
+	_c.mutation.SetAddress(v)
+	return _c
+}
+
+// SetNillableAddress sets the "address" field if the given value is not nil.
+func (_c *MemberCreate) SetNillableAddress(v *string) *MemberCreate {
+	if v != nil {
+		_c.SetAddress(*v)
+	}
+	return _c
+}
+
+// SetNotes sets the "notes" field.
+func (_c *MemberCreate) SetNotes(v string) *MemberCreate {
+	_c.mutation.SetNotes(v)
+	return _c
+}
+
+// SetNillableNotes sets the "notes" field if the given value is not nil.
+func (_c *MemberCreate) SetNillableNotes(v *string) *MemberCreate {
+	if v != nil {
+		_c.SetNotes(*v)
+	}
+	return _c
+}
+
 // SetStatus sets the "status" field.
 func (_c *MemberCreate) SetStatus(v member.Status) *MemberCreate {
 	_c.mutation.SetStatus(v)
@@ -394,6 +422,14 @@ func (_c *MemberCreate) createSpec() (*Member, *sqlgraph.CreateSpec) {
 		_spec.SetField(member.FieldContactEmail, field.TypeString, value)
 		_node.ContactEmail = value
 	}
+	if value, ok := _c.mutation.Address(); ok {
+		_spec.SetField(member.FieldAddress, field.TypeString, value)
+		_node.Address = value
+	}
+	if value, ok := _c.mutation.Notes(); ok {
+		_spec.SetField(member.FieldNotes, field.TypeString, value)
+		_node.Notes = value
+	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(member.FieldStatus, field.TypeEnum, value)
 		_node.Status = value
@@ -615,6 +651,42 @@ func (u *MemberUpsert) UpdateContactEmail() *MemberUpsert {
 // ClearContactEmail clears the value of the "contact_email" field.
 func (u *MemberUpsert) ClearContactEmail() *MemberUpsert {
 	u.SetNull(member.FieldContactEmail)
+	return u
+}
+
+// SetAddress sets the "address" field.
+func (u *MemberUpsert) SetAddress(v string) *MemberUpsert {
+	u.Set(member.FieldAddress, v)
+	return u
+}
+
+// UpdateAddress sets the "address" field to the value that was provided on create.
+func (u *MemberUpsert) UpdateAddress() *MemberUpsert {
+	u.SetExcluded(member.FieldAddress)
+	return u
+}
+
+// ClearAddress clears the value of the "address" field.
+func (u *MemberUpsert) ClearAddress() *MemberUpsert {
+	u.SetNull(member.FieldAddress)
+	return u
+}
+
+// SetNotes sets the "notes" field.
+func (u *MemberUpsert) SetNotes(v string) *MemberUpsert {
+	u.Set(member.FieldNotes, v)
+	return u
+}
+
+// UpdateNotes sets the "notes" field to the value that was provided on create.
+func (u *MemberUpsert) UpdateNotes() *MemberUpsert {
+	u.SetExcluded(member.FieldNotes)
+	return u
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (u *MemberUpsert) ClearNotes() *MemberUpsert {
+	u.SetNull(member.FieldNotes)
 	return u
 }
 
@@ -908,6 +980,48 @@ func (u *MemberUpsertOne) UpdateContactEmail() *MemberUpsertOne {
 func (u *MemberUpsertOne) ClearContactEmail() *MemberUpsertOne {
 	return u.Update(func(s *MemberUpsert) {
 		s.ClearContactEmail()
+	})
+}
+
+// SetAddress sets the "address" field.
+func (u *MemberUpsertOne) SetAddress(v string) *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.SetAddress(v)
+	})
+}
+
+// UpdateAddress sets the "address" field to the value that was provided on create.
+func (u *MemberUpsertOne) UpdateAddress() *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.UpdateAddress()
+	})
+}
+
+// ClearAddress clears the value of the "address" field.
+func (u *MemberUpsertOne) ClearAddress() *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.ClearAddress()
+	})
+}
+
+// SetNotes sets the "notes" field.
+func (u *MemberUpsertOne) SetNotes(v string) *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.SetNotes(v)
+	})
+}
+
+// UpdateNotes sets the "notes" field to the value that was provided on create.
+func (u *MemberUpsertOne) UpdateNotes() *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.UpdateNotes()
+	})
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (u *MemberUpsertOne) ClearNotes() *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.ClearNotes()
 	})
 }
 
@@ -1378,6 +1492,48 @@ func (u *MemberUpsertBulk) UpdateContactEmail() *MemberUpsertBulk {
 func (u *MemberUpsertBulk) ClearContactEmail() *MemberUpsertBulk {
 	return u.Update(func(s *MemberUpsert) {
 		s.ClearContactEmail()
+	})
+}
+
+// SetAddress sets the "address" field.
+func (u *MemberUpsertBulk) SetAddress(v string) *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.SetAddress(v)
+	})
+}
+
+// UpdateAddress sets the "address" field to the value that was provided on create.
+func (u *MemberUpsertBulk) UpdateAddress() *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.UpdateAddress()
+	})
+}
+
+// ClearAddress clears the value of the "address" field.
+func (u *MemberUpsertBulk) ClearAddress() *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.ClearAddress()
+	})
+}
+
+// SetNotes sets the "notes" field.
+func (u *MemberUpsertBulk) SetNotes(v string) *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.SetNotes(v)
+	})
+}
+
+// UpdateNotes sets the "notes" field to the value that was provided on create.
+func (u *MemberUpsertBulk) UpdateNotes() *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.UpdateNotes()
+	})
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (u *MemberUpsertBulk) ClearNotes() *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.ClearNotes()
 	})
 }
 
