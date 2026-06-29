@@ -90,8 +90,8 @@ func (h *MembershipHandler) startPayment(w http.ResponseWriter, r *http.Request,
 		respondError(w, http.StatusServiceUnavailable, "payments unavailable", "treasury_unwired")
 		return
 	}
-	claims, _ := ClaimsFrom(r)
-	resp, err := h.treasury.CreateIntent(r.Context(), claims.GetTenantSlug(), fee.ID.String(), treasury.CreateIntentRequest{
+	// treasury's S2S endpoint keys the path on the tenant UUID (not slug).
+	resp, err := h.treasury.CreateIntent(r.Context(), fee.TenantID.String(), fee.ID.String(), treasury.CreateIntentRequest{
 		SourceService: "library",
 		ReferenceID:   fee.ID.String(),
 		ReferenceType: "membership_fee",

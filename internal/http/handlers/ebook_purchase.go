@@ -27,7 +27,6 @@ func (h *EbookHandler) Purchase(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusUnauthorized, "missing tenant", "unauthorized")
 		return
 	}
-	claims, _ := ClaimsFrom(r)
 	id, err := ParseUUIDParam(chi.URLParam(r, "id"))
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "bad id", "invalid_request")
@@ -64,7 +63,7 @@ func (h *EbookHandler) Purchase(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err.Error(), "purchase_failed")
 		return
 	}
-	resp, err := h.treasury.CreateIntent(r.Context(), claims.GetTenantSlug(), purchase.ID.String(), treasury.CreateIntentRequest{
+	resp, err := h.treasury.CreateIntent(r.Context(), purchase.TenantID.String(), purchase.ID.String(), treasury.CreateIntentRequest{
 		SourceService: "library",
 		ReferenceID:   purchase.ID.String(),
 		ReferenceType: "ebook_sale",

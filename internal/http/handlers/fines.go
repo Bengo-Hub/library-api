@@ -83,7 +83,6 @@ type payResponse struct {
 // @Router /{tenant}/library/fines/{id}/pay [post]
 func (h *FineHandler) Pay(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := TenantUUID(r)
-	claims, _ := ClaimsFrom(r)
 	id, err := ParseUUIDParam(chi.URLParam(r, "id"))
 	if err != nil {
 		respondError(w, http.StatusBadRequest, "bad id", "invalid_request")
@@ -106,7 +105,7 @@ func (h *FineHandler) Pay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	outstanding := f.Amount.Sub(f.AmountPaid)
-	resp, err := h.treasury.CreateIntent(r.Context(), claims.GetTenantSlug(), f.ID.String(), treasury.CreateIntentRequest{
+	resp, err := h.treasury.CreateIntent(r.Context(), f.TenantID.String(), f.ID.String(), treasury.CreateIntentRequest{
 		SourceService: "library",
 		ReferenceID:   f.ID.String(),
 		ReferenceType: "library_fine",
