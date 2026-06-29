@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
@@ -13,6 +15,8 @@ import (
 	"github.com/shopspring/decimal"
 
 	"github.com/bengobox/library-service/internal/ent"
+	"github.com/bengobox/library-service/internal/ent/bibrecord"
+	"github.com/bengobox/library-service/internal/ent/bookcopy"
 	"github.com/bengobox/library-service/internal/ent/branch"
 	"github.com/bengobox/library-service/internal/ent/membertier"
 	"github.com/google/uuid"
@@ -82,21 +86,33 @@ func seedDemo(ctx context.Context, client *ent.Client, tenantID uuid.UUID) error
 		{"The Go Programming Language", "Donovan & Kernighan", "9780134190440"},
 		{"Things Fall Apart", "Chinua Achebe", "9780385474542"},
 	}
-	for i, s := range samples {
-		bib, berr := client.BibRecord.Create().
-			SetTenantID(tenantID).SetTitle(s.title).SetAuthors([]string{s.author}).SetIsbn13(s.isbn).
-			Save(ctx)
+	for _, s := range samples {
+		// Get-or-create the bib (idempotent by ISBN) so re-runs don't duplicate titles.
+		bib, berr := client.BibRecord.Query().
+			Where(bibrecord.TenantID(tenantID), bibrecord.Isbn13(s.isbn)).First(ctx)
 		if berr != nil {
-			continue
+			bib, berr = client.BibRecord.Create().
+				SetTenantID(tenantID).SetTitle(s.title).SetAuthors([]string{s.author}).SetIsbn13(s.isbn).
+				Save(ctx)
+			if berr != nil {
+				continue
+			}
 		}
-		_, _ = client.BookCopy.Create().
-			SetTenantID(tenantID).SetBibRecordID(bib.ID).SetBranchID(br.ID).
-			SetBarcode("DEMO-" + s.isbn).SetAccessionNo("ACC00000" + itoa(i+1)).
-			Save(ctx)
+		// Ensure at least demoCopiesPerTitle physical copies (idempotent by barcode).
+		have, _ := client.BookCopy.Query().
+			Where(bookcopy.TenantID(tenantID), bookcopy.BibRecordID(bib.ID)).Count(ctx)
+		for n := have + 1; n <= demoCopiesPerTitle; n++ {
+			barcode := fmt.Sprintf("DEMO-%s-%02d", s.isbn, n)
+			_, _ = client.BookCopy.Create().
+				SetTenantID(tenantID).SetBibRecordID(bib.ID).SetBranchID(br.ID).
+				SetBarcode(barcode).SetAccessionNo(barcode).
+				SetStatus(bookcopy.StatusAVAILABLE).SetCondition("good").
+				SetAcquisitionDate(time.Now()).
+				Save(ctx)
+		}
 	}
 	return nil
 }
 
-func itoa(n int) string {
-	return string(rune('0' + n))
-}
+// demoCopiesPerTitle mirrors refdata: each demo physical title gets at least this many copies.
+const demoCopiesPerTitle = 5

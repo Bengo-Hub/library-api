@@ -138,6 +138,10 @@ func New(ctx context.Context) (*App, error) {
 	if err := refdata.SeedDemoStaff(ctx, ormClient, log); err != nil {
 		log.Warn("seed demo staff failed", zap.Error(err))
 	}
+	// Top demo physical titles up to 5 copies each (idempotent; no-op for other tenants).
+	if err := refdata.SeedDemoCopies(ctx, ormClient, log); err != nil {
+		log.Warn("seed demo copies failed", zap.Error(err))
+	}
 	// Push the library role catalogue to the auth registry (idempotent; best-effort) so
 	// auth-ui can assign service-level library roles. Runs off the request path.
 	go func() {
