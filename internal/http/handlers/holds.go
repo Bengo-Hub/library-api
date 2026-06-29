@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -9,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/bengobox/library-service/internal/ent"
+	"github.com/bengobox/library-service/internal/ent/bibrecord"
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
 	"github.com/bengobox/library-service/internal/ent/hold"
 	"github.com/bengobox/library-service/internal/ent/member"
@@ -25,25 +27,97 @@ func NewHoldHandler(db *ent.Client, log *zap.Logger) *HoldHandler {
 	return &HoldHandler{db: db, log: log}
 }
 
+// holdStatusToWire maps the stored enum to the library-ui HoldStatus contract (WAITING → pending).
+func holdStatusToWire(s hold.Status) string {
+	if s == hold.StatusWAITING {
+		return "pending"
+	}
+	return strings.ToLower(string(s))
+}
+
+// holdStatusFromWire maps a UI status filter back to the stored enum (pending → WAITING).
+func holdStatusFromWire(s string) hold.Status {
+	if strings.EqualFold(s, "pending") {
+		return hold.StatusWAITING
+	}
+	return hold.Status(strings.ToUpper(s))
+}
+
+type holdResponse struct {
+	ID            string  `json:"id"`
+	BibRecordID   string  `json:"bib_record_id"`
+	BibTitle      string  `json:"bib_title,omitempty"`
+	MemberID      string  `json:"member_id"`
+	MemberName    string  `json:"member_name,omitempty"`
+	MembershipNo  string  `json:"membership_no,omitempty"`
+	BranchID      string  `json:"branch_id,omitempty"`
+	QueuePosition int     `json:"queue_position"`
+	Status        string  `json:"status"`
+	PlacedAt      string  `json:"placed_at,omitempty"`
+	ReadyAt       *string `json:"ready_at,omitempty"`
+	ExpiresAt     *string `json:"expires_at,omitempty"`
+}
+
 // List godoc
 // @Router /{tenant}/library/holds [get]
 func (h *HoldHandler) List(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := TenantUUID(r)
+	ctx := r.Context()
 	q := h.db.Hold.Query().Where(hold.TenantID(tenantID))
 	if s := r.URL.Query().Get("status"); s != "" {
-		q = q.Where(hold.StatusEQ(hold.Status(s)))
+		q = q.Where(hold.StatusEQ(holdStatusFromWire(s)))
 	}
 	if mid := r.URL.Query().Get("member_id"); mid != "" {
 		if id, err := uuid.Parse(mid); err == nil {
 			q = q.Where(hold.MemberID(id))
 		}
 	}
-	rows, err := q.Order(ent.Asc(hold.FieldQueuePosition)).All(r.Context())
+	rows, err := q.Order(ent.Asc(hold.FieldQueuePosition)).All(ctx)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	// Batch-resolve bib titles + member names/numbers.
+	bibIDs := make([]uuid.UUID, 0, len(rows))
+	memberIDs := make([]uuid.UUID, 0, len(rows))
+	for _, hd := range rows {
+		bibIDs = append(bibIDs, hd.BibRecordID)
+		memberIDs = append(memberIDs, hd.MemberID)
+	}
+	titles := map[uuid.UUID]string{}
+	if len(bibIDs) > 0 {
+		bibs, _ := h.db.BibRecord.Query().Where(bibrecord.TenantID(tenantID), bibrecord.IDIn(bibIDs...)).All(ctx)
+		for _, b := range bibs {
+			titles[b.ID] = b.Title
+		}
+	}
+	type minfo struct{ name, no string }
+	members := map[uuid.UUID]minfo{}
+	if len(memberIDs) > 0 {
+		ms, _ := h.db.Member.Query().Where(member.TenantID(tenantID), member.IDIn(memberIDs...)).All(ctx)
+		for _, m := range ms {
+			members[m.ID] = minfo{name: m.DisplayName, no: m.MembershipNo}
+		}
+	}
+	out := make([]holdResponse, 0, len(rows))
+	for _, hd := range rows {
+		resp := holdResponse{
+			ID: hd.ID.String(), BibRecordID: hd.BibRecordID.String(), BibTitle: titles[hd.BibRecordID],
+			MemberID: hd.MemberID.String(), MemberName: members[hd.MemberID].name, MembershipNo: members[hd.MemberID].no,
+			BranchID: hd.BranchID.String(), QueuePosition: hd.QueuePosition, Status: holdStatusToWire(hd.Status),
+			PlacedAt: hd.PlacedAt.Format(time.RFC3339),
+		}
+		if hd.ReadyAt != nil {
+			s := hd.ReadyAt.Format(time.RFC3339)
+			resp.ReadyAt = &s
+		}
+		if hd.ExpiresAt != nil {
+			s := hd.ExpiresAt.Format(time.RFC3339)
+			resp.ExpiresAt = &s
+		}
+		out = append(out, resp)
+	}
+	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
 }
 
 type holdRequest struct {
