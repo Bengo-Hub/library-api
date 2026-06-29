@@ -190,6 +190,7 @@ func New(d Deps) http.Handler {
 			m.With(act("members", "add")).Post("/members", d.Member.CreateMember)
 			m.With(view("members")).Get("/members/{id}", d.Member.GetMember)
 			m.With(act("members", "change")).Put("/members/{id}", d.Member.UpdateMember)
+			m.With(act("members", "delete")).Delete("/members/{id}", d.Member.DeleteMember)
 			m.With(view("members")).Get("/members/{id}/loans", d.Member.MemberLoans)
 			m.With(view("members")).Get("/members/{id}/fines", d.Member.MemberFines)
 			m.With(view("member_tiers")).Get("/member-tiers", d.Member.ListTiers)

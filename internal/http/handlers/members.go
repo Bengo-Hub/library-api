@@ -323,6 +323,36 @@ func (h *MemberHandler) UpdateMember(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, h.singleMemberResponse(r, tenantID, row))
 }
 
+// DeleteMember removes a member (blocked when they have active loans or unpaid fines).
+// @Router /{tenant}/library/members/{id} [delete]
+func (h *MemberHandler) DeleteMember(w http.ResponseWriter, r *http.Request) {
+	tenantID, _ := TenantUUID(r)
+	id, err := ParseUUIDParam(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "bad id", "invalid_request")
+		return
+	}
+	ctx := r.Context()
+	exists, _ := h.db.Member.Query().Where(member.IDEQ(id), member.TenantID(tenantID)).Exist(ctx)
+	if !exists {
+		respondError(w, http.StatusNotFound, "not found", "not_found")
+		return
+	}
+	if n, _ := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.MemberID(id), loan.StatusEQ(loan.StatusACTIVE)).Count(ctx); n > 0 {
+		respondError(w, http.StatusConflict, "member has active loans — return them first", "has_active_loans")
+		return
+	}
+	if n, _ := h.db.Fine.Query().Where(fine.TenantID(tenantID), fine.MemberID(id), fine.StatusIn(fine.StatusUNPAID, fine.StatusPARTIAL)).Count(ctx); n > 0 {
+		respondError(w, http.StatusConflict, "member has unpaid fines — settle or waive them first", "has_unpaid_fines")
+		return
+	}
+	if err := h.db.Member.DeleteOneID(id).Exec(ctx); err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "delete_failed")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"deleted": true})
+}
+
 // MemberLoans lists a member's loans.
 // @Router /{tenant}/library/members/{id}/loans [get]
 func (h *MemberHandler) MemberLoans(w http.ResponseWriter, r *http.Request) {
