@@ -3,16 +3,110 @@ package handlers
 import (
 	"errors"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/bengobox/library-service/internal/ent"
+	"github.com/bengobox/library-service/internal/ent/bibrecord"
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
 	"github.com/bengobox/library-service/internal/ent/loan"
+	"github.com/bengobox/library-service/internal/ent/member"
 	"github.com/bengobox/library-service/internal/modules/circulation"
 )
+
+// loanResponse is the library-ui Loan contract (copy barcode + bib title + member resolved,
+// status lower-cased, overdue derived from due date).
+type loanResponse struct {
+	ID           string  `json:"id"`
+	CopyID       string  `json:"copy_id"`
+	CopyBarcode  string  `json:"copy_barcode,omitempty"`
+	BibRecordID  string  `json:"bib_record_id,omitempty"`
+	BibTitle     string  `json:"bib_title,omitempty"`
+	MemberID     string  `json:"member_id"`
+	MemberName   string  `json:"member_name,omitempty"`
+	MembershipNo string  `json:"membership_no,omitempty"`
+	Status       string  `json:"status"`
+	InHouse      bool    `json:"in_house"`
+	CheckedOutAt string  `json:"checked_out_at"`
+	DueDate      string  `json:"due_date"`
+	ReturnedAt   *string `json:"returned_at,omitempty"`
+	Renewals     int     `json:"renewals"`
+	BranchID     string  `json:"branch_id,omitempty"`
+}
+
+func (h *CirculationHandler) buildLoanResponses(r *http.Request, tenantID uuid.UUID, rows []*ent.Loan) []loanResponse {
+	ctx := r.Context()
+	now := time.Now()
+	copyIDs := make([]uuid.UUID, 0, len(rows))
+	memberIDs := make([]uuid.UUID, 0, len(rows))
+	for _, l := range rows {
+		copyIDs = append(copyIDs, l.CopyID)
+		memberIDs = append(memberIDs, l.MemberID)
+	}
+	// copy → barcode + bib_record_id, then bib → title.
+	type cinfo struct {
+		barcode string
+		bibID   uuid.UUID
+	}
+	copies := map[uuid.UUID]cinfo{}
+	bibIDset := map[uuid.UUID]struct{}{}
+	if len(copyIDs) > 0 {
+		cs, _ := h.db.BookCopy.Query().Where(bookcopy.TenantID(tenantID), bookcopy.IDIn(copyIDs...)).All(ctx)
+		for _, c := range cs {
+			copies[c.ID] = cinfo{barcode: c.Barcode, bibID: c.BibRecordID}
+			bibIDset[c.BibRecordID] = struct{}{}
+		}
+	}
+	titles := map[uuid.UUID]string{}
+	if len(bibIDset) > 0 {
+		ids := make([]uuid.UUID, 0, len(bibIDset))
+		for id := range bibIDset {
+			ids = append(ids, id)
+		}
+		bs, _ := h.db.BibRecord.Query().Where(bibrecord.TenantID(tenantID), bibrecord.IDIn(ids...)).All(ctx)
+		for _, b := range bs {
+			titles[b.ID] = b.Title
+		}
+	}
+	type minfo struct{ name, no string }
+	members := map[uuid.UUID]minfo{}
+	if len(memberIDs) > 0 {
+		ms, _ := h.db.Member.Query().Where(member.TenantID(tenantID), member.IDIn(memberIDs...)).All(ctx)
+		for _, m := range ms {
+			members[m.ID] = minfo{name: m.DisplayName, no: m.MembershipNo}
+		}
+	}
+	out := make([]loanResponse, 0, len(rows))
+	for _, l := range rows {
+		c := copies[l.CopyID]
+		status := strings.ToLower(string(l.Status))
+		if l.Status == loan.StatusACTIVE && l.DueAt.Before(now) {
+			status = "overdue"
+		}
+		resp := loanResponse{
+			ID: l.ID.String(), CopyID: l.CopyID.String(), CopyBarcode: c.barcode, BibRecordID: c.bibID.String(),
+			BibTitle: titles[c.bibID], MemberID: l.MemberID.String(), MemberName: members[l.MemberID].name,
+			MembershipNo: members[l.MemberID].no, Status: status, InHouse: l.InHouse,
+			CheckedOutAt: l.CheckoutAt.Format(time.RFC3339), DueDate: l.DueAt.Format(time.RFC3339),
+			Renewals: l.RenewalsCount, BranchID: l.BranchID.String(),
+		}
+		if l.ReturnedAt != nil {
+			s := l.ReturnedAt.Format(time.RFC3339)
+			resp.ReturnedAt = &s
+		}
+		out = append(out, resp)
+	}
+	return out
+}
+
+func (h *CirculationHandler) loanResponseOne(r *http.Request, tenantID uuid.UUID, l *ent.Loan) loanResponse {
+	out := h.buildLoanResponses(r, tenantID, []*ent.Loan{l})
+	return out[0]
+}
 
 // CirculationHandler serves the circulation desk endpoints.
 type CirculationHandler struct {
@@ -64,7 +158,8 @@ func (h *CirculationHandler) Checkout(w http.ResponseWriter, r *http.Request) {
 		h.writeCircErr(w, err)
 		return
 	}
-	respondJSON(w, http.StatusCreated, l)
+	// Shape: { loan } — the library-ui CheckoutResult reads res.loan.
+	respondJSON(w, http.StatusCreated, map[string]any{"loan": h.loanResponseOne(r, tenantID, l)})
 }
 
 type returnRequest struct {
@@ -97,7 +192,21 @@ func (h *CirculationHandler) Return(w http.ResponseWriter, r *http.Request) {
 		h.writeCircErr(w, err)
 		return
 	}
-	respondJSON(w, http.StatusOK, res)
+	// Shape to the library-ui ReturnResult { loan, fine_amount, hold_triggered, message }.
+	out := map[string]any{"hold_triggered": res.PromotedHld != nil}
+	if res.Loan != nil {
+		out["loan"] = h.loanResponseOne(r, tenantID, res.Loan)
+	}
+	if res.Fine != nil {
+		out["fine_amount"] = res.Fine.Amount.Sub(res.Fine.AmountPaid).InexactFloat64()
+		out["message"] = "Returned with an outstanding fine."
+	} else {
+		out["message"] = "Returned."
+	}
+	if res.PromotedHld != nil {
+		out["message"] = "Returned — a waiting hold is now ready for pickup."
+	}
+	respondJSON(w, http.StatusOK, out)
 }
 
 // Renew godoc
@@ -120,7 +229,7 @@ func (h *CirculationHandler) Renew(w http.ResponseWriter, r *http.Request) {
 		h.writeCircErr(w, err)
 		return
 	}
-	respondJSON(w, http.StatusOK, l)
+	respondJSON(w, http.StatusOK, map[string]any{"loan": h.loanResponseOne(r, tenantID, l)})
 }
 
 // ListLoans godoc
@@ -132,7 +241,12 @@ func (h *CirculationHandler) ListLoans(w http.ResponseWriter, r *http.Request) {
 	limit, offset := PageParams(r)
 	q := h.db.Loan.Query().Where(loan.TenantID(tenantID))
 	if s := r.URL.Query().Get("status"); s != "" {
-		q = q.Where(loan.StatusEQ(loan.Status(s)))
+		// "overdue" is a derived view of ACTIVE loans past due, not a stored status.
+		if strings.EqualFold(s, "overdue") {
+			q = q.Where(loan.StatusEQ(loan.StatusACTIVE), loan.DueAtLT(time.Now()))
+		} else {
+			q = q.Where(loan.StatusEQ(loan.Status(strings.ToUpper(s))))
+		}
 	}
 	if mid := r.URL.Query().Get("member_id"); mid != "" {
 		if id, err := uuid.Parse(mid); err == nil {
@@ -140,7 +254,7 @@ func (h *CirculationHandler) ListLoans(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if r.URL.Query().Get("overdue") == "true" {
-		q = q.Where(loan.StatusEQ(loan.StatusACTIVE))
+		q = q.Where(loan.StatusEQ(loan.StatusACTIVE), loan.DueAtLT(time.Now()))
 	}
 	total, _ := q.Clone().Count(r.Context())
 	rows, err := q.Order(ent.Desc(loan.FieldCheckoutAt)).Limit(limit).Offset(offset).All(r.Context())
@@ -148,7 +262,7 @@ func (h *CirculationHandler) ListLoans(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: total})
+	respondJSON(w, http.StatusOK, listEnvelope{Data: h.buildLoanResponses(r, tenantID, rows), Total: total})
 }
 
 func (h *CirculationHandler) resolveCopyID(r *http.Request, tenantID uuid.UUID, copyID, barcode string) (uuid.UUID, error) {

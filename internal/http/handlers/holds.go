@@ -196,3 +196,34 @@ func (h *HoldHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	}
 	respondJSON(w, http.StatusOK, map[string]any{"cancelled": true})
 }
+
+// MarkReady moves a WAITING hold to READY (shelf hold), stamping ready_at + a pickup deadline so
+// the desk can notify the patron. Idempotent-ish: only WAITING holds can be marked ready.
+// @Router /{tenant}/library/holds/{id}/ready [post]
+func (h *HoldHandler) MarkReady(w http.ResponseWriter, r *http.Request) {
+	tenantID, _ := TenantUUID(r)
+	id, err := ParseUUIDParam(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "bad id", "invalid_request")
+		return
+	}
+	hd, err := h.db.Hold.Query().Where(hold.IDEQ(id), hold.TenantID(tenantID)).Only(r.Context())
+	if ent.IsNotFound(err) {
+		respondError(w, http.StatusNotFound, "not found", "not_found")
+		return
+	} else if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "load_failed")
+		return
+	}
+	if hd.Status != hold.StatusWAITING {
+		respondError(w, http.StatusConflict, "only a pending hold can be marked ready", "invalid_state")
+		return
+	}
+	now := time.Now()
+	if _, err := h.db.Hold.UpdateOneID(id).
+		SetStatus(hold.StatusREADY).SetReadyAt(now).SetExpiresAt(now.AddDate(0, 0, 3)).Save(r.Context()); err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "update_failed")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"ready": true})
+}

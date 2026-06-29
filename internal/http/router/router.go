@@ -218,6 +218,7 @@ func New(d Deps) http.Handler {
 			h.Use(libmw.RequireFeature("library_holds"))
 			h.With(view("holds")).Get("/holds", d.Hold.List)
 			h.With(act("holds", "place")).Post("/holds", d.Hold.Place)
+			h.With(act("holds", "change")).Post("/holds/{id}/ready", d.Hold.MarkReady)
 			h.With(act("holds", "delete")).Delete("/holds/{id}", d.Hold.Cancel)
 		})
 
