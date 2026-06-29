@@ -22,6 +22,8 @@ type Tx struct {
 	BookCopy *BookCopyClient
 	// Branch is the client for interacting with the Branch builders.
 	Branch *BranchClient
+	// CatalogTerm is the client for interacting with the CatalogTerm builders.
+	CatalogTerm *CatalogTermClient
 	// Collection is the client for interacting with the Collection builders.
 	Collection *CollectionClient
 	// CopyTransfer is the client for interacting with the CopyTransfer builders.
@@ -200,6 +202,7 @@ func (tx *Tx) init() {
 	tx.BibRecord = NewBibRecordClient(tx.config)
 	tx.BookCopy = NewBookCopyClient(tx.config)
 	tx.Branch = NewBranchClient(tx.config)
+	tx.CatalogTerm = NewCatalogTermClient(tx.config)
 	tx.Collection = NewCollectionClient(tx.config)
 	tx.CopyTransfer = NewCopyTransferClient(tx.config)
 	tx.DocumentSequence = NewDocumentSequenceClient(tx.config)

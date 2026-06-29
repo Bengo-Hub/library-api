@@ -69,6 +69,18 @@ func (f BranchFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, erro
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.BranchMutation", m)
 }
 
+// The CatalogTermFunc type is an adapter to allow the use of ordinary
+// function as CatalogTerm mutator.
+type CatalogTermFunc func(context.Context, *ent.CatalogTermMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f CatalogTermFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.CatalogTermMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.CatalogTermMutation", m)
+}
+
 // The CollectionFunc type is an adapter to allow the use of ordinary
 // function as Collection mutator.
 type CollectionFunc func(context.Context, *ent.CollectionMutation) (ent.Value, error)

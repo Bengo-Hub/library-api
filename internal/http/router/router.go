@@ -153,6 +153,9 @@ func New(d Deps) http.Handler {
 			c.With(act("catalog", "delete")).Delete("/bibs/{id}", d.Catalog.DeleteBib)
 			c.With(act("catalog", "change")).Post("/bibs/{id}/cover", d.Catalog.UploadCover)
 			c.With(act("catalog", "add")).Post("/import/marc", d.Catalog.ImportMarc)
+			// Cataloging dictionaries (author/publisher/place/subject pickers)
+			c.With(view("catalog")).Get("/terms", d.Catalog.ListTerms)
+			c.With(act("catalog", "add")).Post("/terms", d.Catalog.CreateTerm)
 			// Collections
 			c.With(view("catalog")).Get("/collections", d.Catalog.ListCollections)
 			c.With(act("collections", "add")).Post("/collections", d.Catalog.CreateCollection)

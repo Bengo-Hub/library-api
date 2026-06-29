@@ -20,6 +20,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/bibrecord"
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
 	"github.com/bengobox/library-service/internal/ent/branch"
+	"github.com/bengobox/library-service/internal/ent/catalogterm"
 	"github.com/bengobox/library-service/internal/ent/collection"
 	"github.com/bengobox/library-service/internal/ent/copytransfer"
 	"github.com/bengobox/library-service/internal/ent/documentsequence"
@@ -58,6 +59,8 @@ type Client struct {
 	BookCopy *BookCopyClient
 	// Branch is the client for interacting with the Branch builders.
 	Branch *BranchClient
+	// CatalogTerm is the client for interacting with the CatalogTerm builders.
+	CatalogTerm *CatalogTermClient
 	// Collection is the client for interacting with the Collection builders.
 	Collection *CollectionClient
 	// CopyTransfer is the client for interacting with the CopyTransfer builders.
@@ -116,6 +119,7 @@ func (c *Client) init() {
 	c.BibRecord = NewBibRecordClient(c.config)
 	c.BookCopy = NewBookCopyClient(c.config)
 	c.Branch = NewBranchClient(c.config)
+	c.CatalogTerm = NewCatalogTermClient(c.config)
 	c.Collection = NewCollectionClient(c.config)
 	c.CopyTransfer = NewCopyTransferClient(c.config)
 	c.DocumentSequence = NewDocumentSequenceClient(c.config)
@@ -234,6 +238,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		BibRecord:        NewBibRecordClient(cfg),
 		BookCopy:         NewBookCopyClient(cfg),
 		Branch:           NewBranchClient(cfg),
+		CatalogTerm:      NewCatalogTermClient(cfg),
 		Collection:       NewCollectionClient(cfg),
 		CopyTransfer:     NewCopyTransferClient(cfg),
 		DocumentSequence: NewDocumentSequenceClient(cfg),
@@ -279,6 +284,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		BibRecord:        NewBibRecordClient(cfg),
 		BookCopy:         NewBookCopyClient(cfg),
 		Branch:           NewBranchClient(cfg),
+		CatalogTerm:      NewCatalogTermClient(cfg),
 		Collection:       NewCollectionClient(cfg),
 		CopyTransfer:     NewCopyTransferClient(cfg),
 		DocumentSequence: NewDocumentSequenceClient(cfg),
@@ -329,11 +335,11 @@ func (c *Client) Close() error {
 // In order to add hooks to a specific client, call: `client.Node.Use(...)`.
 func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
-		c.AuditLog, c.Author, c.BibRecord, c.BookCopy, c.Branch, c.Collection,
-		c.CopyTransfer, c.DocumentSequence, c.Ebook, c.EbookLoan, c.EbookPurchase,
-		c.Fine, c.Hold, c.LibraryRole, c.LibraryUser, c.Loan, c.LoanPolicy, c.Member,
-		c.MemberTier, c.MembershipFee, c.OutboxEvent, c.Publisher, c.ServiceConfig,
-		c.StockCount, c.Subject, c.Tenant,
+		c.AuditLog, c.Author, c.BibRecord, c.BookCopy, c.Branch, c.CatalogTerm,
+		c.Collection, c.CopyTransfer, c.DocumentSequence, c.Ebook, c.EbookLoan,
+		c.EbookPurchase, c.Fine, c.Hold, c.LibraryRole, c.LibraryUser, c.Loan,
+		c.LoanPolicy, c.Member, c.MemberTier, c.MembershipFee, c.OutboxEvent,
+		c.Publisher, c.ServiceConfig, c.StockCount, c.Subject, c.Tenant,
 	} {
 		n.Use(hooks...)
 	}
@@ -343,11 +349,11 @@ func (c *Client) Use(hooks ...Hook) {
 // In order to add interceptors to a specific client, call: `client.Node.Intercept(...)`.
 func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
-		c.AuditLog, c.Author, c.BibRecord, c.BookCopy, c.Branch, c.Collection,
-		c.CopyTransfer, c.DocumentSequence, c.Ebook, c.EbookLoan, c.EbookPurchase,
-		c.Fine, c.Hold, c.LibraryRole, c.LibraryUser, c.Loan, c.LoanPolicy, c.Member,
-		c.MemberTier, c.MembershipFee, c.OutboxEvent, c.Publisher, c.ServiceConfig,
-		c.StockCount, c.Subject, c.Tenant,
+		c.AuditLog, c.Author, c.BibRecord, c.BookCopy, c.Branch, c.CatalogTerm,
+		c.Collection, c.CopyTransfer, c.DocumentSequence, c.Ebook, c.EbookLoan,
+		c.EbookPurchase, c.Fine, c.Hold, c.LibraryRole, c.LibraryUser, c.Loan,
+		c.LoanPolicy, c.Member, c.MemberTier, c.MembershipFee, c.OutboxEvent,
+		c.Publisher, c.ServiceConfig, c.StockCount, c.Subject, c.Tenant,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -366,6 +372,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.BookCopy.mutate(ctx, m)
 	case *BranchMutation:
 		return c.Branch.mutate(ctx, m)
+	case *CatalogTermMutation:
+		return c.CatalogTerm.mutate(ctx, m)
 	case *CollectionMutation:
 		return c.Collection.mutate(ctx, m)
 	case *CopyTransferMutation:
@@ -1075,6 +1083,139 @@ func (c *BranchClient) mutate(ctx context.Context, m *BranchMutation) (Value, er
 		return (&BranchDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Branch mutation op: %q", m.Op())
+	}
+}
+
+// CatalogTermClient is a client for the CatalogTerm schema.
+type CatalogTermClient struct {
+	config
+}
+
+// NewCatalogTermClient returns a client for the CatalogTerm from the given config.
+func NewCatalogTermClient(c config) *CatalogTermClient {
+	return &CatalogTermClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `catalogterm.Hooks(f(g(h())))`.
+func (c *CatalogTermClient) Use(hooks ...Hook) {
+	c.hooks.CatalogTerm = append(c.hooks.CatalogTerm, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `catalogterm.Intercept(f(g(h())))`.
+func (c *CatalogTermClient) Intercept(interceptors ...Interceptor) {
+	c.inters.CatalogTerm = append(c.inters.CatalogTerm, interceptors...)
+}
+
+// Create returns a builder for creating a CatalogTerm entity.
+func (c *CatalogTermClient) Create() *CatalogTermCreate {
+	mutation := newCatalogTermMutation(c.config, OpCreate)
+	return &CatalogTermCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of CatalogTerm entities.
+func (c *CatalogTermClient) CreateBulk(builders ...*CatalogTermCreate) *CatalogTermCreateBulk {
+	return &CatalogTermCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *CatalogTermClient) MapCreateBulk(slice any, setFunc func(*CatalogTermCreate, int)) *CatalogTermCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &CatalogTermCreateBulk{err: fmt.Errorf("calling to CatalogTermClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*CatalogTermCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &CatalogTermCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for CatalogTerm.
+func (c *CatalogTermClient) Update() *CatalogTermUpdate {
+	mutation := newCatalogTermMutation(c.config, OpUpdate)
+	return &CatalogTermUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *CatalogTermClient) UpdateOne(_m *CatalogTerm) *CatalogTermUpdateOne {
+	mutation := newCatalogTermMutation(c.config, OpUpdateOne, withCatalogTerm(_m))
+	return &CatalogTermUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *CatalogTermClient) UpdateOneID(id uuid.UUID) *CatalogTermUpdateOne {
+	mutation := newCatalogTermMutation(c.config, OpUpdateOne, withCatalogTermID(id))
+	return &CatalogTermUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for CatalogTerm.
+func (c *CatalogTermClient) Delete() *CatalogTermDelete {
+	mutation := newCatalogTermMutation(c.config, OpDelete)
+	return &CatalogTermDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *CatalogTermClient) DeleteOne(_m *CatalogTerm) *CatalogTermDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *CatalogTermClient) DeleteOneID(id uuid.UUID) *CatalogTermDeleteOne {
+	builder := c.Delete().Where(catalogterm.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &CatalogTermDeleteOne{builder}
+}
+
+// Query returns a query builder for CatalogTerm.
+func (c *CatalogTermClient) Query() *CatalogTermQuery {
+	return &CatalogTermQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeCatalogTerm},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a CatalogTerm entity by its id.
+func (c *CatalogTermClient) Get(ctx context.Context, id uuid.UUID) (*CatalogTerm, error) {
+	return c.Query().Where(catalogterm.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *CatalogTermClient) GetX(ctx context.Context, id uuid.UUID) *CatalogTerm {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *CatalogTermClient) Hooks() []Hook {
+	return c.hooks.CatalogTerm
+}
+
+// Interceptors returns the client interceptors.
+func (c *CatalogTermClient) Interceptors() []Interceptor {
+	return c.inters.CatalogTerm
+}
+
+func (c *CatalogTermClient) mutate(ctx context.Context, m *CatalogTermMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&CatalogTermCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&CatalogTermUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&CatalogTermUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&CatalogTermDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown CatalogTerm mutation op: %q", m.Op())
 	}
 }
 
@@ -3874,15 +4015,16 @@ func (c *TenantClient) mutate(ctx context.Context, m *TenantMutation) (Value, er
 // hooks and interceptors per client, for fast access.
 type (
 	hooks struct {
-		AuditLog, Author, BibRecord, BookCopy, Branch, Collection, CopyTransfer,
-		DocumentSequence, Ebook, EbookLoan, EbookPurchase, Fine, Hold, LibraryRole,
-		LibraryUser, Loan, LoanPolicy, Member, MemberTier, MembershipFee, OutboxEvent,
-		Publisher, ServiceConfig, StockCount, Subject, Tenant []ent.Hook
+		AuditLog, Author, BibRecord, BookCopy, Branch, CatalogTerm, Collection,
+		CopyTransfer, DocumentSequence, Ebook, EbookLoan, EbookPurchase, Fine, Hold,
+		LibraryRole, LibraryUser, Loan, LoanPolicy, Member, MemberTier, MembershipFee,
+		OutboxEvent, Publisher, ServiceConfig, StockCount, Subject, Tenant []ent.Hook
 	}
 	inters struct {
-		AuditLog, Author, BibRecord, BookCopy, Branch, Collection, CopyTransfer,
-		DocumentSequence, Ebook, EbookLoan, EbookPurchase, Fine, Hold, LibraryRole,
-		LibraryUser, Loan, LoanPolicy, Member, MemberTier, MembershipFee, OutboxEvent,
-		Publisher, ServiceConfig, StockCount, Subject, Tenant []ent.Interceptor
+		AuditLog, Author, BibRecord, BookCopy, Branch, CatalogTerm, Collection,
+		CopyTransfer, DocumentSequence, Ebook, EbookLoan, EbookPurchase, Fine, Hold,
+		LibraryRole, LibraryUser, Loan, LoanPolicy, Member, MemberTier, MembershipFee,
+		OutboxEvent, Publisher, ServiceConfig, StockCount, Subject,
+		Tenant []ent.Interceptor
 	}
 )

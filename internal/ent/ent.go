@@ -17,6 +17,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/bibrecord"
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
 	"github.com/bengobox/library-service/internal/ent/branch"
+	"github.com/bengobox/library-service/internal/ent/catalogterm"
 	"github.com/bengobox/library-service/internal/ent/collection"
 	"github.com/bengobox/library-service/internal/ent/copytransfer"
 	"github.com/bengobox/library-service/internal/ent/documentsequence"
@@ -103,6 +104,7 @@ func checkColumn(t, c string) error {
 			bibrecord.Table:        bibrecord.ValidColumn,
 			bookcopy.Table:         bookcopy.ValidColumn,
 			branch.Table:           branch.ValidColumn,
+			catalogterm.Table:      catalogterm.ValidColumn,
 			collection.Table:       collection.ValidColumn,
 			copytransfer.Table:     copytransfer.ValidColumn,
 			documentsequence.Table: documentsequence.ValidColumn,

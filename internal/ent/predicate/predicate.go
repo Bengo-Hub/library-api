@@ -21,6 +21,9 @@ type BookCopy func(*sql.Selector)
 // Branch is the predicate function for branch builders.
 type Branch func(*sql.Selector)
 
+// CatalogTerm is the predicate function for catalogterm builders.
+type CatalogTerm func(*sql.Selector)
+
 // Collection is the predicate function for collection builders.
 type Collection func(*sql.Selector)
 

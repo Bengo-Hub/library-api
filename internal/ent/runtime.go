@@ -10,6 +10,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/bibrecord"
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
 	"github.com/bengobox/library-service/internal/ent/branch"
+	"github.com/bengobox/library-service/internal/ent/catalogterm"
 	"github.com/bengobox/library-service/internal/ent/collection"
 	"github.com/bengobox/library-service/internal/ent/copytransfer"
 	"github.com/bengobox/library-service/internal/ent/documentsequence"
@@ -183,6 +184,33 @@ func init() {
 	branchDescID := branchMixinFields0[0].Descriptor()
 	// branch.DefaultID holds the default value on creation for the id field.
 	branch.DefaultID = branchDescID.Default.(func() uuid.UUID)
+	catalogtermMixin := schema.CatalogTerm{}.Mixin()
+	catalogtermMixinFields0 := catalogtermMixin[0].Fields()
+	_ = catalogtermMixinFields0
+	catalogtermFields := schema.CatalogTerm{}.Fields()
+	_ = catalogtermFields
+	// catalogtermDescCreatedAt is the schema descriptor for created_at field.
+	catalogtermDescCreatedAt := catalogtermMixinFields0[1].Descriptor()
+	// catalogterm.DefaultCreatedAt holds the default value on creation for the created_at field.
+	catalogterm.DefaultCreatedAt = catalogtermDescCreatedAt.Default.(func() time.Time)
+	// catalogtermDescUpdatedAt is the schema descriptor for updated_at field.
+	catalogtermDescUpdatedAt := catalogtermMixinFields0[2].Descriptor()
+	// catalogterm.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	catalogterm.DefaultUpdatedAt = catalogtermDescUpdatedAt.Default.(func() time.Time)
+	// catalogterm.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	catalogterm.UpdateDefaultUpdatedAt = catalogtermDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// catalogtermDescKind is the schema descriptor for kind field.
+	catalogtermDescKind := catalogtermFields[0].Descriptor()
+	// catalogterm.KindValidator is a validator for the "kind" field. It is called by the builders before save.
+	catalogterm.KindValidator = catalogtermDescKind.Validators[0].(func(string) error)
+	// catalogtermDescValue is the schema descriptor for value field.
+	catalogtermDescValue := catalogtermFields[1].Descriptor()
+	// catalogterm.ValueValidator is a validator for the "value" field. It is called by the builders before save.
+	catalogterm.ValueValidator = catalogtermDescValue.Validators[0].(func(string) error)
+	// catalogtermDescID is the schema descriptor for id field.
+	catalogtermDescID := catalogtermMixinFields0[0].Descriptor()
+	// catalogterm.DefaultID holds the default value on creation for the id field.
+	catalogterm.DefaultID = catalogtermDescID.Default.(func() uuid.UUID)
 	collectionMixin := schema.Collection{}.Mixin()
 	collectionMixinFields0 := collectionMixin[0].Fields()
 	_ = collectionMixinFields0

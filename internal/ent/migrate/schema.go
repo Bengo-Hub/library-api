@@ -222,6 +222,38 @@ var (
 			},
 		},
 	}
+	// CatalogTermsColumns holds the columns for the "catalog_terms" table.
+	CatalogTermsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "kind", Type: field.TypeString},
+		{Name: "value", Type: field.TypeString},
+	}
+	// CatalogTermsTable holds the schema information for the "catalog_terms" table.
+	CatalogTermsTable = &schema.Table{
+		Name:       "catalog_terms",
+		Columns:    CatalogTermsColumns,
+		PrimaryKey: []*schema.Column{CatalogTermsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "catalogterm_tenant_id",
+				Unique:  false,
+				Columns: []*schema.Column{CatalogTermsColumns[3]},
+			},
+			{
+				Name:    "catalogterm_tenant_id_kind_value",
+				Unique:  true,
+				Columns: []*schema.Column{CatalogTermsColumns[3], CatalogTermsColumns[4], CatalogTermsColumns[5]},
+			},
+			{
+				Name:    "catalogterm_tenant_id_kind",
+				Unique:  false,
+				Columns: []*schema.Column{CatalogTermsColumns[3], CatalogTermsColumns[4]},
+			},
+		},
+	}
 	// CollectionsColumns holds the columns for the "collections" table.
 	CollectionsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -978,6 +1010,7 @@ var (
 		BibRecordsTable,
 		BookCopiesTable,
 		BranchesTable,
+		CatalogTermsTable,
 		CollectionsTable,
 		CopyTransfersTable,
 		DocumentSequencesTable,

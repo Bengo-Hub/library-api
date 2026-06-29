@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -132,7 +133,21 @@ func (h *CatalogHandler) CreateBib(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err.Error(), "commit_failed")
 		return
 	}
+	h.recordBibTerms(r.Context(), tenantID, req)
 	respondJSON(w, http.StatusCreated, row)
+}
+
+// recordBibTerms grows the cataloging dictionaries (authors/publisher/place/subjects) from a saved
+// bib so the searchable pickers stay populated from real cataloging activity (best-effort).
+func (h *CatalogHandler) recordBibTerms(ctx context.Context, tenantID uuid.UUID, req bibRequest) {
+	upsertCatalogTerms(ctx, h.db, tenantID, "author", req.Authors)
+	upsertCatalogTerms(ctx, h.db, tenantID, "subject", req.Subjects)
+	if req.PublisherName != "" {
+		upsertCatalogTerms(ctx, h.db, tenantID, "publisher", []string{req.PublisherName})
+	}
+	if req.PublicationPlace != "" {
+		upsertCatalogTerms(ctx, h.db, tenantID, "place", []string{req.PublicationPlace})
+	}
 }
 
 // GetBib returns a single bib record.
@@ -184,6 +199,7 @@ func (h *CatalogHandler) UpdateBib(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err.Error(), "update_failed")
 		return
 	}
+	h.recordBibTerms(r.Context(), tenantID, req)
 	respondJSON(w, http.StatusOK, row)
 }
 
