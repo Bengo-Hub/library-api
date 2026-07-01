@@ -202,6 +202,7 @@ func New(ctx context.Context) (*App, error) {
 		AuthorizedValues: handlers.NewAuthorizedValueHandler(ormClient, log),
 		Acquisition:      handlers.NewAcquisitionHandler(ormClient, treasuryClient, log),
 		Serial:           handlers.NewSerialHandler(ormClient, log),
+		PatronPortal:     handlers.NewPatronPortalHandler(ormClient, circulationSvc, treasuryClient, log),
 		RBAC:           rbacService,
 		AllowedOrigins: cfg.HTTP.AllowedOrigins,
 		MediaRoot:      cfg.Media.Root,

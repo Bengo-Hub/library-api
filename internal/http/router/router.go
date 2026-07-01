@@ -40,6 +40,7 @@ type Deps struct {
 	AuthorizedValues *handlers.AuthorizedValueHandler
 	Acquisition      *handlers.AcquisitionHandler
 	Serial           *handlers.SerialHandler
+	PatronPortal     *handlers.PatronPortalHandler
 	AuthMiddleware   *authclient.AuthMiddleware
 	RBAC           *rbac.Service
 	AllowedOrigins []string
@@ -141,6 +142,24 @@ func New(d Deps) http.Handler {
 		lib.With(view("reports")).Get("/reports/popular", d.Reports.Popular)
 		lib.With(view("reports")).Get("/reports/circulation", d.Reports.Circulation)
 		lib.With(view("reports")).Get("/reports/overdue", d.Reports.Overdue)
+		lib.With(view("reports")).Get("/reports/member-activity", d.Reports.MemberActivity)
+		lib.With(view("reports")).Get("/reports/overdue-aging", d.Reports.OverdueAging)
+		lib.With(view("reports")).Get("/reports/item-movement", d.Reports.ItemMovement)
+		lib.With(view("reports")).Get("/reports/fine-aging", d.Reports.FineAging)
+		lib.With(view("reports")).Get("/reports/acquisition-spend", d.Reports.AcquisitionSpend)
+		lib.With(view("reports")).Get("/reports/catalog-stats", d.Reports.CatalogStats)
+		lib.With(view("reports")).Get("/reports/ebook-usage", d.Reports.EbookUsage)
+		lib.With(view("reports")).Get("/reports/member-trend", d.Reports.MemberActivityTrend)
+
+		// Patron self-service portal — any authenticated member.
+		if d.PatronPortal != nil {
+			lib.Get("/me/loans", d.PatronPortal.MyLoans)
+			lib.Get("/me/holds", d.PatronPortal.MyHolds)
+			lib.Get("/me/fines", d.PatronPortal.MyFines)
+			lib.Post("/me/holds", d.PatronPortal.MyPlaceHold)
+			lib.Post("/me/loans/{id}/renew", d.PatronPortal.MyRenewLoan)
+			lib.Post("/me/fines/{id}/pay", d.PatronPortal.MyPayFine)
+		}
 
 		// Catalog (OPAC search + bib/copy management) — feature gate + per-route permission gate.
 		lib.Route("/catalog", func(c chi.Router) {
@@ -195,6 +214,10 @@ func New(d Deps) http.Handler {
 			m.Use(libmw.RequireFeature("library_members"))
 			m.With(view("members")).Get("/members", d.Member.ListMembers)
 			m.With(act("members", "add")).Post("/members", d.Member.CreateMember)
+			m.With(act("members", "add")).Post("/members/import", d.Member.ImportMembers)
+			m.With(view("members")).Get("/members/import/template", d.Member.ImportMembersTemplate)
+			m.With(view("members")).Get("/members/import/{job_id}", d.Member.ImportMembersStatus)
+			m.With(view("members")).Get("/members/import/{job_id}/errors", d.Member.ImportMembersErrors)
 			m.With(view("members")).Get("/members/{id}", d.Member.GetMember)
 			m.With(act("members", "change")).Put("/members/{id}", d.Member.UpdateMember)
 			m.With(act("members", "delete")).Delete("/members/{id}", d.Member.DeleteMember)
