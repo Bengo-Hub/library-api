@@ -279,6 +279,69 @@ func (h *CirculationHandler) resolveCopyID(r *http.Request, tenantID uuid.UUID, 
 	return c.ID, nil
 }
 
+// Recall godoc
+// @Summary Recall a loan — shorten due date and notify borrower to return early
+// @Tags Circulation
+// @Router /{tenant}/library/circulation/loans/{loan_id}/recall [post]
+func (h *CirculationHandler) Recall(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := TenantUUID(r)
+	if !ok {
+		respondError(w, http.StatusUnauthorized, "missing tenant", "unauthorized")
+		return
+	}
+	loanID, err := uuid.Parse(chi.URLParam(r, "loan_id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "bad loan id", "invalid_request")
+		return
+	}
+	var body struct {
+		RequestedByMemberID string `json:"requested_by_member_id"`
+		HoldID              string `json:"hold_id,omitempty"`
+	}
+	if err := Decode(r, &body); err != nil {
+		respondError(w, http.StatusBadRequest, "bad body", "invalid_request")
+		return
+	}
+	requesterID, err := uuid.Parse(body.RequestedByMemberID)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "requested_by_member_id is required", "invalid_request")
+		return
+	}
+	var holdID *uuid.UUID
+	if body.HoldID != "" {
+		if id, err := uuid.Parse(body.HoldID); err == nil {
+			holdID = &id
+		}
+	}
+	if err := h.svc.Recall(r.Context(), tenantID, loanID, requesterID, holdID); err != nil {
+		h.writeCircErr(w, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"message": "Recall registered. Due date shortened and borrower notified."})
+}
+
+// MarkLost godoc
+// @Summary Mark a loan as LOST, set copy status LOST, assess replacement fine
+// @Tags Circulation
+// @Router /{tenant}/library/circulation/loans/{loan_id}/mark-lost [post]
+func (h *CirculationHandler) MarkLost(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := TenantUUID(r)
+	if !ok {
+		respondError(w, http.StatusUnauthorized, "missing tenant", "unauthorized")
+		return
+	}
+	loanID, err := uuid.Parse(chi.URLParam(r, "loan_id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "bad loan id", "invalid_request")
+		return
+	}
+	if err := h.svc.MarkLost(r.Context(), tenantID, loanID, UserIDFrom(r)); err != nil {
+		h.writeCircErr(w, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"message": "Loan marked as lost. Replacement fine assessed."})
+}
+
 // writeCircErr maps circulation domain errors to 4xx with stable codes.
 func (h *CirculationHandler) writeCircErr(w http.ResponseWriter, err error) {
 	switch {
@@ -292,6 +355,14 @@ func (h *CirculationHandler) writeCircErr(w http.ResponseWriter, err error) {
 		respondError(w, http.StatusConflict, err.Error(), "copy_unavailable")
 	case errors.Is(err, circulation.ErrNoActiveLoan):
 		respondError(w, http.StatusNotFound, err.Error(), "no_active_loan")
+	case errors.Is(err, circulation.ErrLoanNotLostable):
+		respondError(w, http.StatusConflict, err.Error(), "loan_not_lostable")
+	case errors.Is(err, circulation.ErrRenewRecalled):
+		respondError(w, http.StatusConflict, err.Error(), "renew_recalled")
+	case errors.Is(err, circulation.ErrNoWaitingHolder):
+		respondError(w, http.StatusConflict, err.Error(), "no_waiting_holder")
+	case errors.Is(err, circulation.ErrAlreadyRecalled):
+		respondError(w, http.StatusConflict, err.Error(), "already_recalled")
 	case errors.Is(err, circulation.ErrRenewLimit):
 		respondError(w, http.StatusConflict, err.Error(), "renew_limit")
 	case errors.Is(err, circulation.ErrRenewHeld):

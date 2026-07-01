@@ -305,6 +305,26 @@ func (_u *MemberUpdate) ClearExpiresAt() *MemberUpdate {
 	return _u
 }
 
+// SetBirthDate sets the "birth_date" field.
+func (_u *MemberUpdate) SetBirthDate(v time.Time) *MemberUpdate {
+	_u.mutation.SetBirthDate(v)
+	return _u
+}
+
+// SetNillableBirthDate sets the "birth_date" field if the given value is not nil.
+func (_u *MemberUpdate) SetNillableBirthDate(v *time.Time) *MemberUpdate {
+	if v != nil {
+		_u.SetBirthDate(*v)
+	}
+	return _u
+}
+
+// ClearBirthDate clears the value of the "birth_date" field.
+func (_u *MemberUpdate) ClearBirthDate() *MemberUpdate {
+	_u.mutation.ClearBirthDate()
+	return _u
+}
+
 // Mutation returns the MemberMutation object of the builder.
 func (_u *MemberUpdate) Mutation() *MemberMutation {
 	return _u.mutation
@@ -450,6 +470,12 @@ func (_u *MemberUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.ExpiresAtCleared() {
 		_spec.ClearField(member.FieldExpiresAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.BirthDate(); ok {
+		_spec.SetField(member.FieldBirthDate, field.TypeTime, value)
+	}
+	if _u.mutation.BirthDateCleared() {
+		_spec.ClearField(member.FieldBirthDate, field.TypeTime)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -747,6 +773,26 @@ func (_u *MemberUpdateOne) ClearExpiresAt() *MemberUpdateOne {
 	return _u
 }
 
+// SetBirthDate sets the "birth_date" field.
+func (_u *MemberUpdateOne) SetBirthDate(v time.Time) *MemberUpdateOne {
+	_u.mutation.SetBirthDate(v)
+	return _u
+}
+
+// SetNillableBirthDate sets the "birth_date" field if the given value is not nil.
+func (_u *MemberUpdateOne) SetNillableBirthDate(v *time.Time) *MemberUpdateOne {
+	if v != nil {
+		_u.SetBirthDate(*v)
+	}
+	return _u
+}
+
+// ClearBirthDate clears the value of the "birth_date" field.
+func (_u *MemberUpdateOne) ClearBirthDate() *MemberUpdateOne {
+	_u.mutation.ClearBirthDate()
+	return _u
+}
+
 // Mutation returns the MemberMutation object of the builder.
 func (_u *MemberUpdateOne) Mutation() *MemberMutation {
 	return _u.mutation
@@ -922,6 +968,12 @@ func (_u *MemberUpdateOne) sqlSave(ctx context.Context) (_node *Member, err erro
 	}
 	if _u.mutation.ExpiresAtCleared() {
 		_spec.ClearField(member.FieldExpiresAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.BirthDate(); ok {
+		_spec.SetField(member.FieldBirthDate, field.TypeTime, value)
+	}
+	if _u.mutation.BirthDateCleared() {
+		_spec.ClearField(member.FieldBirthDate, field.TypeTime)
 	}
 	_node = &Member{config: _u.config}
 	_spec.Assign = _node.assignValues

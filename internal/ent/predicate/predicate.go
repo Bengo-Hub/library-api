@@ -6,11 +6,23 @@ import (
 	"entgo.io/ent/dialect/sql"
 )
 
+// AcquisitionBudget is the predicate function for acquisitionbudget builders.
+type AcquisitionBudget func(*sql.Selector)
+
+// AcquisitionFund is the predicate function for acquisitionfund builders.
+type AcquisitionFund func(*sql.Selector)
+
+// AcquisitionInvoice is the predicate function for acquisitioninvoice builders.
+type AcquisitionInvoice func(*sql.Selector)
+
 // AuditLog is the predicate function for auditlog builders.
 type AuditLog func(*sql.Selector)
 
 // Author is the predicate function for author builders.
 type Author func(*sql.Selector)
+
+// AuthorizedValue is the predicate function for authorizedvalue builders.
+type AuthorizedValue func(*sql.Selector)
 
 // BibRecord is the predicate function for bibrecord builders.
 type BibRecord func(*sql.Selector)
@@ -23,6 +35,9 @@ type Branch func(*sql.Selector)
 
 // CatalogTerm is the predicate function for catalogterm builders.
 type CatalogTerm func(*sql.Selector)
+
+// CirculationRule is the predicate function for circulationrule builders.
+type CirculationRule func(*sql.Selector)
 
 // Collection is the predicate function for collection builders.
 type Collection func(*sql.Selector)
@@ -48,6 +63,9 @@ type Fine func(*sql.Selector)
 // Hold is the predicate function for hold builders.
 type Hold func(*sql.Selector)
 
+// LibraryHoliday is the predicate function for libraryholiday builders.
+type LibraryHoliday func(*sql.Selector)
+
 // LibraryRole is the predicate function for libraryrole builders.
 type LibraryRole func(*sql.Selector)
 
@@ -63,6 +81,9 @@ type LoanPolicy func(*sql.Selector)
 // Member is the predicate function for member builders.
 type Member func(*sql.Selector)
 
+// MemberNotificationPref is the predicate function for membernotificationpref builders.
+type MemberNotificationPref func(*sql.Selector)
+
 // MemberTier is the predicate function for membertier builders.
 type MemberTier func(*sql.Selector)
 
@@ -75,6 +96,15 @@ type OutboxEvent func(*sql.Selector)
 // Publisher is the predicate function for publisher builders.
 type Publisher func(*sql.Selector)
 
+// PurchaseOrder is the predicate function for purchaseorder builders.
+type PurchaseOrder func(*sql.Selector)
+
+// PurchaseOrderLine is the predicate function for purchaseorderline builders.
+type PurchaseOrderLine func(*sql.Selector)
+
+// RecallRequest is the predicate function for recallrequest builders.
+type RecallRequest func(*sql.Selector)
+
 // ServiceConfig is the predicate function for serviceconfig builders.
 type ServiceConfig func(*sql.Selector)
 
@@ -86,3 +116,6 @@ type Subject func(*sql.Selector)
 
 // Tenant is the predicate function for tenant builders.
 type Tenant func(*sql.Selector)
+
+// Vendor is the predicate function for vendor builders.
+type Vendor func(*sql.Selector)

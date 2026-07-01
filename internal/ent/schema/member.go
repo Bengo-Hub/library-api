@@ -34,6 +34,7 @@ func (Member) Fields() []ent.Field {
 		field.Bool("is_walk_in").Default(false),
 		field.Time("joined_at").Optional().Nillable(),
 		field.Time("expires_at").Optional().Nillable(),
+		field.Time("birth_date").Optional().Nillable().Comment("Used for patron age-based tier auto-transitions"),
 	}
 }
 

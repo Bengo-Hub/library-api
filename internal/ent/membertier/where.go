@@ -121,6 +121,26 @@ func IsDefault(v bool) predicate.MemberTier {
 	return predicate.MemberTier(sql.FieldEQ(FieldIsDefault, v))
 }
 
+// EnrollmentPeriodMonths applies equality check predicate on the "enrollment_period_months" field. It's identical to EnrollmentPeriodMonthsEQ.
+func EnrollmentPeriodMonths(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldEQ(FieldEnrollmentPeriodMonths, v))
+}
+
+// MaxAgeYears applies equality check predicate on the "max_age_years" field. It's identical to MaxAgeYearsEQ.
+func MaxAgeYears(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldEQ(FieldMaxAgeYears, v))
+}
+
+// MinAgeYears applies equality check predicate on the "min_age_years" field. It's identical to MinAgeYearsEQ.
+func MinAgeYears(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldEQ(FieldMinAgeYears, v))
+}
+
+// GraduatedTierID applies equality check predicate on the "graduated_tier_id" field. It's identical to GraduatedTierIDEQ.
+func GraduatedTierID(v uuid.UUID) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldEQ(FieldGraduatedTierID, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.MemberTier {
 	return predicate.MemberTier(sql.FieldEQ(FieldCreatedAt, v))
@@ -634,6 +654,206 @@ func IsDefaultEQ(v bool) predicate.MemberTier {
 // IsDefaultNEQ applies the NEQ predicate on the "is_default" field.
 func IsDefaultNEQ(v bool) predicate.MemberTier {
 	return predicate.MemberTier(sql.FieldNEQ(FieldIsDefault, v))
+}
+
+// EnrollmentPeriodMonthsEQ applies the EQ predicate on the "enrollment_period_months" field.
+func EnrollmentPeriodMonthsEQ(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldEQ(FieldEnrollmentPeriodMonths, v))
+}
+
+// EnrollmentPeriodMonthsNEQ applies the NEQ predicate on the "enrollment_period_months" field.
+func EnrollmentPeriodMonthsNEQ(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldNEQ(FieldEnrollmentPeriodMonths, v))
+}
+
+// EnrollmentPeriodMonthsIn applies the In predicate on the "enrollment_period_months" field.
+func EnrollmentPeriodMonthsIn(vs ...int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldIn(FieldEnrollmentPeriodMonths, vs...))
+}
+
+// EnrollmentPeriodMonthsNotIn applies the NotIn predicate on the "enrollment_period_months" field.
+func EnrollmentPeriodMonthsNotIn(vs ...int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldNotIn(FieldEnrollmentPeriodMonths, vs...))
+}
+
+// EnrollmentPeriodMonthsGT applies the GT predicate on the "enrollment_period_months" field.
+func EnrollmentPeriodMonthsGT(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldGT(FieldEnrollmentPeriodMonths, v))
+}
+
+// EnrollmentPeriodMonthsGTE applies the GTE predicate on the "enrollment_period_months" field.
+func EnrollmentPeriodMonthsGTE(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldGTE(FieldEnrollmentPeriodMonths, v))
+}
+
+// EnrollmentPeriodMonthsLT applies the LT predicate on the "enrollment_period_months" field.
+func EnrollmentPeriodMonthsLT(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldLT(FieldEnrollmentPeriodMonths, v))
+}
+
+// EnrollmentPeriodMonthsLTE applies the LTE predicate on the "enrollment_period_months" field.
+func EnrollmentPeriodMonthsLTE(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldLTE(FieldEnrollmentPeriodMonths, v))
+}
+
+// EnrollmentPeriodMonthsIsNil applies the IsNil predicate on the "enrollment_period_months" field.
+func EnrollmentPeriodMonthsIsNil() predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldIsNull(FieldEnrollmentPeriodMonths))
+}
+
+// EnrollmentPeriodMonthsNotNil applies the NotNil predicate on the "enrollment_period_months" field.
+func EnrollmentPeriodMonthsNotNil() predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldNotNull(FieldEnrollmentPeriodMonths))
+}
+
+// MaxAgeYearsEQ applies the EQ predicate on the "max_age_years" field.
+func MaxAgeYearsEQ(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldEQ(FieldMaxAgeYears, v))
+}
+
+// MaxAgeYearsNEQ applies the NEQ predicate on the "max_age_years" field.
+func MaxAgeYearsNEQ(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldNEQ(FieldMaxAgeYears, v))
+}
+
+// MaxAgeYearsIn applies the In predicate on the "max_age_years" field.
+func MaxAgeYearsIn(vs ...int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldIn(FieldMaxAgeYears, vs...))
+}
+
+// MaxAgeYearsNotIn applies the NotIn predicate on the "max_age_years" field.
+func MaxAgeYearsNotIn(vs ...int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldNotIn(FieldMaxAgeYears, vs...))
+}
+
+// MaxAgeYearsGT applies the GT predicate on the "max_age_years" field.
+func MaxAgeYearsGT(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldGT(FieldMaxAgeYears, v))
+}
+
+// MaxAgeYearsGTE applies the GTE predicate on the "max_age_years" field.
+func MaxAgeYearsGTE(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldGTE(FieldMaxAgeYears, v))
+}
+
+// MaxAgeYearsLT applies the LT predicate on the "max_age_years" field.
+func MaxAgeYearsLT(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldLT(FieldMaxAgeYears, v))
+}
+
+// MaxAgeYearsLTE applies the LTE predicate on the "max_age_years" field.
+func MaxAgeYearsLTE(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldLTE(FieldMaxAgeYears, v))
+}
+
+// MaxAgeYearsIsNil applies the IsNil predicate on the "max_age_years" field.
+func MaxAgeYearsIsNil() predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldIsNull(FieldMaxAgeYears))
+}
+
+// MaxAgeYearsNotNil applies the NotNil predicate on the "max_age_years" field.
+func MaxAgeYearsNotNil() predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldNotNull(FieldMaxAgeYears))
+}
+
+// MinAgeYearsEQ applies the EQ predicate on the "min_age_years" field.
+func MinAgeYearsEQ(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldEQ(FieldMinAgeYears, v))
+}
+
+// MinAgeYearsNEQ applies the NEQ predicate on the "min_age_years" field.
+func MinAgeYearsNEQ(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldNEQ(FieldMinAgeYears, v))
+}
+
+// MinAgeYearsIn applies the In predicate on the "min_age_years" field.
+func MinAgeYearsIn(vs ...int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldIn(FieldMinAgeYears, vs...))
+}
+
+// MinAgeYearsNotIn applies the NotIn predicate on the "min_age_years" field.
+func MinAgeYearsNotIn(vs ...int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldNotIn(FieldMinAgeYears, vs...))
+}
+
+// MinAgeYearsGT applies the GT predicate on the "min_age_years" field.
+func MinAgeYearsGT(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldGT(FieldMinAgeYears, v))
+}
+
+// MinAgeYearsGTE applies the GTE predicate on the "min_age_years" field.
+func MinAgeYearsGTE(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldGTE(FieldMinAgeYears, v))
+}
+
+// MinAgeYearsLT applies the LT predicate on the "min_age_years" field.
+func MinAgeYearsLT(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldLT(FieldMinAgeYears, v))
+}
+
+// MinAgeYearsLTE applies the LTE predicate on the "min_age_years" field.
+func MinAgeYearsLTE(v int) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldLTE(FieldMinAgeYears, v))
+}
+
+// MinAgeYearsIsNil applies the IsNil predicate on the "min_age_years" field.
+func MinAgeYearsIsNil() predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldIsNull(FieldMinAgeYears))
+}
+
+// MinAgeYearsNotNil applies the NotNil predicate on the "min_age_years" field.
+func MinAgeYearsNotNil() predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldNotNull(FieldMinAgeYears))
+}
+
+// GraduatedTierIDEQ applies the EQ predicate on the "graduated_tier_id" field.
+func GraduatedTierIDEQ(v uuid.UUID) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldEQ(FieldGraduatedTierID, v))
+}
+
+// GraduatedTierIDNEQ applies the NEQ predicate on the "graduated_tier_id" field.
+func GraduatedTierIDNEQ(v uuid.UUID) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldNEQ(FieldGraduatedTierID, v))
+}
+
+// GraduatedTierIDIn applies the In predicate on the "graduated_tier_id" field.
+func GraduatedTierIDIn(vs ...uuid.UUID) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldIn(FieldGraduatedTierID, vs...))
+}
+
+// GraduatedTierIDNotIn applies the NotIn predicate on the "graduated_tier_id" field.
+func GraduatedTierIDNotIn(vs ...uuid.UUID) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldNotIn(FieldGraduatedTierID, vs...))
+}
+
+// GraduatedTierIDGT applies the GT predicate on the "graduated_tier_id" field.
+func GraduatedTierIDGT(v uuid.UUID) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldGT(FieldGraduatedTierID, v))
+}
+
+// GraduatedTierIDGTE applies the GTE predicate on the "graduated_tier_id" field.
+func GraduatedTierIDGTE(v uuid.UUID) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldGTE(FieldGraduatedTierID, v))
+}
+
+// GraduatedTierIDLT applies the LT predicate on the "graduated_tier_id" field.
+func GraduatedTierIDLT(v uuid.UUID) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldLT(FieldGraduatedTierID, v))
+}
+
+// GraduatedTierIDLTE applies the LTE predicate on the "graduated_tier_id" field.
+func GraduatedTierIDLTE(v uuid.UUID) predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldLTE(FieldGraduatedTierID, v))
+}
+
+// GraduatedTierIDIsNil applies the IsNil predicate on the "graduated_tier_id" field.
+func GraduatedTierIDIsNil() predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldIsNull(FieldGraduatedTierID))
+}
+
+// GraduatedTierIDNotNil applies the NotNil predicate on the "graduated_tier_id" field.
+func GraduatedTierIDNotNil() predicate.MemberTier {
+	return predicate.MemberTier(sql.FieldNotNull(FieldGraduatedTierID))
 }
 
 // And groups predicates with the AND operator between them.

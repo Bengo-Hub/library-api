@@ -26,6 +26,11 @@ func (MemberTier) Fields() []ent.Field {
 		moneyField("max_fine_before_block"),
 		moneyField("annual_fee"),
 		field.Bool("is_default").Default(false),
+		// Patron category auto-transition fields.
+		field.Int("enrollment_period_months").Optional().Nillable().Comment("Auto-set expires_at = joined_at + N months on member creation"),
+		field.Int("max_age_years").Optional().Nillable().Comment("Auto-move to graduated_tier_id when member reaches this age"),
+		field.Int("min_age_years").Optional().Nillable().Comment("Minimum age for this tier (advisory)"),
+		field.UUID("graduated_tier_id", uuidType()).Optional().Nillable().Comment("Tier to auto-move to when member exceeds max_age_years"),
 	}
 }
 

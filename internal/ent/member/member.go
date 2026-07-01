@@ -49,6 +49,8 @@ const (
 	FieldJoinedAt = "joined_at"
 	// FieldExpiresAt holds the string denoting the expires_at field in the database.
 	FieldExpiresAt = "expires_at"
+	// FieldBirthDate holds the string denoting the birth_date field in the database.
+	FieldBirthDate = "birth_date"
 	// Table holds the table name of the member in the database.
 	Table = "members"
 )
@@ -73,6 +75,7 @@ var Columns = []string{
 	FieldIsWalkIn,
 	FieldJoinedAt,
 	FieldExpiresAt,
+	FieldBirthDate,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -220,4 +223,9 @@ func ByJoinedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByExpiresAt orders the results by the expires_at field.
 func ByExpiresAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldExpiresAt, opts...).ToFunc()
+}
+
+// ByBirthDate orders the results by the birth_date field.
+func ByBirthDate(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldBirthDate, opts...).ToFunc()
 }

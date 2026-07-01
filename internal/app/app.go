@@ -25,6 +25,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/migrate"
 	handlers "github.com/bengobox/library-service/internal/http/handlers"
 	router "github.com/bengobox/library-service/internal/http/router"
+	"github.com/bengobox/library-service/internal/modules/calendar"
 	"github.com/bengobox/library-service/internal/modules/circulation"
 	"github.com/bengobox/library-service/internal/modules/consumers"
 	"github.com/bengobox/library-service/internal/modules/membership"
@@ -34,6 +35,7 @@ import (
 	"github.com/bengobox/library-service/internal/platform/database"
 	"github.com/bengobox/library-service/internal/platform/events"
 	"github.com/bengobox/library-service/internal/platform/secrets"
+	"github.com/bengobox/library-service/internal/platform/marketflow"
 	"github.com/bengobox/library-service/internal/platform/subscriptions"
 	"github.com/bengobox/library-service/internal/platform/treasury"
 	"github.com/bengobox/library-service/internal/shared/logger"
@@ -48,10 +50,11 @@ type App struct {
 	cache           *redis.Client
 	events          *nats.Conn
 	orm             *ent.Client
-	outboxPublisher *eventslib.OutboxPoller
-	circulation     *circulation.Service
-	membership      *membership.Service
-	paymentConsumer *consumers.PaymentConsumer
+	outboxPublisher       *eventslib.OutboxPoller
+	circulation           *circulation.Service
+	membership            *membership.Service
+	patronCategoryScheduler *membership.PatronCategoryScheduler
+	paymentConsumer       *consumers.PaymentConsumer
 }
 
 // New constructs and wires the application.
@@ -138,6 +141,10 @@ func New(ctx context.Context) (*App, error) {
 	if err := refdata.SeedGlobalTiersPolicies(ctx, ormClient, log); err != nil {
 		log.Warn("seed global tiers/policies failed", zap.Error(err))
 	}
+	// Seed standard authorized values (LOC, CCODE, NOT_LOAN, etc.) under the global tenant.
+	if err := refdata.SeedAuthorizedValues(ctx, ormClient, refdata.GlobalTenantID, log); err != nil {
+		log.Warn("seed authorized values failed", zap.Error(err))
+	}
 	// Seed demo desk PINs for the sandbox tenant (idempotent; no-op for other tenants).
 	if err := refdata.SeedDemoStaff(ctx, ormClient, log); err != nil {
 		log.Warn("seed demo staff failed", zap.Error(err))
@@ -160,6 +167,7 @@ func New(ctx context.Context) (*App, error) {
 
 	// S2S clients.
 	treasuryClient := treasury.NewClient(cfg.Services.TreasuryURL, cfg.Auth.APIKey, 0)
+	marketflowClient := marketflow.NewClient(cfg.Services.MarketflowURL, cfg.Auth.APIKey, log)
 	subsClient := subscriptions.NewClient(subscriptions.Config{
 		ServiceURL:     cfg.Subscriptions.ServiceURL,
 		APIKey:         cfg.Subscriptions.APIKey,
@@ -167,7 +175,8 @@ func New(ctx context.Context) (*App, error) {
 	})
 
 	// Domain services + handlers.
-	circulationSvc := circulation.NewService(ormClient, log)
+	calendarCalc := calendar.NewCalculator(ormClient, redisClient, log)
+	circulationSvc := circulation.NewService(ormClient, redisClient, log)
 	membershipSvc := membership.NewService(ormClient, log)
 	secretStore := secrets.NewStore(ormClient, log)
 	deps := router.Deps{
@@ -176,7 +185,7 @@ func New(ctx context.Context) (*App, error) {
 		Auth:           handlers.NewAuthHandler(rbacService, log),
 		Catalog:        handlers.NewCatalogHandler(ormClient, secretStore, cfg.Media.Root, log),
 		Branch:         handlers.NewBranchHandler(ormClient, log),
-		Member:         handlers.NewMemberHandler(ormClient, log),
+		Member:         handlers.NewMemberHandler(ormClient, marketflowClient, log),
 		Circulation:    handlers.NewCirculationHandler(ormClient, circulationSvc, log),
 		Hold:           handlers.NewHoldHandler(ormClient, log),
 		Fine:           handlers.NewFineHandler(ormClient, treasuryClient, log),
@@ -185,8 +194,12 @@ func New(ctx context.Context) (*App, error) {
 		RBACHandler:    handlers.NewRBACHandler(rbacService, log),
 		Membership:     handlers.NewMembershipHandler(ormClient, membershipSvc, treasuryClient, log),
 		Sequence:       handlers.NewSequenceHandler(ormClient, log),
-		PINAuth:        handlers.NewPINAuthHandler(ormClient, rbacService, subsClient, terminalJWTSecret(cfg), log),
-		PlatformConfig: handlers.NewPlatformConfigHandler(secretStore, log),
+		PINAuth:          handlers.NewPINAuthHandler(ormClient, rbacService, subsClient, terminalJWTSecret(cfg), log),
+		PlatformConfig:   handlers.NewPlatformConfigHandler(secretStore, log),
+		CirculationRules: handlers.NewCirculationRuleHandler(ormClient, circulationSvc, log),
+		Holiday:          handlers.NewHolidayHandler(ormClient, calendarCalc, log),
+		AuthorizedValues: handlers.NewAuthorizedValueHandler(ormClient, log),
+		Acquisition:      handlers.NewAcquisitionHandler(ormClient, treasuryClient, log),
 		RBAC:           rbacService,
 		AllowedOrigins: cfg.HTTP.AllowedOrigins,
 		MediaRoot:      cfg.Media.Root,
@@ -225,11 +238,12 @@ func New(ctx context.Context) (*App, error) {
 		db:              dbPool,
 		cache:           redisClient,
 		events:          natsConn,
-		orm:             ormClient,
-		outboxPublisher: outboxPublisher,
-		circulation:     circulationSvc,
-		membership:      membershipSvc,
-		paymentConsumer: consumers.NewPaymentConsumer(ormClient, log),
+		orm:                     ormClient,
+		outboxPublisher:         outboxPublisher,
+		circulation:             circulationSvc,
+		membership:              membershipSvc,
+		patronCategoryScheduler: membership.NewPatronCategoryScheduler(ormClient, log),
+		paymentConsumer:         consumers.NewPaymentConsumer(ormClient, log),
 	}, nil
 }
 
@@ -238,8 +252,14 @@ func (a *App) Run(ctx context.Context) error {
 	// Overdue scheduler (idempotent; safe on every replica).
 	a.circulation.StartOverdueScheduler(ctx, time.Hour)
 
+	// Hold expiry scheduler — expires READY holds past their pickup deadline, frees copies.
+	a.circulation.StartHoldExpiryScheduler(ctx, time.Hour)
+
 	// Membership-fee dunning scheduler (daily; auto-issues fees near expiry).
 	a.membership.StartScheduler(ctx, 24*time.Hour)
+
+	// Patron category auto-transition scheduler (daily; expires cards + graduates patrons by age).
+	a.patronCategoryScheduler.Start(ctx, 24*time.Hour)
 
 	// Treasury payment reconcile consumer.
 	if a.events != nil && a.paymentConsumer != nil {

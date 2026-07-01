@@ -191,6 +191,62 @@ func (_c *MemberTierCreate) SetNillableIsDefault(v *bool) *MemberTierCreate {
 	return _c
 }
 
+// SetEnrollmentPeriodMonths sets the "enrollment_period_months" field.
+func (_c *MemberTierCreate) SetEnrollmentPeriodMonths(v int) *MemberTierCreate {
+	_c.mutation.SetEnrollmentPeriodMonths(v)
+	return _c
+}
+
+// SetNillableEnrollmentPeriodMonths sets the "enrollment_period_months" field if the given value is not nil.
+func (_c *MemberTierCreate) SetNillableEnrollmentPeriodMonths(v *int) *MemberTierCreate {
+	if v != nil {
+		_c.SetEnrollmentPeriodMonths(*v)
+	}
+	return _c
+}
+
+// SetMaxAgeYears sets the "max_age_years" field.
+func (_c *MemberTierCreate) SetMaxAgeYears(v int) *MemberTierCreate {
+	_c.mutation.SetMaxAgeYears(v)
+	return _c
+}
+
+// SetNillableMaxAgeYears sets the "max_age_years" field if the given value is not nil.
+func (_c *MemberTierCreate) SetNillableMaxAgeYears(v *int) *MemberTierCreate {
+	if v != nil {
+		_c.SetMaxAgeYears(*v)
+	}
+	return _c
+}
+
+// SetMinAgeYears sets the "min_age_years" field.
+func (_c *MemberTierCreate) SetMinAgeYears(v int) *MemberTierCreate {
+	_c.mutation.SetMinAgeYears(v)
+	return _c
+}
+
+// SetNillableMinAgeYears sets the "min_age_years" field if the given value is not nil.
+func (_c *MemberTierCreate) SetNillableMinAgeYears(v *int) *MemberTierCreate {
+	if v != nil {
+		_c.SetMinAgeYears(*v)
+	}
+	return _c
+}
+
+// SetGraduatedTierID sets the "graduated_tier_id" field.
+func (_c *MemberTierCreate) SetGraduatedTierID(v uuid.UUID) *MemberTierCreate {
+	_c.mutation.SetGraduatedTierID(v)
+	return _c
+}
+
+// SetNillableGraduatedTierID sets the "graduated_tier_id" field if the given value is not nil.
+func (_c *MemberTierCreate) SetNillableGraduatedTierID(v *uuid.UUID) *MemberTierCreate {
+	if v != nil {
+		_c.SetGraduatedTierID(*v)
+	}
+	return _c
+}
+
 // SetID sets the "id" field.
 func (_c *MemberTierCreate) SetID(v uuid.UUID) *MemberTierCreate {
 	_c.mutation.SetID(v)
@@ -424,6 +480,22 @@ func (_c *MemberTierCreate) createSpec() (*MemberTier, *sqlgraph.CreateSpec) {
 		_spec.SetField(membertier.FieldIsDefault, field.TypeBool, value)
 		_node.IsDefault = value
 	}
+	if value, ok := _c.mutation.EnrollmentPeriodMonths(); ok {
+		_spec.SetField(membertier.FieldEnrollmentPeriodMonths, field.TypeInt, value)
+		_node.EnrollmentPeriodMonths = &value
+	}
+	if value, ok := _c.mutation.MaxAgeYears(); ok {
+		_spec.SetField(membertier.FieldMaxAgeYears, field.TypeInt, value)
+		_node.MaxAgeYears = &value
+	}
+	if value, ok := _c.mutation.MinAgeYears(); ok {
+		_spec.SetField(membertier.FieldMinAgeYears, field.TypeInt, value)
+		_node.MinAgeYears = &value
+	}
+	if value, ok := _c.mutation.GraduatedTierID(); ok {
+		_spec.SetField(membertier.FieldGraduatedTierID, field.TypeUUID, value)
+		_node.GraduatedTierID = &value
+	}
 	return _node, _spec
 }
 
@@ -647,6 +719,96 @@ func (u *MemberTierUpsert) SetIsDefault(v bool) *MemberTierUpsert {
 // UpdateIsDefault sets the "is_default" field to the value that was provided on create.
 func (u *MemberTierUpsert) UpdateIsDefault() *MemberTierUpsert {
 	u.SetExcluded(membertier.FieldIsDefault)
+	return u
+}
+
+// SetEnrollmentPeriodMonths sets the "enrollment_period_months" field.
+func (u *MemberTierUpsert) SetEnrollmentPeriodMonths(v int) *MemberTierUpsert {
+	u.Set(membertier.FieldEnrollmentPeriodMonths, v)
+	return u
+}
+
+// UpdateEnrollmentPeriodMonths sets the "enrollment_period_months" field to the value that was provided on create.
+func (u *MemberTierUpsert) UpdateEnrollmentPeriodMonths() *MemberTierUpsert {
+	u.SetExcluded(membertier.FieldEnrollmentPeriodMonths)
+	return u
+}
+
+// AddEnrollmentPeriodMonths adds v to the "enrollment_period_months" field.
+func (u *MemberTierUpsert) AddEnrollmentPeriodMonths(v int) *MemberTierUpsert {
+	u.Add(membertier.FieldEnrollmentPeriodMonths, v)
+	return u
+}
+
+// ClearEnrollmentPeriodMonths clears the value of the "enrollment_period_months" field.
+func (u *MemberTierUpsert) ClearEnrollmentPeriodMonths() *MemberTierUpsert {
+	u.SetNull(membertier.FieldEnrollmentPeriodMonths)
+	return u
+}
+
+// SetMaxAgeYears sets the "max_age_years" field.
+func (u *MemberTierUpsert) SetMaxAgeYears(v int) *MemberTierUpsert {
+	u.Set(membertier.FieldMaxAgeYears, v)
+	return u
+}
+
+// UpdateMaxAgeYears sets the "max_age_years" field to the value that was provided on create.
+func (u *MemberTierUpsert) UpdateMaxAgeYears() *MemberTierUpsert {
+	u.SetExcluded(membertier.FieldMaxAgeYears)
+	return u
+}
+
+// AddMaxAgeYears adds v to the "max_age_years" field.
+func (u *MemberTierUpsert) AddMaxAgeYears(v int) *MemberTierUpsert {
+	u.Add(membertier.FieldMaxAgeYears, v)
+	return u
+}
+
+// ClearMaxAgeYears clears the value of the "max_age_years" field.
+func (u *MemberTierUpsert) ClearMaxAgeYears() *MemberTierUpsert {
+	u.SetNull(membertier.FieldMaxAgeYears)
+	return u
+}
+
+// SetMinAgeYears sets the "min_age_years" field.
+func (u *MemberTierUpsert) SetMinAgeYears(v int) *MemberTierUpsert {
+	u.Set(membertier.FieldMinAgeYears, v)
+	return u
+}
+
+// UpdateMinAgeYears sets the "min_age_years" field to the value that was provided on create.
+func (u *MemberTierUpsert) UpdateMinAgeYears() *MemberTierUpsert {
+	u.SetExcluded(membertier.FieldMinAgeYears)
+	return u
+}
+
+// AddMinAgeYears adds v to the "min_age_years" field.
+func (u *MemberTierUpsert) AddMinAgeYears(v int) *MemberTierUpsert {
+	u.Add(membertier.FieldMinAgeYears, v)
+	return u
+}
+
+// ClearMinAgeYears clears the value of the "min_age_years" field.
+func (u *MemberTierUpsert) ClearMinAgeYears() *MemberTierUpsert {
+	u.SetNull(membertier.FieldMinAgeYears)
+	return u
+}
+
+// SetGraduatedTierID sets the "graduated_tier_id" field.
+func (u *MemberTierUpsert) SetGraduatedTierID(v uuid.UUID) *MemberTierUpsert {
+	u.Set(membertier.FieldGraduatedTierID, v)
+	return u
+}
+
+// UpdateGraduatedTierID sets the "graduated_tier_id" field to the value that was provided on create.
+func (u *MemberTierUpsert) UpdateGraduatedTierID() *MemberTierUpsert {
+	u.SetExcluded(membertier.FieldGraduatedTierID)
+	return u
+}
+
+// ClearGraduatedTierID clears the value of the "graduated_tier_id" field.
+func (u *MemberTierUpsert) ClearGraduatedTierID() *MemberTierUpsert {
+	u.SetNull(membertier.FieldGraduatedTierID)
 	return u
 }
 
@@ -901,6 +1063,111 @@ func (u *MemberTierUpsertOne) SetIsDefault(v bool) *MemberTierUpsertOne {
 func (u *MemberTierUpsertOne) UpdateIsDefault() *MemberTierUpsertOne {
 	return u.Update(func(s *MemberTierUpsert) {
 		s.UpdateIsDefault()
+	})
+}
+
+// SetEnrollmentPeriodMonths sets the "enrollment_period_months" field.
+func (u *MemberTierUpsertOne) SetEnrollmentPeriodMonths(v int) *MemberTierUpsertOne {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.SetEnrollmentPeriodMonths(v)
+	})
+}
+
+// AddEnrollmentPeriodMonths adds v to the "enrollment_period_months" field.
+func (u *MemberTierUpsertOne) AddEnrollmentPeriodMonths(v int) *MemberTierUpsertOne {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.AddEnrollmentPeriodMonths(v)
+	})
+}
+
+// UpdateEnrollmentPeriodMonths sets the "enrollment_period_months" field to the value that was provided on create.
+func (u *MemberTierUpsertOne) UpdateEnrollmentPeriodMonths() *MemberTierUpsertOne {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.UpdateEnrollmentPeriodMonths()
+	})
+}
+
+// ClearEnrollmentPeriodMonths clears the value of the "enrollment_period_months" field.
+func (u *MemberTierUpsertOne) ClearEnrollmentPeriodMonths() *MemberTierUpsertOne {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.ClearEnrollmentPeriodMonths()
+	})
+}
+
+// SetMaxAgeYears sets the "max_age_years" field.
+func (u *MemberTierUpsertOne) SetMaxAgeYears(v int) *MemberTierUpsertOne {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.SetMaxAgeYears(v)
+	})
+}
+
+// AddMaxAgeYears adds v to the "max_age_years" field.
+func (u *MemberTierUpsertOne) AddMaxAgeYears(v int) *MemberTierUpsertOne {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.AddMaxAgeYears(v)
+	})
+}
+
+// UpdateMaxAgeYears sets the "max_age_years" field to the value that was provided on create.
+func (u *MemberTierUpsertOne) UpdateMaxAgeYears() *MemberTierUpsertOne {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.UpdateMaxAgeYears()
+	})
+}
+
+// ClearMaxAgeYears clears the value of the "max_age_years" field.
+func (u *MemberTierUpsertOne) ClearMaxAgeYears() *MemberTierUpsertOne {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.ClearMaxAgeYears()
+	})
+}
+
+// SetMinAgeYears sets the "min_age_years" field.
+func (u *MemberTierUpsertOne) SetMinAgeYears(v int) *MemberTierUpsertOne {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.SetMinAgeYears(v)
+	})
+}
+
+// AddMinAgeYears adds v to the "min_age_years" field.
+func (u *MemberTierUpsertOne) AddMinAgeYears(v int) *MemberTierUpsertOne {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.AddMinAgeYears(v)
+	})
+}
+
+// UpdateMinAgeYears sets the "min_age_years" field to the value that was provided on create.
+func (u *MemberTierUpsertOne) UpdateMinAgeYears() *MemberTierUpsertOne {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.UpdateMinAgeYears()
+	})
+}
+
+// ClearMinAgeYears clears the value of the "min_age_years" field.
+func (u *MemberTierUpsertOne) ClearMinAgeYears() *MemberTierUpsertOne {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.ClearMinAgeYears()
+	})
+}
+
+// SetGraduatedTierID sets the "graduated_tier_id" field.
+func (u *MemberTierUpsertOne) SetGraduatedTierID(v uuid.UUID) *MemberTierUpsertOne {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.SetGraduatedTierID(v)
+	})
+}
+
+// UpdateGraduatedTierID sets the "graduated_tier_id" field to the value that was provided on create.
+func (u *MemberTierUpsertOne) UpdateGraduatedTierID() *MemberTierUpsertOne {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.UpdateGraduatedTierID()
+	})
+}
+
+// ClearGraduatedTierID clears the value of the "graduated_tier_id" field.
+func (u *MemberTierUpsertOne) ClearGraduatedTierID() *MemberTierUpsertOne {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.ClearGraduatedTierID()
 	})
 }
 
@@ -1322,6 +1589,111 @@ func (u *MemberTierUpsertBulk) SetIsDefault(v bool) *MemberTierUpsertBulk {
 func (u *MemberTierUpsertBulk) UpdateIsDefault() *MemberTierUpsertBulk {
 	return u.Update(func(s *MemberTierUpsert) {
 		s.UpdateIsDefault()
+	})
+}
+
+// SetEnrollmentPeriodMonths sets the "enrollment_period_months" field.
+func (u *MemberTierUpsertBulk) SetEnrollmentPeriodMonths(v int) *MemberTierUpsertBulk {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.SetEnrollmentPeriodMonths(v)
+	})
+}
+
+// AddEnrollmentPeriodMonths adds v to the "enrollment_period_months" field.
+func (u *MemberTierUpsertBulk) AddEnrollmentPeriodMonths(v int) *MemberTierUpsertBulk {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.AddEnrollmentPeriodMonths(v)
+	})
+}
+
+// UpdateEnrollmentPeriodMonths sets the "enrollment_period_months" field to the value that was provided on create.
+func (u *MemberTierUpsertBulk) UpdateEnrollmentPeriodMonths() *MemberTierUpsertBulk {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.UpdateEnrollmentPeriodMonths()
+	})
+}
+
+// ClearEnrollmentPeriodMonths clears the value of the "enrollment_period_months" field.
+func (u *MemberTierUpsertBulk) ClearEnrollmentPeriodMonths() *MemberTierUpsertBulk {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.ClearEnrollmentPeriodMonths()
+	})
+}
+
+// SetMaxAgeYears sets the "max_age_years" field.
+func (u *MemberTierUpsertBulk) SetMaxAgeYears(v int) *MemberTierUpsertBulk {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.SetMaxAgeYears(v)
+	})
+}
+
+// AddMaxAgeYears adds v to the "max_age_years" field.
+func (u *MemberTierUpsertBulk) AddMaxAgeYears(v int) *MemberTierUpsertBulk {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.AddMaxAgeYears(v)
+	})
+}
+
+// UpdateMaxAgeYears sets the "max_age_years" field to the value that was provided on create.
+func (u *MemberTierUpsertBulk) UpdateMaxAgeYears() *MemberTierUpsertBulk {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.UpdateMaxAgeYears()
+	})
+}
+
+// ClearMaxAgeYears clears the value of the "max_age_years" field.
+func (u *MemberTierUpsertBulk) ClearMaxAgeYears() *MemberTierUpsertBulk {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.ClearMaxAgeYears()
+	})
+}
+
+// SetMinAgeYears sets the "min_age_years" field.
+func (u *MemberTierUpsertBulk) SetMinAgeYears(v int) *MemberTierUpsertBulk {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.SetMinAgeYears(v)
+	})
+}
+
+// AddMinAgeYears adds v to the "min_age_years" field.
+func (u *MemberTierUpsertBulk) AddMinAgeYears(v int) *MemberTierUpsertBulk {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.AddMinAgeYears(v)
+	})
+}
+
+// UpdateMinAgeYears sets the "min_age_years" field to the value that was provided on create.
+func (u *MemberTierUpsertBulk) UpdateMinAgeYears() *MemberTierUpsertBulk {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.UpdateMinAgeYears()
+	})
+}
+
+// ClearMinAgeYears clears the value of the "min_age_years" field.
+func (u *MemberTierUpsertBulk) ClearMinAgeYears() *MemberTierUpsertBulk {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.ClearMinAgeYears()
+	})
+}
+
+// SetGraduatedTierID sets the "graduated_tier_id" field.
+func (u *MemberTierUpsertBulk) SetGraduatedTierID(v uuid.UUID) *MemberTierUpsertBulk {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.SetGraduatedTierID(v)
+	})
+}
+
+// UpdateGraduatedTierID sets the "graduated_tier_id" field to the value that was provided on create.
+func (u *MemberTierUpsertBulk) UpdateGraduatedTierID() *MemberTierUpsertBulk {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.UpdateGraduatedTierID()
+	})
+}
+
+// ClearGraduatedTierID clears the value of the "graduated_tier_id" field.
+func (u *MemberTierUpsertBulk) ClearGraduatedTierID() *MemberTierUpsertBulk {
+	return u.Update(func(s *MemberTierUpsert) {
+		s.ClearGraduatedTierID()
 	})
 }
 

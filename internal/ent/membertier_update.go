@@ -225,6 +225,107 @@ func (_u *MemberTierUpdate) SetNillableIsDefault(v *bool) *MemberTierUpdate {
 	return _u
 }
 
+// SetEnrollmentPeriodMonths sets the "enrollment_period_months" field.
+func (_u *MemberTierUpdate) SetEnrollmentPeriodMonths(v int) *MemberTierUpdate {
+	_u.mutation.ResetEnrollmentPeriodMonths()
+	_u.mutation.SetEnrollmentPeriodMonths(v)
+	return _u
+}
+
+// SetNillableEnrollmentPeriodMonths sets the "enrollment_period_months" field if the given value is not nil.
+func (_u *MemberTierUpdate) SetNillableEnrollmentPeriodMonths(v *int) *MemberTierUpdate {
+	if v != nil {
+		_u.SetEnrollmentPeriodMonths(*v)
+	}
+	return _u
+}
+
+// AddEnrollmentPeriodMonths adds value to the "enrollment_period_months" field.
+func (_u *MemberTierUpdate) AddEnrollmentPeriodMonths(v int) *MemberTierUpdate {
+	_u.mutation.AddEnrollmentPeriodMonths(v)
+	return _u
+}
+
+// ClearEnrollmentPeriodMonths clears the value of the "enrollment_period_months" field.
+func (_u *MemberTierUpdate) ClearEnrollmentPeriodMonths() *MemberTierUpdate {
+	_u.mutation.ClearEnrollmentPeriodMonths()
+	return _u
+}
+
+// SetMaxAgeYears sets the "max_age_years" field.
+func (_u *MemberTierUpdate) SetMaxAgeYears(v int) *MemberTierUpdate {
+	_u.mutation.ResetMaxAgeYears()
+	_u.mutation.SetMaxAgeYears(v)
+	return _u
+}
+
+// SetNillableMaxAgeYears sets the "max_age_years" field if the given value is not nil.
+func (_u *MemberTierUpdate) SetNillableMaxAgeYears(v *int) *MemberTierUpdate {
+	if v != nil {
+		_u.SetMaxAgeYears(*v)
+	}
+	return _u
+}
+
+// AddMaxAgeYears adds value to the "max_age_years" field.
+func (_u *MemberTierUpdate) AddMaxAgeYears(v int) *MemberTierUpdate {
+	_u.mutation.AddMaxAgeYears(v)
+	return _u
+}
+
+// ClearMaxAgeYears clears the value of the "max_age_years" field.
+func (_u *MemberTierUpdate) ClearMaxAgeYears() *MemberTierUpdate {
+	_u.mutation.ClearMaxAgeYears()
+	return _u
+}
+
+// SetMinAgeYears sets the "min_age_years" field.
+func (_u *MemberTierUpdate) SetMinAgeYears(v int) *MemberTierUpdate {
+	_u.mutation.ResetMinAgeYears()
+	_u.mutation.SetMinAgeYears(v)
+	return _u
+}
+
+// SetNillableMinAgeYears sets the "min_age_years" field if the given value is not nil.
+func (_u *MemberTierUpdate) SetNillableMinAgeYears(v *int) *MemberTierUpdate {
+	if v != nil {
+		_u.SetMinAgeYears(*v)
+	}
+	return _u
+}
+
+// AddMinAgeYears adds value to the "min_age_years" field.
+func (_u *MemberTierUpdate) AddMinAgeYears(v int) *MemberTierUpdate {
+	_u.mutation.AddMinAgeYears(v)
+	return _u
+}
+
+// ClearMinAgeYears clears the value of the "min_age_years" field.
+func (_u *MemberTierUpdate) ClearMinAgeYears() *MemberTierUpdate {
+	_u.mutation.ClearMinAgeYears()
+	return _u
+}
+
+// SetGraduatedTierID sets the "graduated_tier_id" field.
+func (_u *MemberTierUpdate) SetGraduatedTierID(v uuid.UUID) *MemberTierUpdate {
+	_u.mutation.SetGraduatedTierID(v)
+	return _u
+}
+
+// SetNillableGraduatedTierID sets the "graduated_tier_id" field if the given value is not nil.
+func (_u *MemberTierUpdate) SetNillableGraduatedTierID(v *uuid.UUID) *MemberTierUpdate {
+	if v != nil {
+		_u.SetGraduatedTierID(*v)
+	}
+	return _u
+}
+
+// ClearGraduatedTierID clears the value of the "graduated_tier_id" field.
+func (_u *MemberTierUpdate) ClearGraduatedTierID() *MemberTierUpdate {
+	_u.mutation.ClearGraduatedTierID()
+	return _u
+}
+
 // Mutation returns the MemberTierMutation object of the builder.
 func (_u *MemberTierUpdate) Mutation() *MemberTierMutation {
 	return _u.mutation
@@ -338,6 +439,39 @@ func (_u *MemberTierUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if value, ok := _u.mutation.IsDefault(); ok {
 		_spec.SetField(membertier.FieldIsDefault, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.EnrollmentPeriodMonths(); ok {
+		_spec.SetField(membertier.FieldEnrollmentPeriodMonths, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedEnrollmentPeriodMonths(); ok {
+		_spec.AddField(membertier.FieldEnrollmentPeriodMonths, field.TypeInt, value)
+	}
+	if _u.mutation.EnrollmentPeriodMonthsCleared() {
+		_spec.ClearField(membertier.FieldEnrollmentPeriodMonths, field.TypeInt)
+	}
+	if value, ok := _u.mutation.MaxAgeYears(); ok {
+		_spec.SetField(membertier.FieldMaxAgeYears, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedMaxAgeYears(); ok {
+		_spec.AddField(membertier.FieldMaxAgeYears, field.TypeInt, value)
+	}
+	if _u.mutation.MaxAgeYearsCleared() {
+		_spec.ClearField(membertier.FieldMaxAgeYears, field.TypeInt)
+	}
+	if value, ok := _u.mutation.MinAgeYears(); ok {
+		_spec.SetField(membertier.FieldMinAgeYears, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedMinAgeYears(); ok {
+		_spec.AddField(membertier.FieldMinAgeYears, field.TypeInt, value)
+	}
+	if _u.mutation.MinAgeYearsCleared() {
+		_spec.ClearField(membertier.FieldMinAgeYears, field.TypeInt)
+	}
+	if value, ok := _u.mutation.GraduatedTierID(); ok {
+		_spec.SetField(membertier.FieldGraduatedTierID, field.TypeUUID, value)
+	}
+	if _u.mutation.GraduatedTierIDCleared() {
+		_spec.ClearField(membertier.FieldGraduatedTierID, field.TypeUUID)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -554,6 +688,107 @@ func (_u *MemberTierUpdateOne) SetNillableIsDefault(v *bool) *MemberTierUpdateOn
 	return _u
 }
 
+// SetEnrollmentPeriodMonths sets the "enrollment_period_months" field.
+func (_u *MemberTierUpdateOne) SetEnrollmentPeriodMonths(v int) *MemberTierUpdateOne {
+	_u.mutation.ResetEnrollmentPeriodMonths()
+	_u.mutation.SetEnrollmentPeriodMonths(v)
+	return _u
+}
+
+// SetNillableEnrollmentPeriodMonths sets the "enrollment_period_months" field if the given value is not nil.
+func (_u *MemberTierUpdateOne) SetNillableEnrollmentPeriodMonths(v *int) *MemberTierUpdateOne {
+	if v != nil {
+		_u.SetEnrollmentPeriodMonths(*v)
+	}
+	return _u
+}
+
+// AddEnrollmentPeriodMonths adds value to the "enrollment_period_months" field.
+func (_u *MemberTierUpdateOne) AddEnrollmentPeriodMonths(v int) *MemberTierUpdateOne {
+	_u.mutation.AddEnrollmentPeriodMonths(v)
+	return _u
+}
+
+// ClearEnrollmentPeriodMonths clears the value of the "enrollment_period_months" field.
+func (_u *MemberTierUpdateOne) ClearEnrollmentPeriodMonths() *MemberTierUpdateOne {
+	_u.mutation.ClearEnrollmentPeriodMonths()
+	return _u
+}
+
+// SetMaxAgeYears sets the "max_age_years" field.
+func (_u *MemberTierUpdateOne) SetMaxAgeYears(v int) *MemberTierUpdateOne {
+	_u.mutation.ResetMaxAgeYears()
+	_u.mutation.SetMaxAgeYears(v)
+	return _u
+}
+
+// SetNillableMaxAgeYears sets the "max_age_years" field if the given value is not nil.
+func (_u *MemberTierUpdateOne) SetNillableMaxAgeYears(v *int) *MemberTierUpdateOne {
+	if v != nil {
+		_u.SetMaxAgeYears(*v)
+	}
+	return _u
+}
+
+// AddMaxAgeYears adds value to the "max_age_years" field.
+func (_u *MemberTierUpdateOne) AddMaxAgeYears(v int) *MemberTierUpdateOne {
+	_u.mutation.AddMaxAgeYears(v)
+	return _u
+}
+
+// ClearMaxAgeYears clears the value of the "max_age_years" field.
+func (_u *MemberTierUpdateOne) ClearMaxAgeYears() *MemberTierUpdateOne {
+	_u.mutation.ClearMaxAgeYears()
+	return _u
+}
+
+// SetMinAgeYears sets the "min_age_years" field.
+func (_u *MemberTierUpdateOne) SetMinAgeYears(v int) *MemberTierUpdateOne {
+	_u.mutation.ResetMinAgeYears()
+	_u.mutation.SetMinAgeYears(v)
+	return _u
+}
+
+// SetNillableMinAgeYears sets the "min_age_years" field if the given value is not nil.
+func (_u *MemberTierUpdateOne) SetNillableMinAgeYears(v *int) *MemberTierUpdateOne {
+	if v != nil {
+		_u.SetMinAgeYears(*v)
+	}
+	return _u
+}
+
+// AddMinAgeYears adds value to the "min_age_years" field.
+func (_u *MemberTierUpdateOne) AddMinAgeYears(v int) *MemberTierUpdateOne {
+	_u.mutation.AddMinAgeYears(v)
+	return _u
+}
+
+// ClearMinAgeYears clears the value of the "min_age_years" field.
+func (_u *MemberTierUpdateOne) ClearMinAgeYears() *MemberTierUpdateOne {
+	_u.mutation.ClearMinAgeYears()
+	return _u
+}
+
+// SetGraduatedTierID sets the "graduated_tier_id" field.
+func (_u *MemberTierUpdateOne) SetGraduatedTierID(v uuid.UUID) *MemberTierUpdateOne {
+	_u.mutation.SetGraduatedTierID(v)
+	return _u
+}
+
+// SetNillableGraduatedTierID sets the "graduated_tier_id" field if the given value is not nil.
+func (_u *MemberTierUpdateOne) SetNillableGraduatedTierID(v *uuid.UUID) *MemberTierUpdateOne {
+	if v != nil {
+		_u.SetGraduatedTierID(*v)
+	}
+	return _u
+}
+
+// ClearGraduatedTierID clears the value of the "graduated_tier_id" field.
+func (_u *MemberTierUpdateOne) ClearGraduatedTierID() *MemberTierUpdateOne {
+	_u.mutation.ClearGraduatedTierID()
+	return _u
+}
+
 // Mutation returns the MemberTierMutation object of the builder.
 func (_u *MemberTierUpdateOne) Mutation() *MemberTierMutation {
 	return _u.mutation
@@ -697,6 +932,39 @@ func (_u *MemberTierUpdateOne) sqlSave(ctx context.Context) (_node *MemberTier, 
 	}
 	if value, ok := _u.mutation.IsDefault(); ok {
 		_spec.SetField(membertier.FieldIsDefault, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.EnrollmentPeriodMonths(); ok {
+		_spec.SetField(membertier.FieldEnrollmentPeriodMonths, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedEnrollmentPeriodMonths(); ok {
+		_spec.AddField(membertier.FieldEnrollmentPeriodMonths, field.TypeInt, value)
+	}
+	if _u.mutation.EnrollmentPeriodMonthsCleared() {
+		_spec.ClearField(membertier.FieldEnrollmentPeriodMonths, field.TypeInt)
+	}
+	if value, ok := _u.mutation.MaxAgeYears(); ok {
+		_spec.SetField(membertier.FieldMaxAgeYears, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedMaxAgeYears(); ok {
+		_spec.AddField(membertier.FieldMaxAgeYears, field.TypeInt, value)
+	}
+	if _u.mutation.MaxAgeYearsCleared() {
+		_spec.ClearField(membertier.FieldMaxAgeYears, field.TypeInt)
+	}
+	if value, ok := _u.mutation.MinAgeYears(); ok {
+		_spec.SetField(membertier.FieldMinAgeYears, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedMinAgeYears(); ok {
+		_spec.AddField(membertier.FieldMinAgeYears, field.TypeInt, value)
+	}
+	if _u.mutation.MinAgeYearsCleared() {
+		_spec.ClearField(membertier.FieldMinAgeYears, field.TypeInt)
+	}
+	if value, ok := _u.mutation.GraduatedTierID(); ok {
+		_spec.SetField(membertier.FieldGraduatedTierID, field.TypeUUID, value)
+	}
+	if _u.mutation.GraduatedTierIDCleared() {
+		_spec.ClearField(membertier.FieldGraduatedTierID, field.TypeUUID)
 	}
 	_node = &MemberTier{config: _u.config}
 	_spec.Assign = _node.assignValues

@@ -51,7 +51,9 @@ type Member struct {
 	// JoinedAt holds the value of the "joined_at" field.
 	JoinedAt *time.Time `json:"joined_at,omitempty"`
 	// ExpiresAt holds the value of the "expires_at" field.
-	ExpiresAt    *time.Time `json:"expires_at,omitempty"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	// Used for patron age-based tier auto-transitions
+	BirthDate    *time.Time `json:"birth_date,omitempty"`
 	selectValues sql.SelectValues
 }
 
@@ -66,7 +68,7 @@ func (*Member) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case member.FieldMembershipNo, member.FieldDisplayName, member.FieldContactPhone, member.FieldContactEmail, member.FieldAddress, member.FieldNotes, member.FieldStatus:
 			values[i] = new(sql.NullString)
-		case member.FieldCreatedAt, member.FieldUpdatedAt, member.FieldJoinedAt, member.FieldExpiresAt:
+		case member.FieldCreatedAt, member.FieldUpdatedAt, member.FieldJoinedAt, member.FieldExpiresAt, member.FieldBirthDate:
 			values[i] = new(sql.NullTime)
 		case member.FieldID, member.FieldTenantID, member.FieldTierID:
 			values[i] = new(uuid.UUID)
@@ -198,6 +200,13 @@ func (_m *Member) assignValues(columns []string, values []any) error {
 				_m.ExpiresAt = new(time.Time)
 				*_m.ExpiresAt = value.Time
 			}
+		case member.FieldBirthDate:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field birth_date", values[i])
+			} else if value.Valid {
+				_m.BirthDate = new(time.Time)
+				*_m.BirthDate = value.Time
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -292,6 +301,11 @@ func (_m *Member) String() string {
 	builder.WriteString(", ")
 	if v := _m.ExpiresAt; v != nil {
 		builder.WriteString("expires_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.BirthDate; v != nil {
+		builder.WriteString("birth_date=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteByte(')')

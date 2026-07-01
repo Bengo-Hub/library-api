@@ -44,8 +44,16 @@ type MemberTier struct {
 	// AnnualFee holds the value of the "annual_fee" field.
 	AnnualFee decimal.Decimal `json:"annual_fee,omitempty"`
 	// IsDefault holds the value of the "is_default" field.
-	IsDefault    bool `json:"is_default,omitempty"`
-	selectValues sql.SelectValues
+	IsDefault bool `json:"is_default,omitempty"`
+	// Auto-set expires_at = joined_at + N months on member creation
+	EnrollmentPeriodMonths *int `json:"enrollment_period_months,omitempty"`
+	// Auto-move to graduated_tier_id when member reaches this age
+	MaxAgeYears *int `json:"max_age_years,omitempty"`
+	// Minimum age for this tier (advisory)
+	MinAgeYears *int `json:"min_age_years,omitempty"`
+	// Tier to auto-move to when member exceeds max_age_years
+	GraduatedTierID *uuid.UUID `json:"graduated_tier_id,omitempty"`
+	selectValues    sql.SelectValues
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -53,11 +61,13 @@ func (*MemberTier) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case membertier.FieldGraduatedTierID:
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		case membertier.FieldDailyFineRate, membertier.FieldMaxFineBeforeBlock, membertier.FieldAnnualFee:
 			values[i] = new(decimal.Decimal)
 		case membertier.FieldIsDefault:
 			values[i] = new(sql.NullBool)
-		case membertier.FieldMaxConcurrentLoans, membertier.FieldLoanPeriodDays, membertier.FieldMaxRenewals, membertier.FieldHoldLimit, membertier.FieldEbookConcurrentLimit:
+		case membertier.FieldMaxConcurrentLoans, membertier.FieldLoanPeriodDays, membertier.FieldMaxRenewals, membertier.FieldHoldLimit, membertier.FieldEbookConcurrentLimit, membertier.FieldEnrollmentPeriodMonths, membertier.FieldMaxAgeYears, membertier.FieldMinAgeYears:
 			values[i] = new(sql.NullInt64)
 		case membertier.FieldName:
 			values[i] = new(sql.NullString)
@@ -164,6 +174,34 @@ func (_m *MemberTier) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.IsDefault = value.Bool
 			}
+		case membertier.FieldEnrollmentPeriodMonths:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field enrollment_period_months", values[i])
+			} else if value.Valid {
+				_m.EnrollmentPeriodMonths = new(int)
+				*_m.EnrollmentPeriodMonths = int(value.Int64)
+			}
+		case membertier.FieldMaxAgeYears:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field max_age_years", values[i])
+			} else if value.Valid {
+				_m.MaxAgeYears = new(int)
+				*_m.MaxAgeYears = int(value.Int64)
+			}
+		case membertier.FieldMinAgeYears:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field min_age_years", values[i])
+			} else if value.Valid {
+				_m.MinAgeYears = new(int)
+				*_m.MinAgeYears = int(value.Int64)
+			}
+		case membertier.FieldGraduatedTierID:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field graduated_tier_id", values[i])
+			} else if value.Valid {
+				_m.GraduatedTierID = new(uuid.UUID)
+				*_m.GraduatedTierID = *value.S.(*uuid.UUID)
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -238,6 +276,26 @@ func (_m *MemberTier) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("is_default=")
 	builder.WriteString(fmt.Sprintf("%v", _m.IsDefault))
+	builder.WriteString(", ")
+	if v := _m.EnrollmentPeriodMonths; v != nil {
+		builder.WriteString("enrollment_period_months=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.MaxAgeYears; v != nil {
+		builder.WriteString("max_age_years=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.MinAgeYears; v != nil {
+		builder.WriteString("min_age_years=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.GraduatedTierID; v != nil {
+		builder.WriteString("graduated_tier_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

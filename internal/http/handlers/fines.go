@@ -13,6 +13,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/fine"
 	"github.com/bengobox/library-service/internal/ent/member"
 	"github.com/bengobox/library-service/internal/events"
+	"github.com/bengobox/library-service/internal/payref"
 	"github.com/bengobox/library-service/internal/platform/treasury"
 )
 
@@ -217,12 +218,13 @@ func (h *FineHandler) Pay(w http.ResponseWriter, r *http.Request) {
 	outstanding := f.Amount.Sub(f.AmountPaid)
 	resp, err := h.treasury.CreateIntent(r.Context(), f.TenantID.String(), f.ID.String(), treasury.CreateIntentRequest{
 		SourceService: "library",
-		ReferenceID:   f.ID.String(),
+		ReferenceID:   payref.Build("LIB", TenantSlug(r), f.TenantID, f.ID),
 		ReferenceType: "library_fine",
 		Amount:        outstanding.InexactFloat64(),
 		Currency:      "KES",
 		PaymentMethod: "pending",
 		Description:   "Library fine payment",
+		Metadata:      map[string]any{"service": "library", "entity_id": f.ID.String()},
 	})
 	if err != nil {
 		respondError(w, http.StatusBadGateway, err.Error(), "intent_failed")

@@ -30,6 +30,11 @@ const (
 	EventEbookExpired     = "ebook.expired"
 	EventMembershipFeeDue = "membership.fee_due"
 	EventBibCreated       = "bib.created"
+	EventBranchCreated    = "branch.created"
+	EventHoldExpired      = "hold.expired"
+	EventLoanRecalled     = "loan.recalled"
+	EventMemberExpired    = "member.expired"
+	EventMemberGraduated  = "member.graduated"
 )
 
 // Publisher inserts outbox rows. oc is either client.OutboxEvent or tx.OutboxEvent.

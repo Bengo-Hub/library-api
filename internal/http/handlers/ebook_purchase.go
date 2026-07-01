@@ -7,14 +7,16 @@ import (
 
 	"github.com/bengobox/library-service/internal/ent/ebook"
 	"github.com/bengobox/library-service/internal/ent/ebookpurchase"
+	"github.com/bengobox/library-service/internal/payref"
 	"github.com/bengobox/library-service/internal/platform/treasury"
 )
 
 type purchaseResponse struct {
-	PurchaseID  string `json:"purchase_id"`
-	IntentID    string `json:"intent_id"`
-	InitiateURL string `json:"initiate_url"`
-	Amount      string `json:"amount"`
+	PurchaseID    string `json:"purchase_id"`
+	IntentID      string `json:"intent_id"`
+	InitiateURL   string `json:"initiate_url"`
+	Amount        string `json:"amount"`
+	DownloadToken string `json:"download_token"`
 }
 
 // Purchase godoc
@@ -65,12 +67,13 @@ func (h *EbookHandler) Purchase(w http.ResponseWriter, r *http.Request) {
 	}
 	resp, err := h.treasury.CreateIntent(r.Context(), purchase.TenantID.String(), purchase.ID.String(), treasury.CreateIntentRequest{
 		SourceService: "library",
-		ReferenceID:   purchase.ID.String(),
+		ReferenceID:   payref.Build("LIB", TenantSlug(r), purchase.TenantID, purchase.ID),
 		ReferenceType: "ebook_sale",
 		Amount:        eb.Price.InexactFloat64(),
 		Currency:      "KES",
 		PaymentMethod: "pending",
 		Description:   "E-book purchase",
+		Metadata:      map[string]any{"service": "library", "entity_id": purchase.ID.String()},
 	})
 	if err != nil {
 		respondError(w, http.StatusBadGateway, err.Error(), "intent_failed")
@@ -79,7 +82,8 @@ func (h *EbookHandler) Purchase(w http.ResponseWriter, r *http.Request) {
 	intentID := resp.ResolvedID()
 	_, _ = h.db.EbookPurchase.UpdateOneID(purchase.ID).SetTreasuryIntentID(intentID).Save(r.Context())
 	respondJSON(w, http.StatusOK, purchaseResponse{
-		PurchaseID: purchase.ID.String(), IntentID: intentID, InitiateURL: resp.InitiateURL, Amount: resp.Amount,
+		PurchaseID: purchase.ID.String(), IntentID: intentID, InitiateURL: resp.InitiateURL,
+		Amount: resp.Amount, DownloadToken: purchase.DownloadToken,
 	})
 }
 

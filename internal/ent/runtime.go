@@ -5,12 +5,17 @@ package ent
 import (
 	"time"
 
+	"github.com/bengobox/library-service/internal/ent/acquisitionbudget"
+	"github.com/bengobox/library-service/internal/ent/acquisitionfund"
+	"github.com/bengobox/library-service/internal/ent/acquisitioninvoice"
 	"github.com/bengobox/library-service/internal/ent/auditlog"
 	"github.com/bengobox/library-service/internal/ent/author"
+	"github.com/bengobox/library-service/internal/ent/authorizedvalue"
 	"github.com/bengobox/library-service/internal/ent/bibrecord"
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
 	"github.com/bengobox/library-service/internal/ent/branch"
 	"github.com/bengobox/library-service/internal/ent/catalogterm"
+	"github.com/bengobox/library-service/internal/ent/circulationrule"
 	"github.com/bengobox/library-service/internal/ent/collection"
 	"github.com/bengobox/library-service/internal/ent/copytransfer"
 	"github.com/bengobox/library-service/internal/ent/documentsequence"
@@ -19,20 +24,26 @@ import (
 	"github.com/bengobox/library-service/internal/ent/ebookpurchase"
 	"github.com/bengobox/library-service/internal/ent/fine"
 	"github.com/bengobox/library-service/internal/ent/hold"
+	"github.com/bengobox/library-service/internal/ent/libraryholiday"
 	"github.com/bengobox/library-service/internal/ent/libraryrole"
 	"github.com/bengobox/library-service/internal/ent/libraryuser"
 	"github.com/bengobox/library-service/internal/ent/loan"
 	"github.com/bengobox/library-service/internal/ent/loanpolicy"
 	"github.com/bengobox/library-service/internal/ent/member"
+	"github.com/bengobox/library-service/internal/ent/membernotificationpref"
 	"github.com/bengobox/library-service/internal/ent/membershipfee"
 	"github.com/bengobox/library-service/internal/ent/membertier"
 	"github.com/bengobox/library-service/internal/ent/outboxevent"
 	"github.com/bengobox/library-service/internal/ent/publisher"
+	"github.com/bengobox/library-service/internal/ent/purchaseorder"
+	"github.com/bengobox/library-service/internal/ent/purchaseorderline"
+	"github.com/bengobox/library-service/internal/ent/recallrequest"
 	"github.com/bengobox/library-service/internal/ent/schema"
 	"github.com/bengobox/library-service/internal/ent/serviceconfig"
 	"github.com/bengobox/library-service/internal/ent/stockcount"
 	"github.com/bengobox/library-service/internal/ent/subject"
 	"github.com/bengobox/library-service/internal/ent/tenant"
+	"github.com/bengobox/library-service/internal/ent/vendor"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 )
@@ -41,6 +52,95 @@ import (
 // (default values, validators, hooks and policies) and stitches it
 // to their package variables.
 func init() {
+	acquisitionbudgetMixin := schema.AcquisitionBudget{}.Mixin()
+	acquisitionbudgetMixinFields0 := acquisitionbudgetMixin[0].Fields()
+	_ = acquisitionbudgetMixinFields0
+	acquisitionbudgetFields := schema.AcquisitionBudget{}.Fields()
+	_ = acquisitionbudgetFields
+	// acquisitionbudgetDescCreatedAt is the schema descriptor for created_at field.
+	acquisitionbudgetDescCreatedAt := acquisitionbudgetMixinFields0[1].Descriptor()
+	// acquisitionbudget.DefaultCreatedAt holds the default value on creation for the created_at field.
+	acquisitionbudget.DefaultCreatedAt = acquisitionbudgetDescCreatedAt.Default.(func() time.Time)
+	// acquisitionbudgetDescUpdatedAt is the schema descriptor for updated_at field.
+	acquisitionbudgetDescUpdatedAt := acquisitionbudgetMixinFields0[2].Descriptor()
+	// acquisitionbudget.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	acquisitionbudget.DefaultUpdatedAt = acquisitionbudgetDescUpdatedAt.Default.(func() time.Time)
+	// acquisitionbudget.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	acquisitionbudget.UpdateDefaultUpdatedAt = acquisitionbudgetDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// acquisitionbudgetDescName is the schema descriptor for name field.
+	acquisitionbudgetDescName := acquisitionbudgetFields[0].Descriptor()
+	// acquisitionbudget.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	acquisitionbudget.NameValidator = acquisitionbudgetDescName.Validators[0].(func(string) error)
+	// acquisitionbudgetDescTotalAmount is the schema descriptor for total_amount field.
+	acquisitionbudgetDescTotalAmount := acquisitionbudgetFields[2].Descriptor()
+	// acquisitionbudget.DefaultTotalAmount holds the default value on creation for the total_amount field.
+	acquisitionbudget.DefaultTotalAmount = acquisitionbudgetDescTotalAmount.Default.(decimal.Decimal)
+	// acquisitionbudgetDescAllocated is the schema descriptor for allocated field.
+	acquisitionbudgetDescAllocated := acquisitionbudgetFields[3].Descriptor()
+	// acquisitionbudget.DefaultAllocated holds the default value on creation for the allocated field.
+	acquisitionbudget.DefaultAllocated = acquisitionbudgetDescAllocated.Default.(decimal.Decimal)
+	// acquisitionbudgetDescSpent is the schema descriptor for spent field.
+	acquisitionbudgetDescSpent := acquisitionbudgetFields[4].Descriptor()
+	// acquisitionbudget.DefaultSpent holds the default value on creation for the spent field.
+	acquisitionbudget.DefaultSpent = acquisitionbudgetDescSpent.Default.(decimal.Decimal)
+	// acquisitionbudgetDescID is the schema descriptor for id field.
+	acquisitionbudgetDescID := acquisitionbudgetMixinFields0[0].Descriptor()
+	// acquisitionbudget.DefaultID holds the default value on creation for the id field.
+	acquisitionbudget.DefaultID = acquisitionbudgetDescID.Default.(func() uuid.UUID)
+	acquisitionfundMixin := schema.AcquisitionFund{}.Mixin()
+	acquisitionfundMixinFields0 := acquisitionfundMixin[0].Fields()
+	_ = acquisitionfundMixinFields0
+	acquisitionfundFields := schema.AcquisitionFund{}.Fields()
+	_ = acquisitionfundFields
+	// acquisitionfundDescCreatedAt is the schema descriptor for created_at field.
+	acquisitionfundDescCreatedAt := acquisitionfundMixinFields0[1].Descriptor()
+	// acquisitionfund.DefaultCreatedAt holds the default value on creation for the created_at field.
+	acquisitionfund.DefaultCreatedAt = acquisitionfundDescCreatedAt.Default.(func() time.Time)
+	// acquisitionfundDescUpdatedAt is the schema descriptor for updated_at field.
+	acquisitionfundDescUpdatedAt := acquisitionfundMixinFields0[2].Descriptor()
+	// acquisitionfund.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	acquisitionfund.DefaultUpdatedAt = acquisitionfundDescUpdatedAt.Default.(func() time.Time)
+	// acquisitionfund.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	acquisitionfund.UpdateDefaultUpdatedAt = acquisitionfundDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// acquisitionfundDescName is the schema descriptor for name field.
+	acquisitionfundDescName := acquisitionfundFields[1].Descriptor()
+	// acquisitionfund.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	acquisitionfund.NameValidator = acquisitionfundDescName.Validators[0].(func(string) error)
+	// acquisitionfundDescAllocatedAmount is the schema descriptor for allocated_amount field.
+	acquisitionfundDescAllocatedAmount := acquisitionfundFields[3].Descriptor()
+	// acquisitionfund.DefaultAllocatedAmount holds the default value on creation for the allocated_amount field.
+	acquisitionfund.DefaultAllocatedAmount = acquisitionfundDescAllocatedAmount.Default.(decimal.Decimal)
+	// acquisitionfundDescSpent is the schema descriptor for spent field.
+	acquisitionfundDescSpent := acquisitionfundFields[4].Descriptor()
+	// acquisitionfund.DefaultSpent holds the default value on creation for the spent field.
+	acquisitionfund.DefaultSpent = acquisitionfundDescSpent.Default.(decimal.Decimal)
+	// acquisitionfundDescID is the schema descriptor for id field.
+	acquisitionfundDescID := acquisitionfundMixinFields0[0].Descriptor()
+	// acquisitionfund.DefaultID holds the default value on creation for the id field.
+	acquisitionfund.DefaultID = acquisitionfundDescID.Default.(func() uuid.UUID)
+	acquisitioninvoiceMixin := schema.AcquisitionInvoice{}.Mixin()
+	acquisitioninvoiceMixinFields0 := acquisitioninvoiceMixin[0].Fields()
+	_ = acquisitioninvoiceMixinFields0
+	acquisitioninvoiceFields := schema.AcquisitionInvoice{}.Fields()
+	_ = acquisitioninvoiceFields
+	// acquisitioninvoiceDescCreatedAt is the schema descriptor for created_at field.
+	acquisitioninvoiceDescCreatedAt := acquisitioninvoiceMixinFields0[1].Descriptor()
+	// acquisitioninvoice.DefaultCreatedAt holds the default value on creation for the created_at field.
+	acquisitioninvoice.DefaultCreatedAt = acquisitioninvoiceDescCreatedAt.Default.(func() time.Time)
+	// acquisitioninvoiceDescUpdatedAt is the schema descriptor for updated_at field.
+	acquisitioninvoiceDescUpdatedAt := acquisitioninvoiceMixinFields0[2].Descriptor()
+	// acquisitioninvoice.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	acquisitioninvoice.DefaultUpdatedAt = acquisitioninvoiceDescUpdatedAt.Default.(func() time.Time)
+	// acquisitioninvoice.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	acquisitioninvoice.UpdateDefaultUpdatedAt = acquisitioninvoiceDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// acquisitioninvoiceDescAmount is the schema descriptor for amount field.
+	acquisitioninvoiceDescAmount := acquisitioninvoiceFields[6].Descriptor()
+	// acquisitioninvoice.DefaultAmount holds the default value on creation for the amount field.
+	acquisitioninvoice.DefaultAmount = acquisitioninvoiceDescAmount.Default.(decimal.Decimal)
+	// acquisitioninvoiceDescID is the schema descriptor for id field.
+	acquisitioninvoiceDescID := acquisitioninvoiceMixinFields0[0].Descriptor()
+	// acquisitioninvoice.DefaultID holds the default value on creation for the id field.
+	acquisitioninvoice.DefaultID = acquisitioninvoiceDescID.Default.(func() uuid.UUID)
 	auditlogMixin := schema.AuditLog{}.Mixin()
 	auditlogMixinFields0 := auditlogMixin[0].Fields()
 	_ = auditlogMixinFields0
@@ -91,6 +191,45 @@ func init() {
 	authorDescID := authorMixinFields0[0].Descriptor()
 	// author.DefaultID holds the default value on creation for the id field.
 	author.DefaultID = authorDescID.Default.(func() uuid.UUID)
+	authorizedvalueMixin := schema.AuthorizedValue{}.Mixin()
+	authorizedvalueMixinFields0 := authorizedvalueMixin[0].Fields()
+	_ = authorizedvalueMixinFields0
+	authorizedvalueFields := schema.AuthorizedValue{}.Fields()
+	_ = authorizedvalueFields
+	// authorizedvalueDescCreatedAt is the schema descriptor for created_at field.
+	authorizedvalueDescCreatedAt := authorizedvalueMixinFields0[1].Descriptor()
+	// authorizedvalue.DefaultCreatedAt holds the default value on creation for the created_at field.
+	authorizedvalue.DefaultCreatedAt = authorizedvalueDescCreatedAt.Default.(func() time.Time)
+	// authorizedvalueDescUpdatedAt is the schema descriptor for updated_at field.
+	authorizedvalueDescUpdatedAt := authorizedvalueMixinFields0[2].Descriptor()
+	// authorizedvalue.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	authorizedvalue.DefaultUpdatedAt = authorizedvalueDescUpdatedAt.Default.(func() time.Time)
+	// authorizedvalue.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	authorizedvalue.UpdateDefaultUpdatedAt = authorizedvalueDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// authorizedvalueDescCategory is the schema descriptor for category field.
+	authorizedvalueDescCategory := authorizedvalueFields[0].Descriptor()
+	// authorizedvalue.CategoryValidator is a validator for the "category" field. It is called by the builders before save.
+	authorizedvalue.CategoryValidator = authorizedvalueDescCategory.Validators[0].(func(string) error)
+	// authorizedvalueDescValue is the schema descriptor for value field.
+	authorizedvalueDescValue := authorizedvalueFields[1].Descriptor()
+	// authorizedvalue.ValueValidator is a validator for the "value" field. It is called by the builders before save.
+	authorizedvalue.ValueValidator = authorizedvalueDescValue.Validators[0].(func(string) error)
+	// authorizedvalueDescIsSystem is the schema descriptor for is_system field.
+	authorizedvalueDescIsSystem := authorizedvalueFields[4].Descriptor()
+	// authorizedvalue.DefaultIsSystem holds the default value on creation for the is_system field.
+	authorizedvalue.DefaultIsSystem = authorizedvalueDescIsSystem.Default.(bool)
+	// authorizedvalueDescDisplayOrder is the schema descriptor for display_order field.
+	authorizedvalueDescDisplayOrder := authorizedvalueFields[5].Descriptor()
+	// authorizedvalue.DefaultDisplayOrder holds the default value on creation for the display_order field.
+	authorizedvalue.DefaultDisplayOrder = authorizedvalueDescDisplayOrder.Default.(int)
+	// authorizedvalueDescIsActive is the schema descriptor for is_active field.
+	authorizedvalueDescIsActive := authorizedvalueFields[6].Descriptor()
+	// authorizedvalue.DefaultIsActive holds the default value on creation for the is_active field.
+	authorizedvalue.DefaultIsActive = authorizedvalueDescIsActive.Default.(bool)
+	// authorizedvalueDescID is the schema descriptor for id field.
+	authorizedvalueDescID := authorizedvalueMixinFields0[0].Descriptor()
+	// authorizedvalue.DefaultID holds the default value on creation for the id field.
+	authorizedvalue.DefaultID = authorizedvalueDescID.Default.(func() uuid.UUID)
 	bibrecordMixin := schema.BibRecord{}.Mixin()
 	bibrecordMixinFields0 := bibrecordMixin[0].Fields()
 	_ = bibrecordMixinFields0
@@ -211,6 +350,73 @@ func init() {
 	catalogtermDescID := catalogtermMixinFields0[0].Descriptor()
 	// catalogterm.DefaultID holds the default value on creation for the id field.
 	catalogterm.DefaultID = catalogtermDescID.Default.(func() uuid.UUID)
+	circulationruleMixin := schema.CirculationRule{}.Mixin()
+	circulationruleMixinFields0 := circulationruleMixin[0].Fields()
+	_ = circulationruleMixinFields0
+	circulationruleFields := schema.CirculationRule{}.Fields()
+	_ = circulationruleFields
+	// circulationruleDescCreatedAt is the schema descriptor for created_at field.
+	circulationruleDescCreatedAt := circulationruleMixinFields0[1].Descriptor()
+	// circulationrule.DefaultCreatedAt holds the default value on creation for the created_at field.
+	circulationrule.DefaultCreatedAt = circulationruleDescCreatedAt.Default.(func() time.Time)
+	// circulationruleDescUpdatedAt is the schema descriptor for updated_at field.
+	circulationruleDescUpdatedAt := circulationruleMixinFields0[2].Descriptor()
+	// circulationrule.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	circulationrule.DefaultUpdatedAt = circulationruleDescUpdatedAt.Default.(func() time.Time)
+	// circulationrule.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	circulationrule.UpdateDefaultUpdatedAt = circulationruleDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// circulationruleDescLoanPeriodDays is the schema descriptor for loan_period_days field.
+	circulationruleDescLoanPeriodDays := circulationruleFields[3].Descriptor()
+	// circulationrule.DefaultLoanPeriodDays holds the default value on creation for the loan_period_days field.
+	circulationrule.DefaultLoanPeriodDays = circulationruleDescLoanPeriodDays.Default.(int)
+	// circulationruleDescLoanPeriodHours is the schema descriptor for loan_period_hours field.
+	circulationruleDescLoanPeriodHours := circulationruleFields[4].Descriptor()
+	// circulationrule.DefaultLoanPeriodHours holds the default value on creation for the loan_period_hours field.
+	circulationrule.DefaultLoanPeriodHours = circulationruleDescLoanPeriodHours.Default.(int)
+	// circulationruleDescIsHourly is the schema descriptor for is_hourly field.
+	circulationruleDescIsHourly := circulationruleFields[5].Descriptor()
+	// circulationrule.DefaultIsHourly holds the default value on creation for the is_hourly field.
+	circulationrule.DefaultIsHourly = circulationruleDescIsHourly.Default.(bool)
+	// circulationruleDescMaxRenewals is the schema descriptor for max_renewals field.
+	circulationruleDescMaxRenewals := circulationruleFields[6].Descriptor()
+	// circulationrule.DefaultMaxRenewals holds the default value on creation for the max_renewals field.
+	circulationrule.DefaultMaxRenewals = circulationruleDescMaxRenewals.Default.(int)
+	// circulationruleDescHoldable is the schema descriptor for holdable field.
+	circulationruleDescHoldable := circulationruleFields[7].Descriptor()
+	// circulationrule.DefaultHoldable holds the default value on creation for the holdable field.
+	circulationrule.DefaultHoldable = circulationruleDescHoldable.Default.(bool)
+	// circulationruleDescFinePerDay is the schema descriptor for fine_per_day field.
+	circulationruleDescFinePerDay := circulationruleFields[8].Descriptor()
+	// circulationrule.DefaultFinePerDay holds the default value on creation for the fine_per_day field.
+	circulationrule.DefaultFinePerDay = circulationruleDescFinePerDay.Default.(decimal.Decimal)
+	// circulationruleDescGraceDays is the schema descriptor for grace_days field.
+	circulationruleDescGraceDays := circulationruleFields[9].Descriptor()
+	// circulationrule.DefaultGraceDays holds the default value on creation for the grace_days field.
+	circulationrule.DefaultGraceDays = circulationruleDescGraceDays.Default.(int)
+	// circulationruleDescMaxFineCap is the schema descriptor for max_fine_cap field.
+	circulationruleDescMaxFineCap := circulationruleFields[10].Descriptor()
+	// circulationrule.DefaultMaxFineCap holds the default value on creation for the max_fine_cap field.
+	circulationrule.DefaultMaxFineCap = circulationruleDescMaxFineCap.Default.(decimal.Decimal)
+	// circulationruleDescCapFineAtReplacementPrice is the schema descriptor for cap_fine_at_replacement_price field.
+	circulationruleDescCapFineAtReplacementPrice := circulationruleFields[11].Descriptor()
+	// circulationrule.DefaultCapFineAtReplacementPrice holds the default value on creation for the cap_fine_at_replacement_price field.
+	circulationrule.DefaultCapFineAtReplacementPrice = circulationruleDescCapFineAtReplacementPrice.Default.(bool)
+	// circulationruleDescRentalCharge is the schema descriptor for rental_charge field.
+	circulationruleDescRentalCharge := circulationruleFields[12].Descriptor()
+	// circulationrule.DefaultRentalCharge holds the default value on creation for the rental_charge field.
+	circulationrule.DefaultRentalCharge = circulationruleDescRentalCharge.Default.(decimal.Decimal)
+	// circulationruleDescReplacementCost is the schema descriptor for replacement_cost field.
+	circulationruleDescReplacementCost := circulationruleFields[13].Descriptor()
+	// circulationrule.DefaultReplacementCost holds the default value on creation for the replacement_cost field.
+	circulationrule.DefaultReplacementCost = circulationruleDescReplacementCost.Default.(decimal.Decimal)
+	// circulationruleDescProcessingFee is the schema descriptor for processing_fee field.
+	circulationruleDescProcessingFee := circulationruleFields[14].Descriptor()
+	// circulationrule.DefaultProcessingFee holds the default value on creation for the processing_fee field.
+	circulationrule.DefaultProcessingFee = circulationruleDescProcessingFee.Default.(decimal.Decimal)
+	// circulationruleDescID is the schema descriptor for id field.
+	circulationruleDescID := circulationruleMixinFields0[0].Descriptor()
+	// circulationrule.DefaultID holds the default value on creation for the id field.
+	circulationrule.DefaultID = circulationruleDescID.Default.(func() uuid.UUID)
 	collectionMixin := schema.Collection{}.Mixin()
 	collectionMixinFields0 := collectionMixin[0].Fields()
 	_ = collectionMixinFields0
@@ -427,6 +633,33 @@ func init() {
 	holdDescID := holdMixinFields0[0].Descriptor()
 	// hold.DefaultID holds the default value on creation for the id field.
 	hold.DefaultID = holdDescID.Default.(func() uuid.UUID)
+	libraryholidayMixin := schema.LibraryHoliday{}.Mixin()
+	libraryholidayMixinFields0 := libraryholidayMixin[0].Fields()
+	_ = libraryholidayMixinFields0
+	libraryholidayFields := schema.LibraryHoliday{}.Fields()
+	_ = libraryholidayFields
+	// libraryholidayDescCreatedAt is the schema descriptor for created_at field.
+	libraryholidayDescCreatedAt := libraryholidayMixinFields0[1].Descriptor()
+	// libraryholiday.DefaultCreatedAt holds the default value on creation for the created_at field.
+	libraryholiday.DefaultCreatedAt = libraryholidayDescCreatedAt.Default.(func() time.Time)
+	// libraryholidayDescUpdatedAt is the schema descriptor for updated_at field.
+	libraryholidayDescUpdatedAt := libraryholidayMixinFields0[2].Descriptor()
+	// libraryholiday.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	libraryholiday.DefaultUpdatedAt = libraryholidayDescUpdatedAt.Default.(func() time.Time)
+	// libraryholiday.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	libraryholiday.UpdateDefaultUpdatedAt = libraryholidayDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// libraryholidayDescHolidayDate is the schema descriptor for holiday_date field.
+	libraryholidayDescHolidayDate := libraryholidayFields[1].Descriptor()
+	// libraryholiday.DefaultHolidayDate holds the default value on creation for the holiday_date field.
+	libraryholiday.DefaultHolidayDate = libraryholidayDescHolidayDate.Default.(func() time.Time)
+	// libraryholidayDescIsRecurring is the schema descriptor for is_recurring field.
+	libraryholidayDescIsRecurring := libraryholidayFields[3].Descriptor()
+	// libraryholiday.DefaultIsRecurring holds the default value on creation for the is_recurring field.
+	libraryholiday.DefaultIsRecurring = libraryholidayDescIsRecurring.Default.(bool)
+	// libraryholidayDescID is the schema descriptor for id field.
+	libraryholidayDescID := libraryholidayMixinFields0[0].Descriptor()
+	// libraryholiday.DefaultID holds the default value on creation for the id field.
+	libraryholiday.DefaultID = libraryholidayDescID.Default.(func() uuid.UUID)
 	libraryroleMixin := schema.LibraryRole{}.Mixin()
 	libraryroleMixinFields0 := libraryroleMixin[0].Fields()
 	_ = libraryroleMixinFields0
@@ -586,6 +819,33 @@ func init() {
 	memberDescID := memberMixinFields0[0].Descriptor()
 	// member.DefaultID holds the default value on creation for the id field.
 	member.DefaultID = memberDescID.Default.(func() uuid.UUID)
+	membernotificationprefMixin := schema.MemberNotificationPref{}.Mixin()
+	membernotificationprefMixinFields0 := membernotificationprefMixin[0].Fields()
+	_ = membernotificationprefMixinFields0
+	membernotificationprefFields := schema.MemberNotificationPref{}.Fields()
+	_ = membernotificationprefFields
+	// membernotificationprefDescCreatedAt is the schema descriptor for created_at field.
+	membernotificationprefDescCreatedAt := membernotificationprefMixinFields0[1].Descriptor()
+	// membernotificationpref.DefaultCreatedAt holds the default value on creation for the created_at field.
+	membernotificationpref.DefaultCreatedAt = membernotificationprefDescCreatedAt.Default.(func() time.Time)
+	// membernotificationprefDescUpdatedAt is the schema descriptor for updated_at field.
+	membernotificationprefDescUpdatedAt := membernotificationprefMixinFields0[2].Descriptor()
+	// membernotificationpref.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	membernotificationpref.DefaultUpdatedAt = membernotificationprefDescUpdatedAt.Default.(func() time.Time)
+	// membernotificationpref.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	membernotificationpref.UpdateDefaultUpdatedAt = membernotificationprefDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// membernotificationprefDescEventType is the schema descriptor for event_type field.
+	membernotificationprefDescEventType := membernotificationprefFields[1].Descriptor()
+	// membernotificationpref.EventTypeValidator is a validator for the "event_type" field. It is called by the builders before save.
+	membernotificationpref.EventTypeValidator = membernotificationprefDescEventType.Validators[0].(func(string) error)
+	// membernotificationprefDescIsEnabled is the schema descriptor for is_enabled field.
+	membernotificationprefDescIsEnabled := membernotificationprefFields[3].Descriptor()
+	// membernotificationpref.DefaultIsEnabled holds the default value on creation for the is_enabled field.
+	membernotificationpref.DefaultIsEnabled = membernotificationprefDescIsEnabled.Default.(bool)
+	// membernotificationprefDescID is the schema descriptor for id field.
+	membernotificationprefDescID := membernotificationprefMixinFields0[0].Descriptor()
+	// membernotificationpref.DefaultID holds the default value on creation for the id field.
+	membernotificationpref.DefaultID = membernotificationprefDescID.Default.(func() uuid.UUID)
 	membertierMixin := schema.MemberTier{}.Mixin()
 	membertierMixinFields0 := membertierMixin[0].Fields()
 	_ = membertierMixinFields0
@@ -721,6 +981,91 @@ func init() {
 	publisherDescID := publisherMixinFields0[0].Descriptor()
 	// publisher.DefaultID holds the default value on creation for the id field.
 	publisher.DefaultID = publisherDescID.Default.(func() uuid.UUID)
+	purchaseorderMixin := schema.PurchaseOrder{}.Mixin()
+	purchaseorderMixinFields0 := purchaseorderMixin[0].Fields()
+	_ = purchaseorderMixinFields0
+	purchaseorderFields := schema.PurchaseOrder{}.Fields()
+	_ = purchaseorderFields
+	// purchaseorderDescCreatedAt is the schema descriptor for created_at field.
+	purchaseorderDescCreatedAt := purchaseorderMixinFields0[1].Descriptor()
+	// purchaseorder.DefaultCreatedAt holds the default value on creation for the created_at field.
+	purchaseorder.DefaultCreatedAt = purchaseorderDescCreatedAt.Default.(func() time.Time)
+	// purchaseorderDescUpdatedAt is the schema descriptor for updated_at field.
+	purchaseorderDescUpdatedAt := purchaseorderMixinFields0[2].Descriptor()
+	// purchaseorder.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	purchaseorder.DefaultUpdatedAt = purchaseorderDescUpdatedAt.Default.(func() time.Time)
+	// purchaseorder.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	purchaseorder.UpdateDefaultUpdatedAt = purchaseorderDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// purchaseorderDescSubtotal is the schema descriptor for subtotal field.
+	purchaseorderDescSubtotal := purchaseorderFields[7].Descriptor()
+	// purchaseorder.DefaultSubtotal holds the default value on creation for the subtotal field.
+	purchaseorder.DefaultSubtotal = purchaseorderDescSubtotal.Default.(decimal.Decimal)
+	// purchaseorderDescTax is the schema descriptor for tax field.
+	purchaseorderDescTax := purchaseorderFields[8].Descriptor()
+	// purchaseorder.DefaultTax holds the default value on creation for the tax field.
+	purchaseorder.DefaultTax = purchaseorderDescTax.Default.(decimal.Decimal)
+	// purchaseorderDescTotal is the schema descriptor for total field.
+	purchaseorderDescTotal := purchaseorderFields[9].Descriptor()
+	// purchaseorder.DefaultTotal holds the default value on creation for the total field.
+	purchaseorder.DefaultTotal = purchaseorderDescTotal.Default.(decimal.Decimal)
+	// purchaseorderDescCurrencyCode is the schema descriptor for currency_code field.
+	purchaseorderDescCurrencyCode := purchaseorderFields[10].Descriptor()
+	// purchaseorder.DefaultCurrencyCode holds the default value on creation for the currency_code field.
+	purchaseorder.DefaultCurrencyCode = purchaseorderDescCurrencyCode.Default.(string)
+	// purchaseorderDescID is the schema descriptor for id field.
+	purchaseorderDescID := purchaseorderMixinFields0[0].Descriptor()
+	// purchaseorder.DefaultID holds the default value on creation for the id field.
+	purchaseorder.DefaultID = purchaseorderDescID.Default.(func() uuid.UUID)
+	purchaseorderlineMixin := schema.PurchaseOrderLine{}.Mixin()
+	purchaseorderlineMixinFields0 := purchaseorderlineMixin[0].Fields()
+	_ = purchaseorderlineMixinFields0
+	purchaseorderlineFields := schema.PurchaseOrderLine{}.Fields()
+	_ = purchaseorderlineFields
+	// purchaseorderlineDescCreatedAt is the schema descriptor for created_at field.
+	purchaseorderlineDescCreatedAt := purchaseorderlineMixinFields0[1].Descriptor()
+	// purchaseorderline.DefaultCreatedAt holds the default value on creation for the created_at field.
+	purchaseorderline.DefaultCreatedAt = purchaseorderlineDescCreatedAt.Default.(func() time.Time)
+	// purchaseorderlineDescUpdatedAt is the schema descriptor for updated_at field.
+	purchaseorderlineDescUpdatedAt := purchaseorderlineMixinFields0[2].Descriptor()
+	// purchaseorderline.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	purchaseorderline.DefaultUpdatedAt = purchaseorderlineDescUpdatedAt.Default.(func() time.Time)
+	// purchaseorderline.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	purchaseorderline.UpdateDefaultUpdatedAt = purchaseorderlineDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// purchaseorderlineDescUnitPrice is the schema descriptor for unit_price field.
+	purchaseorderlineDescUnitPrice := purchaseorderlineFields[5].Descriptor()
+	// purchaseorderline.DefaultUnitPrice holds the default value on creation for the unit_price field.
+	purchaseorderline.DefaultUnitPrice = purchaseorderlineDescUnitPrice.Default.(decimal.Decimal)
+	// purchaseorderlineDescQuantity is the schema descriptor for quantity field.
+	purchaseorderlineDescQuantity := purchaseorderlineFields[6].Descriptor()
+	// purchaseorderline.DefaultQuantity holds the default value on creation for the quantity field.
+	purchaseorderline.DefaultQuantity = purchaseorderlineDescQuantity.Default.(int)
+	// purchaseorderlineDescReceivedQty is the schema descriptor for received_qty field.
+	purchaseorderlineDescReceivedQty := purchaseorderlineFields[7].Descriptor()
+	// purchaseorderline.DefaultReceivedQty holds the default value on creation for the received_qty field.
+	purchaseorderline.DefaultReceivedQty = purchaseorderlineDescReceivedQty.Default.(int)
+	// purchaseorderlineDescID is the schema descriptor for id field.
+	purchaseorderlineDescID := purchaseorderlineMixinFields0[0].Descriptor()
+	// purchaseorderline.DefaultID holds the default value on creation for the id field.
+	purchaseorderline.DefaultID = purchaseorderlineDescID.Default.(func() uuid.UUID)
+	recallrequestMixin := schema.RecallRequest{}.Mixin()
+	recallrequestMixinFields0 := recallrequestMixin[0].Fields()
+	_ = recallrequestMixinFields0
+	recallrequestFields := schema.RecallRequest{}.Fields()
+	_ = recallrequestFields
+	// recallrequestDescCreatedAt is the schema descriptor for created_at field.
+	recallrequestDescCreatedAt := recallrequestMixinFields0[1].Descriptor()
+	// recallrequest.DefaultCreatedAt holds the default value on creation for the created_at field.
+	recallrequest.DefaultCreatedAt = recallrequestDescCreatedAt.Default.(func() time.Time)
+	// recallrequestDescUpdatedAt is the schema descriptor for updated_at field.
+	recallrequestDescUpdatedAt := recallrequestMixinFields0[2].Descriptor()
+	// recallrequest.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	recallrequest.DefaultUpdatedAt = recallrequestDescUpdatedAt.Default.(func() time.Time)
+	// recallrequest.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	recallrequest.UpdateDefaultUpdatedAt = recallrequestDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// recallrequestDescID is the schema descriptor for id field.
+	recallrequestDescID := recallrequestMixinFields0[0].Descriptor()
+	// recallrequest.DefaultID holds the default value on creation for the id field.
+	recallrequest.DefaultID = recallrequestDescID.Default.(func() uuid.UUID)
 	serviceconfigFields := schema.ServiceConfig{}.Fields()
 	_ = serviceconfigFields
 	// serviceconfigDescConfigKey is the schema descriptor for config_key field.
@@ -827,4 +1172,31 @@ func init() {
 	tenant.DefaultUpdatedAt = tenantDescUpdatedAt.Default.(func() time.Time)
 	// tenant.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	tenant.UpdateDefaultUpdatedAt = tenantDescUpdatedAt.UpdateDefault.(func() time.Time)
+	vendorMixin := schema.Vendor{}.Mixin()
+	vendorMixinFields0 := vendorMixin[0].Fields()
+	_ = vendorMixinFields0
+	vendorFields := schema.Vendor{}.Fields()
+	_ = vendorFields
+	// vendorDescCreatedAt is the schema descriptor for created_at field.
+	vendorDescCreatedAt := vendorMixinFields0[1].Descriptor()
+	// vendor.DefaultCreatedAt holds the default value on creation for the created_at field.
+	vendor.DefaultCreatedAt = vendorDescCreatedAt.Default.(func() time.Time)
+	// vendorDescUpdatedAt is the schema descriptor for updated_at field.
+	vendorDescUpdatedAt := vendorMixinFields0[2].Descriptor()
+	// vendor.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	vendor.DefaultUpdatedAt = vendorDescUpdatedAt.Default.(func() time.Time)
+	// vendor.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	vendor.UpdateDefaultUpdatedAt = vendorDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// vendorDescName is the schema descriptor for name field.
+	vendorDescName := vendorFields[0].Descriptor()
+	// vendor.NameValidator is a validator for the "name" field. It is called by the builders before save.
+	vendor.NameValidator = vendorDescName.Validators[0].(func(string) error)
+	// vendorDescIsActive is the schema descriptor for is_active field.
+	vendorDescIsActive := vendorFields[10].Descriptor()
+	// vendor.DefaultIsActive holds the default value on creation for the is_active field.
+	vendor.DefaultIsActive = vendorDescIsActive.Default.(bool)
+	// vendorDescID is the schema descriptor for id field.
+	vendorDescID := vendorMixinFields0[0].Descriptor()
+	// vendor.DefaultID holds the default value on creation for the id field.
+	vendor.DefaultID = vendorDescID.Default.(func() uuid.UUID)
 }

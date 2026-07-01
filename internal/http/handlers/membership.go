@@ -9,6 +9,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent"
 	"github.com/bengobox/library-service/internal/ent/membershipfee"
 	"github.com/bengobox/library-service/internal/modules/membership"
+	"github.com/bengobox/library-service/internal/payref"
 	"github.com/bengobox/library-service/internal/platform/treasury"
 )
 
@@ -93,12 +94,13 @@ func (h *MembershipHandler) startPayment(w http.ResponseWriter, r *http.Request,
 	// treasury's S2S endpoint keys the path on the tenant UUID (not slug).
 	resp, err := h.treasury.CreateIntent(r.Context(), fee.TenantID.String(), fee.ID.String(), treasury.CreateIntentRequest{
 		SourceService: "library",
-		ReferenceID:   fee.ID.String(),
+		ReferenceID:   payref.Build("LIB", TenantSlug(r), fee.TenantID, fee.ID),
 		ReferenceType: "membership_fee",
 		Amount:        fee.Amount.InexactFloat64(),
 		Currency:      "KES",
 		PaymentMethod: "pending",
 		Description:   "Library membership fee",
+		Metadata:      map[string]any{"service": "library", "entity_id": fee.ID.String()},
 	})
 	if err != nil {
 		respondError(w, http.StatusBadGateway, err.Error(), "intent_failed")

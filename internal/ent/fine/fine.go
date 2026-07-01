@@ -100,11 +100,13 @@ const DefaultReason = ReasonOVERDUE
 
 // Reason values.
 const (
-	ReasonOVERDUE    Reason = "OVERDUE"
-	ReasonLOST       Reason = "LOST"
-	ReasonDAMAGE     Reason = "DAMAGE"
-	ReasonMEMBERSHIP Reason = "MEMBERSHIP"
-	ReasonOTHER      Reason = "OTHER"
+	ReasonOVERDUE     Reason = "OVERDUE"
+	ReasonLOST        Reason = "LOST"
+	ReasonDAMAGE      Reason = "DAMAGE"
+	ReasonMEMBERSHIP  Reason = "MEMBERSHIP"
+	ReasonRENTAL      Reason = "RENTAL"
+	ReasonREPLACEMENT Reason = "REPLACEMENT"
+	ReasonOTHER       Reason = "OTHER"
 )
 
 func (r Reason) String() string {
@@ -114,7 +116,7 @@ func (r Reason) String() string {
 // ReasonValidator is a validator for the "reason" field enum values. It is called by the builders before save.
 func ReasonValidator(r Reason) error {
 	switch r {
-	case ReasonOVERDUE, ReasonLOST, ReasonDAMAGE, ReasonMEMBERSHIP, ReasonOTHER:
+	case ReasonOVERDUE, ReasonLOST, ReasonDAMAGE, ReasonMEMBERSHIP, ReasonRENTAL, ReasonREPLACEMENT, ReasonOTHER:
 		return nil
 	default:
 		return fmt.Errorf("fine: invalid enum value for reason field: %q", r)

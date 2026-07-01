@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -16,20 +17,22 @@ import (
 	"github.com/bengobox/library-service/internal/ent/loan"
 	"github.com/bengobox/library-service/internal/ent/member"
 	"github.com/bengobox/library-service/internal/ent/membertier"
-	"github.com/bengobox/library-service/internal/modules/refdata"
 	"github.com/bengobox/library-service/internal/events"
+	"github.com/bengobox/library-service/internal/modules/refdata"
 	"github.com/bengobox/library-service/internal/modules/sequence"
+	"github.com/bengobox/library-service/internal/platform/marketflow"
 )
 
 // MemberHandler serves member + tier + loan-policy endpoints.
 type MemberHandler struct {
-	db  *ent.Client
-	log *zap.Logger
+	db         *ent.Client
+	marketflow *marketflow.Client
+	log        *zap.Logger
 }
 
 // NewMemberHandler builds the member handler.
-func NewMemberHandler(db *ent.Client, log *zap.Logger) *MemberHandler {
-	return &MemberHandler{db: db, log: log}
+func NewMemberHandler(db *ent.Client, mf *marketflow.Client, log *zap.Logger) *MemberHandler {
+	return &MemberHandler{db: db, marketflow: mf, log: log}
 }
 
 // memberRequest accepts the library-ui MemberInput contract (first_name/last_name/email/phone/…)
@@ -54,6 +57,7 @@ type memberRequest struct {
 	Address      string `json:"address"`
 	Notes        string `json:"notes"`
 	ExpiresAt    string `json:"expires_at"`
+	BirthDate    string `json:"birth_date"`
 	IsWalkIn     bool   `json:"is_walk_in"`
 }
 
@@ -214,10 +218,12 @@ func (h *MemberHandler) CreateMember(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	now := time.Now()
 	c := tx.Member.Create().
 		SetTenantID(tenantID).SetMembershipNo(memberNo).SetTierID(tierID).
 		SetDisplayName(req.name()).SetContactPhone(req.phone()).
-		SetContactEmail(req.email()).SetAddress(req.Address).SetNotes(req.Notes).SetIsWalkIn(req.IsWalkIn)
+		SetContactEmail(req.email()).SetAddress(req.Address).SetNotes(req.Notes).SetIsWalkIn(req.IsWalkIn).
+		SetJoinedAt(now)
 	if st := strings.TrimSpace(req.Status); st != "" {
 		c.SetStatus(member.Status(strings.ToUpper(st)))
 	}
@@ -230,8 +236,14 @@ func (h *MemberHandler) CreateMember(w http.ResponseWriter, r *http.Request) {
 	if bid, perr := uuid.Parse(req.branch()); perr == nil {
 		c.SetHomeBranchID(bid)
 	}
+	if bd, ok := parseDate(req.BirthDate); ok {
+		c.SetBirthDate(bd)
+	}
+	// Honor explicit expires_at; otherwise auto-compute from tier enrollment period.
 	if t, ok := parseDate(req.ExpiresAt); ok {
 		c.SetExpiresAt(t)
+	} else if tier, terr := tx.MemberTier.Get(r.Context(), tierID); terr == nil && tier.EnrollmentPeriodMonths != nil {
+		c.SetExpiresAt(now.AddDate(0, *tier.EnrollmentPeriodMonths, 0))
 	}
 	row, err := c.Save(r.Context())
 	if err != nil {
@@ -246,6 +258,10 @@ func (h *MemberHandler) CreateMember(w http.ResponseWriter, r *http.Request) {
 	if err := tx.Commit(); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "commit_failed")
 		return
+	}
+	// Best-effort CRM sync — never blocks the response.
+	if cid := h.marketflow.UpsertContactByPhone(r.Context(), tenantID, row.ContactPhone, row.DisplayName); cid != uuid.Nil {
+		_, _ = h.db.Member.UpdateOneID(row.ID).SetCrmContactID(cid).Save(r.Context())
 	}
 	respondJSON(w, http.StatusCreated, h.singleMemberResponse(r, tenantID, row))
 }
@@ -322,6 +338,12 @@ func (h *MemberHandler) UpdateMember(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "update_failed")
 		return
+	}
+	// Best-effort CRM sync when name or phone was touched.
+	if req.name() != "" || req.phone() != "" {
+		if cid := h.marketflow.UpsertContactByPhone(r.Context(), tenantID, row.ContactPhone, row.DisplayName); cid != uuid.Nil {
+			_, _ = h.db.Member.UpdateOneID(row.ID).SetCrmContactID(cid).Save(r.Context())
+		}
 	}
 	respondJSON(w, http.StatusOK, h.singleMemberResponse(r, tenantID, row))
 }

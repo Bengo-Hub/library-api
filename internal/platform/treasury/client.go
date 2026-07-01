@@ -31,7 +31,7 @@ func NewClient(serviceURL, internalServiceKey string, timeout time.Duration) *Cl
 // CreateIntentRequest is the body for POST /api/v1/s2s/{tenant}/payments/intents.
 type CreateIntentRequest struct {
 	SourceService string         `json:"source_service"` // always "library"
-	ReferenceID   string         `json:"reference_id"`   // fine/fee/purchase UUID
+	ReferenceID   string         `json:"reference_id"`   // service-identifiable ref: LIB-{slug}-{hex} (see internal/payref); becomes the Paystack reference
 	ReferenceType string         `json:"reference_type"` // library_fine | membership_fee | ebook_sale
 	Amount        float64        `json:"amount"`
 	Currency      string         `json:"currency"`
@@ -70,6 +70,48 @@ func (c *Client) CreateIntent(ctx context.Context, tenantSlug, idempotencyKey st
 		headers["Idempotency-Key"] = idempotencyKey
 	}
 	return doRequest[IntentResponse](ctx, c.http, http.MethodPost, url, c.apiKey, headers, req)
+}
+
+// InvoiceLine is one line item on a vendor invoice.
+type InvoiceLine struct {
+	Description string  `json:"description"`
+	Quantity    int     `json:"quantity"`
+	UnitPrice   float64 `json:"unit_price"`
+}
+
+// CreateInvoiceRequest is the body for POST /api/v1/s2s/{tenant}/invoices.
+type CreateInvoiceRequest struct {
+	SourceService string        `json:"source_service"` // "library"
+	ReferenceID   string        `json:"reference_id"`
+	ReferenceType string        `json:"reference_type"` // "acquisition_invoice"
+	InvoiceType   string        `json:"invoice_type"`   // "vendor_bill"
+	Amount        float64       `json:"amount"`
+	Currency      string        `json:"currency"`
+	Description   string        `json:"description,omitempty"`
+	VendorName    string        `json:"vendor_name,omitempty"`
+	Lines         []InvoiceLine `json:"lines,omitempty"`
+	Metadata      map[string]any `json:"metadata,omitempty"`
+}
+
+// InvoiceResponse is the response from POST /api/v1/s2s/{tenant}/invoices.
+type InvoiceResponse struct {
+	InvoiceID string `json:"invoice_id"`
+	ID        string `json:"id"`
+	Status    string `json:"status"`
+}
+
+// ResolvedID returns InvoiceID if non-empty, falling back to ID.
+func (r *InvoiceResponse) ResolvedID() string {
+	if r.InvoiceID != "" {
+		return r.InvoiceID
+	}
+	return r.ID
+}
+
+// CreateInvoice calls POST /api/v1/s2s/{tenant}/invoices to create a vendor bill.
+func (c *Client) CreateInvoice(ctx context.Context, tenantSlug string, req CreateInvoiceRequest) (*InvoiceResponse, error) {
+	url := fmt.Sprintf("%s/api/v1/s2s/%s/invoices", c.baseURL, tenantSlug)
+	return doRequest[InvoiceResponse](ctx, c.http, http.MethodPost, url, c.apiKey, nil, req)
 }
 
 func doRequest[T any](ctx context.Context, client *http.Client, method, url, apiKey string, headers map[string]string, body any) (*T, error) {

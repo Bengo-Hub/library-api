@@ -10,6 +10,7 @@ import (
 
 	"github.com/bengobox/library-service/internal/ent"
 	"github.com/bengobox/library-service/internal/ent/branch"
+	"github.com/bengobox/library-service/internal/events"
 )
 
 // BranchHandler serves library branch (location) endpoints.
@@ -91,12 +92,25 @@ func (h *BranchHandler) Create(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "name and code are required", "invalid_request")
 		return
 	}
-	row, err := h.db.Branch.Create().
+	tx, err := h.db.Tx(r.Context())
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "tx_failed")
+		return
+	}
+	row, err := tx.Branch.Create().
 		SetTenantID(tenantID).SetName(req.Name).SetCode(req.Code).
 		SetAddress(req.Address).SetIsDefault(req.IsDefault).
 		Save(r.Context())
 	if err != nil {
+		_ = tx.Rollback()
 		respondError(w, http.StatusInternalServerError, err.Error(), "create_failed")
+		return
+	}
+	_ = events.Publish(r.Context(), tx.OutboxEvent, tenantID, row.ID.String(), events.EventBranchCreated, map[string]any{
+		"branch_id": row.ID, "name": row.Name, "code": row.Code,
+	})
+	if err := tx.Commit(); err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "commit_failed")
 		return
 	}
 	respondJSON(w, http.StatusCreated, row)

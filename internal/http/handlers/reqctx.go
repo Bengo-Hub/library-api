@@ -27,6 +27,15 @@ func TenantUUID(r *http.Request) (uuid.UUID, bool) {
 	return id, true
 }
 
+// TenantSlug resolves the tenant slug from JWT claims (best-effort; "" when absent).
+// Used to build service-identifiable payment references (see internal/payref).
+func TenantSlug(r *http.Request) string {
+	if claims, ok := ClaimsFrom(r); ok && claims != nil {
+		return claims.GetTenantSlug()
+	}
+	return ""
+}
+
 // UserIDFrom returns the acting user's id (JWT subject).
 func UserIDFrom(r *http.Request) string {
 	if claims, ok := ClaimsFrom(r); ok && claims != nil {

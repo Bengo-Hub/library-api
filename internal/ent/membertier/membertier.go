@@ -41,6 +41,14 @@ const (
 	FieldAnnualFee = "annual_fee"
 	// FieldIsDefault holds the string denoting the is_default field in the database.
 	FieldIsDefault = "is_default"
+	// FieldEnrollmentPeriodMonths holds the string denoting the enrollment_period_months field in the database.
+	FieldEnrollmentPeriodMonths = "enrollment_period_months"
+	// FieldMaxAgeYears holds the string denoting the max_age_years field in the database.
+	FieldMaxAgeYears = "max_age_years"
+	// FieldMinAgeYears holds the string denoting the min_age_years field in the database.
+	FieldMinAgeYears = "min_age_years"
+	// FieldGraduatedTierID holds the string denoting the graduated_tier_id field in the database.
+	FieldGraduatedTierID = "graduated_tier_id"
 	// Table holds the table name of the membertier in the database.
 	Table = "member_tiers"
 )
@@ -61,6 +69,10 @@ var Columns = []string{
 	FieldMaxFineBeforeBlock,
 	FieldAnnualFee,
 	FieldIsDefault,
+	FieldEnrollmentPeriodMonths,
+	FieldMaxAgeYears,
+	FieldMinAgeYears,
+	FieldGraduatedTierID,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -175,4 +187,24 @@ func ByAnnualFee(opts ...sql.OrderTermOption) OrderOption {
 // ByIsDefault orders the results by the is_default field.
 func ByIsDefault(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldIsDefault, opts...).ToFunc()
+}
+
+// ByEnrollmentPeriodMonths orders the results by the enrollment_period_months field.
+func ByEnrollmentPeriodMonths(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEnrollmentPeriodMonths, opts...).ToFunc()
+}
+
+// ByMaxAgeYears orders the results by the max_age_years field.
+func ByMaxAgeYears(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMaxAgeYears, opts...).ToFunc()
+}
+
+// ByMinAgeYears orders the results by the min_age_years field.
+func ByMinAgeYears(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMinAgeYears, opts...).ToFunc()
+}
+
+// ByGraduatedTierID orders the results by the graduated_tier_id field.
+func ByGraduatedTierID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldGraduatedTierID, opts...).ToFunc()
 }

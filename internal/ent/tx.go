@@ -12,10 +12,18 @@ import (
 // Tx is a transactional client that is created by calling Client.Tx().
 type Tx struct {
 	config
+	// AcquisitionBudget is the client for interacting with the AcquisitionBudget builders.
+	AcquisitionBudget *AcquisitionBudgetClient
+	// AcquisitionFund is the client for interacting with the AcquisitionFund builders.
+	AcquisitionFund *AcquisitionFundClient
+	// AcquisitionInvoice is the client for interacting with the AcquisitionInvoice builders.
+	AcquisitionInvoice *AcquisitionInvoiceClient
 	// AuditLog is the client for interacting with the AuditLog builders.
 	AuditLog *AuditLogClient
 	// Author is the client for interacting with the Author builders.
 	Author *AuthorClient
+	// AuthorizedValue is the client for interacting with the AuthorizedValue builders.
+	AuthorizedValue *AuthorizedValueClient
 	// BibRecord is the client for interacting with the BibRecord builders.
 	BibRecord *BibRecordClient
 	// BookCopy is the client for interacting with the BookCopy builders.
@@ -24,6 +32,8 @@ type Tx struct {
 	Branch *BranchClient
 	// CatalogTerm is the client for interacting with the CatalogTerm builders.
 	CatalogTerm *CatalogTermClient
+	// CirculationRule is the client for interacting with the CirculationRule builders.
+	CirculationRule *CirculationRuleClient
 	// Collection is the client for interacting with the Collection builders.
 	Collection *CollectionClient
 	// CopyTransfer is the client for interacting with the CopyTransfer builders.
@@ -40,6 +50,8 @@ type Tx struct {
 	Fine *FineClient
 	// Hold is the client for interacting with the Hold builders.
 	Hold *HoldClient
+	// LibraryHoliday is the client for interacting with the LibraryHoliday builders.
+	LibraryHoliday *LibraryHolidayClient
 	// LibraryRole is the client for interacting with the LibraryRole builders.
 	LibraryRole *LibraryRoleClient
 	// LibraryUser is the client for interacting with the LibraryUser builders.
@@ -50,6 +62,8 @@ type Tx struct {
 	LoanPolicy *LoanPolicyClient
 	// Member is the client for interacting with the Member builders.
 	Member *MemberClient
+	// MemberNotificationPref is the client for interacting with the MemberNotificationPref builders.
+	MemberNotificationPref *MemberNotificationPrefClient
 	// MemberTier is the client for interacting with the MemberTier builders.
 	MemberTier *MemberTierClient
 	// MembershipFee is the client for interacting with the MembershipFee builders.
@@ -58,6 +72,12 @@ type Tx struct {
 	OutboxEvent *OutboxEventClient
 	// Publisher is the client for interacting with the Publisher builders.
 	Publisher *PublisherClient
+	// PurchaseOrder is the client for interacting with the PurchaseOrder builders.
+	PurchaseOrder *PurchaseOrderClient
+	// PurchaseOrderLine is the client for interacting with the PurchaseOrderLine builders.
+	PurchaseOrderLine *PurchaseOrderLineClient
+	// RecallRequest is the client for interacting with the RecallRequest builders.
+	RecallRequest *RecallRequestClient
 	// ServiceConfig is the client for interacting with the ServiceConfig builders.
 	ServiceConfig *ServiceConfigClient
 	// StockCount is the client for interacting with the StockCount builders.
@@ -66,6 +86,8 @@ type Tx struct {
 	Subject *SubjectClient
 	// Tenant is the client for interacting with the Tenant builders.
 	Tenant *TenantClient
+	// Vendor is the client for interacting with the Vendor builders.
+	Vendor *VendorClient
 
 	// lazily loaded.
 	client     *Client
@@ -197,12 +219,17 @@ func (tx *Tx) Client() *Client {
 }
 
 func (tx *Tx) init() {
+	tx.AcquisitionBudget = NewAcquisitionBudgetClient(tx.config)
+	tx.AcquisitionFund = NewAcquisitionFundClient(tx.config)
+	tx.AcquisitionInvoice = NewAcquisitionInvoiceClient(tx.config)
 	tx.AuditLog = NewAuditLogClient(tx.config)
 	tx.Author = NewAuthorClient(tx.config)
+	tx.AuthorizedValue = NewAuthorizedValueClient(tx.config)
 	tx.BibRecord = NewBibRecordClient(tx.config)
 	tx.BookCopy = NewBookCopyClient(tx.config)
 	tx.Branch = NewBranchClient(tx.config)
 	tx.CatalogTerm = NewCatalogTermClient(tx.config)
+	tx.CirculationRule = NewCirculationRuleClient(tx.config)
 	tx.Collection = NewCollectionClient(tx.config)
 	tx.CopyTransfer = NewCopyTransferClient(tx.config)
 	tx.DocumentSequence = NewDocumentSequenceClient(tx.config)
@@ -211,19 +238,25 @@ func (tx *Tx) init() {
 	tx.EbookPurchase = NewEbookPurchaseClient(tx.config)
 	tx.Fine = NewFineClient(tx.config)
 	tx.Hold = NewHoldClient(tx.config)
+	tx.LibraryHoliday = NewLibraryHolidayClient(tx.config)
 	tx.LibraryRole = NewLibraryRoleClient(tx.config)
 	tx.LibraryUser = NewLibraryUserClient(tx.config)
 	tx.Loan = NewLoanClient(tx.config)
 	tx.LoanPolicy = NewLoanPolicyClient(tx.config)
 	tx.Member = NewMemberClient(tx.config)
+	tx.MemberNotificationPref = NewMemberNotificationPrefClient(tx.config)
 	tx.MemberTier = NewMemberTierClient(tx.config)
 	tx.MembershipFee = NewMembershipFeeClient(tx.config)
 	tx.OutboxEvent = NewOutboxEventClient(tx.config)
 	tx.Publisher = NewPublisherClient(tx.config)
+	tx.PurchaseOrder = NewPurchaseOrderClient(tx.config)
+	tx.PurchaseOrderLine = NewPurchaseOrderLineClient(tx.config)
+	tx.RecallRequest = NewRecallRequestClient(tx.config)
 	tx.ServiceConfig = NewServiceConfigClient(tx.config)
 	tx.StockCount = NewStockCountClient(tx.config)
 	tx.Subject = NewSubjectClient(tx.config)
 	tx.Tenant = NewTenantClient(tx.config)
+	tx.Vendor = NewVendorClient(tx.config)
 }
 
 // txDriver wraps the given dialect.Tx with a nop dialect.Driver implementation.
@@ -233,7 +266,7 @@ func (tx *Tx) init() {
 // of them in order to commit or rollback the transaction.
 //
 // If a closed transaction is embedded in one of the generated entities, and the entity
-// applies a query, for example: AuditLog.QueryXXX(), the query will be executed
+// applies a query, for example: AcquisitionBudget.QueryXXX(), the query will be executed
 // through the driver which created this transaction.
 //
 // Note that txDriver is not goroutine safe.

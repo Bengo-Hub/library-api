@@ -12,12 +12,17 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/bengobox/library-service/internal/ent/acquisitionbudget"
+	"github.com/bengobox/library-service/internal/ent/acquisitionfund"
+	"github.com/bengobox/library-service/internal/ent/acquisitioninvoice"
 	"github.com/bengobox/library-service/internal/ent/auditlog"
 	"github.com/bengobox/library-service/internal/ent/author"
+	"github.com/bengobox/library-service/internal/ent/authorizedvalue"
 	"github.com/bengobox/library-service/internal/ent/bibrecord"
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
 	"github.com/bengobox/library-service/internal/ent/branch"
 	"github.com/bengobox/library-service/internal/ent/catalogterm"
+	"github.com/bengobox/library-service/internal/ent/circulationrule"
 	"github.com/bengobox/library-service/internal/ent/collection"
 	"github.com/bengobox/library-service/internal/ent/copytransfer"
 	"github.com/bengobox/library-service/internal/ent/documentsequence"
@@ -26,19 +31,25 @@ import (
 	"github.com/bengobox/library-service/internal/ent/ebookpurchase"
 	"github.com/bengobox/library-service/internal/ent/fine"
 	"github.com/bengobox/library-service/internal/ent/hold"
+	"github.com/bengobox/library-service/internal/ent/libraryholiday"
 	"github.com/bengobox/library-service/internal/ent/libraryrole"
 	"github.com/bengobox/library-service/internal/ent/libraryuser"
 	"github.com/bengobox/library-service/internal/ent/loan"
 	"github.com/bengobox/library-service/internal/ent/loanpolicy"
 	"github.com/bengobox/library-service/internal/ent/member"
+	"github.com/bengobox/library-service/internal/ent/membernotificationpref"
 	"github.com/bengobox/library-service/internal/ent/membershipfee"
 	"github.com/bengobox/library-service/internal/ent/membertier"
 	"github.com/bengobox/library-service/internal/ent/outboxevent"
 	"github.com/bengobox/library-service/internal/ent/publisher"
+	"github.com/bengobox/library-service/internal/ent/purchaseorder"
+	"github.com/bengobox/library-service/internal/ent/purchaseorderline"
+	"github.com/bengobox/library-service/internal/ent/recallrequest"
 	"github.com/bengobox/library-service/internal/ent/serviceconfig"
 	"github.com/bengobox/library-service/internal/ent/stockcount"
 	"github.com/bengobox/library-service/internal/ent/subject"
 	"github.com/bengobox/library-service/internal/ent/tenant"
+	"github.com/bengobox/library-service/internal/ent/vendor"
 )
 
 // ent aliases to avoid import conflicts in user's code.
@@ -99,33 +110,44 @@ var (
 func checkColumn(t, c string) error {
 	initCheck.Do(func() {
 		columnCheck = sql.NewColumnCheck(map[string]func(string) bool{
-			auditlog.Table:         auditlog.ValidColumn,
-			author.Table:           author.ValidColumn,
-			bibrecord.Table:        bibrecord.ValidColumn,
-			bookcopy.Table:         bookcopy.ValidColumn,
-			branch.Table:           branch.ValidColumn,
-			catalogterm.Table:      catalogterm.ValidColumn,
-			collection.Table:       collection.ValidColumn,
-			copytransfer.Table:     copytransfer.ValidColumn,
-			documentsequence.Table: documentsequence.ValidColumn,
-			ebook.Table:            ebook.ValidColumn,
-			ebookloan.Table:        ebookloan.ValidColumn,
-			ebookpurchase.Table:    ebookpurchase.ValidColumn,
-			fine.Table:             fine.ValidColumn,
-			hold.Table:             hold.ValidColumn,
-			libraryrole.Table:      libraryrole.ValidColumn,
-			libraryuser.Table:      libraryuser.ValidColumn,
-			loan.Table:             loan.ValidColumn,
-			loanpolicy.Table:       loanpolicy.ValidColumn,
-			member.Table:           member.ValidColumn,
-			membertier.Table:       membertier.ValidColumn,
-			membershipfee.Table:    membershipfee.ValidColumn,
-			outboxevent.Table:      outboxevent.ValidColumn,
-			publisher.Table:        publisher.ValidColumn,
-			serviceconfig.Table:    serviceconfig.ValidColumn,
-			stockcount.Table:       stockcount.ValidColumn,
-			subject.Table:          subject.ValidColumn,
-			tenant.Table:           tenant.ValidColumn,
+			acquisitionbudget.Table:      acquisitionbudget.ValidColumn,
+			acquisitionfund.Table:        acquisitionfund.ValidColumn,
+			acquisitioninvoice.Table:     acquisitioninvoice.ValidColumn,
+			auditlog.Table:               auditlog.ValidColumn,
+			author.Table:                 author.ValidColumn,
+			authorizedvalue.Table:        authorizedvalue.ValidColumn,
+			bibrecord.Table:              bibrecord.ValidColumn,
+			bookcopy.Table:               bookcopy.ValidColumn,
+			branch.Table:                 branch.ValidColumn,
+			catalogterm.Table:            catalogterm.ValidColumn,
+			circulationrule.Table:        circulationrule.ValidColumn,
+			collection.Table:             collection.ValidColumn,
+			copytransfer.Table:           copytransfer.ValidColumn,
+			documentsequence.Table:       documentsequence.ValidColumn,
+			ebook.Table:                  ebook.ValidColumn,
+			ebookloan.Table:              ebookloan.ValidColumn,
+			ebookpurchase.Table:          ebookpurchase.ValidColumn,
+			fine.Table:                   fine.ValidColumn,
+			hold.Table:                   hold.ValidColumn,
+			libraryholiday.Table:         libraryholiday.ValidColumn,
+			libraryrole.Table:            libraryrole.ValidColumn,
+			libraryuser.Table:            libraryuser.ValidColumn,
+			loan.Table:                   loan.ValidColumn,
+			loanpolicy.Table:             loanpolicy.ValidColumn,
+			member.Table:                 member.ValidColumn,
+			membernotificationpref.Table: membernotificationpref.ValidColumn,
+			membertier.Table:             membertier.ValidColumn,
+			membershipfee.Table:          membershipfee.ValidColumn,
+			outboxevent.Table:            outboxevent.ValidColumn,
+			publisher.Table:              publisher.ValidColumn,
+			purchaseorder.Table:          purchaseorder.ValidColumn,
+			purchaseorderline.Table:      purchaseorderline.ValidColumn,
+			recallrequest.Table:          recallrequest.ValidColumn,
+			serviceconfig.Table:          serviceconfig.ValidColumn,
+			stockcount.Table:             stockcount.ValidColumn,
+			subject.Table:                subject.ValidColumn,
+			tenant.Table:                 tenant.ValidColumn,
+			vendor.Table:                 vendor.ValidColumn,
 		})
 	})
 	return columnCheck(t, c)

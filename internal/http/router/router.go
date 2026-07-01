@@ -34,8 +34,12 @@ type Deps struct {
 	Membership     *handlers.MembershipHandler
 	Sequence       *handlers.SequenceHandler
 	PINAuth        *handlers.PINAuthHandler
-	PlatformConfig *handlers.PlatformConfigHandler
-	AuthMiddleware *authclient.AuthMiddleware
+	PlatformConfig   *handlers.PlatformConfigHandler
+	CirculationRules *handlers.CirculationRuleHandler
+	Holiday          *handlers.HolidayHandler
+	AuthorizedValues *handlers.AuthorizedValueHandler
+	Acquisition      *handlers.AcquisitionHandler
+	AuthMiddleware   *authclient.AuthMiddleware
 	RBAC           *rbac.Service
 	AllowedOrigins []string
 	MediaRoot      string
@@ -196,6 +200,8 @@ func New(d Deps) http.Handler {
 			m.With(view("members")).Get("/members/{id}/card.pdf", d.Member.MemberCard)
 			m.With(view("members")).Get("/members/{id}/loans", d.Member.MemberLoans)
 			m.With(view("members")).Get("/members/{id}/fines", d.Member.MemberFines)
+			m.With(view("members")).Get("/members/{id}/notification-prefs", d.Member.GetNotificationPrefs)
+			m.With(act("members", "change")).Put("/members/{id}/notification-prefs", d.Member.UpdateNotificationPrefs)
 			m.With(view("member_tiers")).Get("/member-tiers", d.Member.ListTiers)
 			m.With(act("member_tiers", "add")).Post("/member-tiers", d.Member.CreateTier)
 			m.With(act("member_tiers", "change")).Put("/member-tiers/{id}", d.Member.UpdateTier)
@@ -207,12 +213,14 @@ func New(d Deps) http.Handler {
 			m.With(act("membership_fees", "pay")).Post("/membership-fees/{id}/pay", d.Membership.Pay)
 		})
 
-		// Circulation (checkout/return/renew) — feature gate + per-action permission gate.
+		// Circulation (checkout/return/renew/mark-lost) — feature gate + per-action permission gate.
 		lib.Group(func(c chi.Router) {
 			c.Use(libmw.RequireFeature("library_circulation"))
 			c.With(act("circulation", "checkout")).Post("/circulation/checkout", d.Circulation.Checkout)
 			c.With(act("circulation", "return")).Post("/circulation/return", d.Circulation.Return)
 			c.With(act("circulation", "renew")).Post("/circulation/renew/{loan_id}", d.Circulation.Renew)
+			c.With(act("circulation", "manage")).Post("/circulation/loans/{loan_id}/mark-lost", d.Circulation.MarkLost)
+			c.With(act("circulation", "manage")).Post("/circulation/loans/{loan_id}/recall", d.Circulation.Recall)
 			c.With(view("circulation")).Get("/circulation/loans", d.Circulation.ListLoans)
 		})
 
@@ -263,6 +271,57 @@ func New(d Deps) http.Handler {
 		if d.Sequence != nil {
 			lib.With(view("settings")).Get("/settings/sequences", d.Sequence.List)
 			lib.With(act("settings", "manage")).Put("/settings/sequences/{kind}", d.Sequence.Update)
+		}
+
+		// Admin — 3D circulation rules matrix (branch × tier × format).
+		if d.CirculationRules != nil {
+			lib.With(view("settings")).Get("/admin/circulation-rules", d.CirculationRules.List)
+			lib.With(act("settings", "manage")).Post("/admin/circulation-rules", d.CirculationRules.Create)
+			lib.With(act("settings", "manage")).Put("/admin/circulation-rules/{id}", d.CirculationRules.Update)
+			lib.With(act("settings", "manage")).Delete("/admin/circulation-rules/{id}", d.CirculationRules.Delete)
+		}
+
+		// Admin — library holiday calendar.
+		if d.Holiday != nil {
+			lib.With(view("settings")).Get("/admin/holidays", d.Holiday.List)
+			lib.With(act("settings", "manage")).Post("/admin/holidays", d.Holiday.Create)
+			lib.With(act("settings", "manage")).Put("/admin/holidays/{id}", d.Holiday.Update)
+			lib.With(act("settings", "manage")).Delete("/admin/holidays/{id}", d.Holiday.Delete)
+		}
+
+		// Admin — authorized values (controlled vocabulary).
+		if d.AuthorizedValues != nil {
+			lib.With(view("settings")).Get("/admin/authorized-values/categories", d.AuthorizedValues.ListCategories)
+			lib.With(view("settings")).Get("/admin/authorized-values", d.AuthorizedValues.List)
+			lib.With(act("settings", "manage")).Post("/admin/authorized-values", d.AuthorizedValues.Create)
+			lib.With(act("settings", "manage")).Put("/admin/authorized-values/{id}", d.AuthorizedValues.Update)
+			lib.With(act("settings", "manage")).Delete("/admin/authorized-values/{id}", d.AuthorizedValues.Delete)
+		}
+
+		// Acquisitions — vendors, budgets/funds, purchase orders, invoices.
+		if d.Acquisition != nil {
+			lib.With(view("acquisitions")).Get("/acquisitions/vendors", d.Acquisition.ListVendors)
+			lib.With(act("acquisitions", "add")).Post("/acquisitions/vendors", d.Acquisition.CreateVendor)
+			lib.With(view("acquisitions")).Get("/acquisitions/vendors/{id}", d.Acquisition.GetVendor)
+			lib.With(act("acquisitions", "change")).Put("/acquisitions/vendors/{id}", d.Acquisition.UpdateVendor)
+
+			lib.With(view("acquisitions")).Get("/acquisitions/budgets", d.Acquisition.ListBudgets)
+			lib.With(act("acquisitions", "add")).Post("/acquisitions/budgets", d.Acquisition.CreateBudget)
+			lib.With(act("acquisitions", "change")).Put("/acquisitions/budgets/{id}", d.Acquisition.UpdateBudget)
+			lib.With(view("acquisitions")).Get("/acquisitions/budgets/{budget_id}/funds", d.Acquisition.ListFunds)
+			lib.With(act("acquisitions", "add")).Post("/acquisitions/budgets/{budget_id}/funds", d.Acquisition.CreateFund)
+
+			lib.With(view("acquisitions")).Get("/acquisitions/orders", d.Acquisition.ListOrders)
+			lib.With(act("acquisitions", "add")).Post("/acquisitions/orders", d.Acquisition.CreateOrder)
+			lib.With(view("acquisitions")).Get("/acquisitions/orders/{id}", d.Acquisition.GetOrder)
+			lib.With(act("acquisitions", "change")).Put("/acquisitions/orders/{id}", d.Acquisition.UpdateOrder)
+			lib.With(act("acquisitions", "change")).Post("/acquisitions/orders/{id}/submit", d.Acquisition.SubmitOrder)
+			lib.With(act("acquisitions", "add")).Post("/acquisitions/orders/{id}/lines", d.Acquisition.AddLine)
+			lib.With(act("acquisitions", "change")).Post("/acquisitions/orders/{id}/lines/{line_id}/receive", d.Acquisition.ReceiveLine)
+
+			lib.With(view("acquisitions")).Get("/acquisitions/invoices", d.Acquisition.ListInvoices)
+			lib.With(view("acquisitions")).Get("/acquisitions/invoices/{id}", d.Acquisition.GetInvoice)
+			lib.With(act("acquisitions", "add")).Post("/acquisitions/invoices", d.Acquisition.CreateInvoice)
 		}
 	})
 

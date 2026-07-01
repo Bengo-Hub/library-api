@@ -125,10 +125,11 @@ type holdRequest struct {
 	BibRecordID string `json:"bib_record_id"`
 	MemberID    string `json:"member_id"`
 	BranchID    string `json:"branch_id"`
+	CopyID      string `json:"copy_id,omitempty"` // optional — item-level hold
 }
 
 // Place godoc
-// @Summary Place a hold on a bib record
+// @Summary Place a hold on a bib record (optionally on a specific copy for item-level holds)
 // @Tags Holds
 // @Router /{tenant}/library/holds [post]
 func (h *HoldHandler) Place(w http.ResponseWriter, r *http.Request) {
@@ -157,6 +158,27 @@ func (h *HoldHandler) Place(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusNotFound, "member not found", "not_found")
 		return
 	}
+
+	// Optional item-level copy: validate copy belongs to this bib and is borrowable.
+	var copyID *uuid.UUID
+	if req.CopyID != "" {
+		parsed, perr := uuid.Parse(req.CopyID)
+		if perr != nil {
+			respondError(w, http.StatusBadRequest, "invalid copy_id", "invalid_request")
+			return
+		}
+		c, cerr := h.db.BookCopy.Query().Where(bookcopy.IDEQ(parsed), bookcopy.TenantID(tenantID)).Only(r.Context())
+		if cerr != nil {
+			respondError(w, http.StatusNotFound, "copy not found", "not_found")
+			return
+		}
+		if c.BibRecordID != bibID {
+			respondError(w, http.StatusConflict, "copy does not belong to this bib record", "copy_bib_mismatch")
+			return
+		}
+		copyID = &parsed
+	}
+
 	// Resolve branch: explicit → member home → first available copy's branch.
 	branchID := uuid.Nil
 	if req.BranchID != "" {
@@ -167,9 +189,13 @@ func (h *HoldHandler) Place(w http.ResponseWriter, r *http.Request) {
 		branchID = c.BranchID
 	}
 	pos, _ := h.db.Hold.Query().Where(hold.TenantID(tenantID), hold.BibRecordID(bibID), hold.StatusEQ(hold.StatusWAITING)).Count(r.Context())
-	row, err := h.db.Hold.Create().
+	create := h.db.Hold.Create().
 		SetTenantID(tenantID).SetBibRecordID(bibID).SetMemberID(memberID).SetBranchID(branchID).
-		SetQueuePosition(pos + 1).SetPlacedAt(time.Now()).Save(r.Context())
+		SetQueuePosition(pos + 1).SetPlacedAt(time.Now())
+	if copyID != nil {
+		create = create.SetCopyID(*copyID)
+	}
+	row, err := create.Save(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "create_failed")
 		return

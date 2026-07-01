@@ -20,7 +20,7 @@ func (Fine) Fields() []ent.Field {
 		field.UUID("member_id", uuidType()),
 		field.UUID("loan_id", uuidType()).Optional().Nillable(),
 		field.Enum("reason").
-			Values("OVERDUE", "LOST", "DAMAGE", "MEMBERSHIP", "OTHER").
+			Values("OVERDUE", "LOST", "DAMAGE", "MEMBERSHIP", "RENTAL", "REPLACEMENT", "OTHER").
 			Default("OVERDUE"),
 		field.String("description").Optional(),
 		moneyField("amount"),

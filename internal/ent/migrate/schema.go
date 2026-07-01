@@ -8,6 +8,123 @@ import (
 )
 
 var (
+	// AcquisitionBudgetsColumns holds the columns for the "acquisition_budgets" table.
+	AcquisitionBudgetsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "name", Type: field.TypeString},
+		{Name: "fiscal_year", Type: field.TypeInt},
+		{Name: "total_amount", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "allocated", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "spent", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"OPEN", "CLOSED"}, Default: "OPEN"},
+		{Name: "notes", Type: field.TypeString, Nullable: true},
+	}
+	// AcquisitionBudgetsTable holds the schema information for the "acquisition_budgets" table.
+	AcquisitionBudgetsTable = &schema.Table{
+		Name:       "acquisition_budgets",
+		Columns:    AcquisitionBudgetsColumns,
+		PrimaryKey: []*schema.Column{AcquisitionBudgetsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "acquisitionbudget_tenant_id",
+				Unique:  false,
+				Columns: []*schema.Column{AcquisitionBudgetsColumns[3]},
+			},
+			{
+				Name:    "acquisitionbudget_tenant_id_fiscal_year",
+				Unique:  false,
+				Columns: []*schema.Column{AcquisitionBudgetsColumns[3], AcquisitionBudgetsColumns[5]},
+			},
+			{
+				Name:    "acquisitionbudget_tenant_id_name",
+				Unique:  false,
+				Columns: []*schema.Column{AcquisitionBudgetsColumns[3], AcquisitionBudgetsColumns[4]},
+			},
+		},
+	}
+	// AcquisitionFundsColumns holds the columns for the "acquisition_funds" table.
+	AcquisitionFundsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "budget_id", Type: field.TypeUUID},
+		{Name: "name", Type: field.TypeString},
+		{Name: "code", Type: field.TypeString, Nullable: true},
+		{Name: "allocated_amount", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "spent", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "description", Type: field.TypeString, Nullable: true},
+	}
+	// AcquisitionFundsTable holds the schema information for the "acquisition_funds" table.
+	AcquisitionFundsTable = &schema.Table{
+		Name:       "acquisition_funds",
+		Columns:    AcquisitionFundsColumns,
+		PrimaryKey: []*schema.Column{AcquisitionFundsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "acquisitionfund_tenant_id",
+				Unique:  false,
+				Columns: []*schema.Column{AcquisitionFundsColumns[3]},
+			},
+			{
+				Name:    "acquisitionfund_tenant_id_budget_id",
+				Unique:  false,
+				Columns: []*schema.Column{AcquisitionFundsColumns[3], AcquisitionFundsColumns[4]},
+			},
+			{
+				Name:    "acquisitionfund_tenant_id_code",
+				Unique:  false,
+				Columns: []*schema.Column{AcquisitionFundsColumns[3], AcquisitionFundsColumns[6]},
+			},
+		},
+	}
+	// AcquisitionInvoicesColumns holds the columns for the "acquisition_invoices" table.
+	AcquisitionInvoicesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "vendor_id", Type: field.TypeUUID},
+		{Name: "po_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "invoice_no", Type: field.TypeString, Nullable: true},
+		{Name: "reference_id", Type: field.TypeString, Nullable: true},
+		{Name: "treasury_invoice_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "invoice_date", Type: field.TypeTime, Nullable: true},
+		{Name: "amount", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"PENDING", "PAID", "CANCELLED"}, Default: "PENDING"},
+		{Name: "notes", Type: field.TypeString, Nullable: true},
+	}
+	// AcquisitionInvoicesTable holds the schema information for the "acquisition_invoices" table.
+	AcquisitionInvoicesTable = &schema.Table{
+		Name:       "acquisition_invoices",
+		Columns:    AcquisitionInvoicesColumns,
+		PrimaryKey: []*schema.Column{AcquisitionInvoicesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "acquisitioninvoice_tenant_id",
+				Unique:  false,
+				Columns: []*schema.Column{AcquisitionInvoicesColumns[3]},
+			},
+			{
+				Name:    "acquisitioninvoice_tenant_id_vendor_id",
+				Unique:  false,
+				Columns: []*schema.Column{AcquisitionInvoicesColumns[3], AcquisitionInvoicesColumns[4]},
+			},
+			{
+				Name:    "acquisitioninvoice_tenant_id_po_id",
+				Unique:  false,
+				Columns: []*schema.Column{AcquisitionInvoicesColumns[3], AcquisitionInvoicesColumns[5]},
+			},
+			{
+				Name:    "acquisitioninvoice_tenant_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{AcquisitionInvoicesColumns[3], AcquisitionInvoicesColumns[11]},
+			},
+		},
+	}
 	// AuditLogsColumns holds the columns for the "audit_logs" table.
 	AuditLogsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -69,6 +186,43 @@ var (
 				Name:    "author_tenant_id_name",
 				Unique:  false,
 				Columns: []*schema.Column{AuthorsColumns[3], AuthorsColumns[4]},
+			},
+		},
+	}
+	// AuthorizedValuesColumns holds the columns for the "authorized_values" table.
+	AuthorizedValuesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "category", Type: field.TypeString},
+		{Name: "value", Type: field.TypeString},
+		{Name: "label", Type: field.TypeString, Nullable: true},
+		{Name: "description", Type: field.TypeString, Nullable: true},
+		{Name: "is_system", Type: field.TypeBool, Default: false},
+		{Name: "display_order", Type: field.TypeInt, Default: 0},
+		{Name: "is_active", Type: field.TypeBool, Default: true},
+	}
+	// AuthorizedValuesTable holds the schema information for the "authorized_values" table.
+	AuthorizedValuesTable = &schema.Table{
+		Name:       "authorized_values",
+		Columns:    AuthorizedValuesColumns,
+		PrimaryKey: []*schema.Column{AuthorizedValuesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "authorizedvalue_tenant_id",
+				Unique:  false,
+				Columns: []*schema.Column{AuthorizedValuesColumns[3]},
+			},
+			{
+				Name:    "authorizedvalue_tenant_id_category_value",
+				Unique:  true,
+				Columns: []*schema.Column{AuthorizedValuesColumns[3], AuthorizedValuesColumns[4], AuthorizedValuesColumns[5]},
+			},
+			{
+				Name:    "authorizedvalue_tenant_id_category_display_order",
+				Unique:  false,
+				Columns: []*schema.Column{AuthorizedValuesColumns[3], AuthorizedValuesColumns[4], AuthorizedValuesColumns[9]},
 			},
 		},
 	}
@@ -251,6 +405,48 @@ var (
 				Name:    "catalogterm_tenant_id_kind",
 				Unique:  false,
 				Columns: []*schema.Column{CatalogTermsColumns[3], CatalogTermsColumns[4]},
+			},
+		},
+	}
+	// CirculationRulesColumns holds the columns for the "circulation_rules" table.
+	CirculationRulesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "branch_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "tier_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "item_format", Type: field.TypeEnum, Nullable: true, Enums: []string{"PHYSICAL", "EBOOK", "AUDIOBOOK", "PERIODICAL"}},
+		{Name: "loan_period_days", Type: field.TypeInt, Default: 14},
+		{Name: "loan_period_hours", Type: field.TypeInt, Default: 0},
+		{Name: "is_hourly", Type: field.TypeBool, Default: false},
+		{Name: "max_renewals", Type: field.TypeInt, Default: 2},
+		{Name: "holdable", Type: field.TypeBool, Default: true},
+		{Name: "fine_per_day", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(10,4)"}},
+		{Name: "grace_days", Type: field.TypeInt, Default: 0},
+		{Name: "max_fine_cap", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "cap_fine_at_replacement_price", Type: field.TypeBool, Default: false},
+		{Name: "rental_charge", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "replacement_cost", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "processing_fee", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "due_date_mode", Type: field.TypeEnum, Enums: []string{"DAYS", "CALENDAR", "DATEDUE", "DAYWEEK"}, Default: "DAYS"},
+		{Name: "label", Type: field.TypeString, Nullable: true},
+	}
+	// CirculationRulesTable holds the schema information for the "circulation_rules" table.
+	CirculationRulesTable = &schema.Table{
+		Name:       "circulation_rules",
+		Columns:    CirculationRulesColumns,
+		PrimaryKey: []*schema.Column{CirculationRulesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "circulationrule_tenant_id",
+				Unique:  false,
+				Columns: []*schema.Column{CirculationRulesColumns[3]},
+			},
+			{
+				Name:    "circulationrule_tenant_id_branch_id_tier_id_item_format",
+				Unique:  false,
+				Columns: []*schema.Column{CirculationRulesColumns[3], CirculationRulesColumns[4], CirculationRulesColumns[5], CirculationRulesColumns[6]},
 			},
 		},
 	}
@@ -478,7 +674,7 @@ var (
 		{Name: "tenant_id", Type: field.TypeUUID},
 		{Name: "member_id", Type: field.TypeUUID},
 		{Name: "loan_id", Type: field.TypeUUID, Nullable: true},
-		{Name: "reason", Type: field.TypeEnum, Enums: []string{"OVERDUE", "LOST", "DAMAGE", "MEMBERSHIP", "OTHER"}, Default: "OVERDUE"},
+		{Name: "reason", Type: field.TypeEnum, Enums: []string{"OVERDUE", "LOST", "DAMAGE", "MEMBERSHIP", "RENTAL", "REPLACEMENT", "OTHER"}, Default: "OVERDUE"},
 		{Name: "description", Type: field.TypeString, Nullable: true},
 		{Name: "amount", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
 		{Name: "amount_paid", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
@@ -547,6 +743,35 @@ var (
 				Name:    "hold_tenant_id_member_id_status",
 				Unique:  false,
 				Columns: []*schema.Column{HoldsColumns[3], HoldsColumns[5], HoldsColumns[9]},
+			},
+		},
+	}
+	// LibraryHolidaysColumns holds the columns for the "library_holidays" table.
+	LibraryHolidaysColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "branch_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "holiday_date", Type: field.TypeTime},
+		{Name: "description", Type: field.TypeString, Nullable: true},
+		{Name: "is_recurring", Type: field.TypeBool, Default: false},
+	}
+	// LibraryHolidaysTable holds the schema information for the "library_holidays" table.
+	LibraryHolidaysTable = &schema.Table{
+		Name:       "library_holidays",
+		Columns:    LibraryHolidaysColumns,
+		PrimaryKey: []*schema.Column{LibraryHolidaysColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "libraryholiday_tenant_id",
+				Unique:  false,
+				Columns: []*schema.Column{LibraryHolidaysColumns[3]},
+			},
+			{
+				Name:    "libraryholiday_tenant_id_branch_id_holiday_date",
+				Unique:  false,
+				Columns: []*schema.Column{LibraryHolidaysColumns[3], LibraryHolidaysColumns[4], LibraryHolidaysColumns[5]},
 			},
 		},
 	}
@@ -713,6 +938,7 @@ var (
 		{Name: "is_walk_in", Type: field.TypeBool, Default: false},
 		{Name: "joined_at", Type: field.TypeTime, Nullable: true},
 		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
+		{Name: "birth_date", Type: field.TypeTime, Nullable: true},
 	}
 	// MembersTable holds the schema information for the "members" table.
 	MembersTable = &schema.Table{
@@ -747,6 +973,35 @@ var (
 			},
 		},
 	}
+	// MemberNotificationPrefsColumns holds the columns for the "member_notification_prefs" table.
+	MemberNotificationPrefsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "member_id", Type: field.TypeUUID},
+		{Name: "event_type", Type: field.TypeString},
+		{Name: "channel", Type: field.TypeEnum, Enums: []string{"EMAIL", "SMS", "WHATSAPP", "PUSH", "NONE"}},
+		{Name: "is_enabled", Type: field.TypeBool, Default: true},
+	}
+	// MemberNotificationPrefsTable holds the schema information for the "member_notification_prefs" table.
+	MemberNotificationPrefsTable = &schema.Table{
+		Name:       "member_notification_prefs",
+		Columns:    MemberNotificationPrefsColumns,
+		PrimaryKey: []*schema.Column{MemberNotificationPrefsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "membernotificationpref_tenant_id",
+				Unique:  false,
+				Columns: []*schema.Column{MemberNotificationPrefsColumns[3]},
+			},
+			{
+				Name:    "membernotificationpref_tenant_id_member_id_event_type_channel",
+				Unique:  true,
+				Columns: []*schema.Column{MemberNotificationPrefsColumns[3], MemberNotificationPrefsColumns[4], MemberNotificationPrefsColumns[5], MemberNotificationPrefsColumns[6]},
+			},
+		},
+	}
 	// MemberTiersColumns holds the columns for the "member_tiers" table.
 	MemberTiersColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -763,6 +1018,10 @@ var (
 		{Name: "max_fine_before_block", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
 		{Name: "annual_fee", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
 		{Name: "is_default", Type: field.TypeBool, Default: false},
+		{Name: "enrollment_period_months", Type: field.TypeInt, Nullable: true},
+		{Name: "max_age_years", Type: field.TypeInt, Nullable: true},
+		{Name: "min_age_years", Type: field.TypeInt, Nullable: true},
+		{Name: "graduated_tier_id", Type: field.TypeUUID, Nullable: true},
 	}
 	// MemberTiersTable holds the schema information for the "member_tiers" table.
 	MemberTiersTable = &schema.Table{
@@ -881,6 +1140,118 @@ var (
 				Name:    "publisher_tenant_id_name",
 				Unique:  false,
 				Columns: []*schema.Column{PublishersColumns[3], PublishersColumns[4]},
+			},
+		},
+	}
+	// PurchaseOrdersColumns holds the columns for the "purchase_orders" table.
+	PurchaseOrdersColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "po_number", Type: field.TypeString, Nullable: true},
+		{Name: "vendor_id", Type: field.TypeUUID},
+		{Name: "fund_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"DRAFT", "SUBMITTED", "PARTIAL", "RECEIVED", "CANCELLED"}, Default: "DRAFT"},
+		{Name: "order_date", Type: field.TypeTime, Nullable: true},
+		{Name: "expected_date", Type: field.TypeTime, Nullable: true},
+		{Name: "notes", Type: field.TypeString, Nullable: true},
+		{Name: "subtotal", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "tax", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "total", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "currency_code", Type: field.TypeString, Default: "KES"},
+	}
+	// PurchaseOrdersTable holds the schema information for the "purchase_orders" table.
+	PurchaseOrdersTable = &schema.Table{
+		Name:       "purchase_orders",
+		Columns:    PurchaseOrdersColumns,
+		PrimaryKey: []*schema.Column{PurchaseOrdersColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "purchaseorder_tenant_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseOrdersColumns[3]},
+			},
+			{
+				Name:    "purchaseorder_tenant_id_vendor_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseOrdersColumns[3], PurchaseOrdersColumns[5]},
+			},
+			{
+				Name:    "purchaseorder_tenant_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseOrdersColumns[3], PurchaseOrdersColumns[7]},
+			},
+			{
+				Name:    "purchaseorder_tenant_id_po_number",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseOrdersColumns[3], PurchaseOrdersColumns[4]},
+			},
+		},
+	}
+	// PurchaseOrderLinesColumns holds the columns for the "purchase_order_lines" table.
+	PurchaseOrderLinesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "po_id", Type: field.TypeUUID},
+		{Name: "bib_record_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "title", Type: field.TypeString, Nullable: true},
+		{Name: "isbn", Type: field.TypeString, Nullable: true},
+		{Name: "author", Type: field.TypeString, Nullable: true},
+		{Name: "unit_price", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "quantity", Type: field.TypeInt, Default: 1},
+		{Name: "received_qty", Type: field.TypeInt, Default: 0},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"PENDING", "PARTIAL", "RECEIVED", "CANCELLED"}, Default: "PENDING"},
+		{Name: "notes", Type: field.TypeString, Nullable: true},
+	}
+	// PurchaseOrderLinesTable holds the schema information for the "purchase_order_lines" table.
+	PurchaseOrderLinesTable = &schema.Table{
+		Name:       "purchase_order_lines",
+		Columns:    PurchaseOrderLinesColumns,
+		PrimaryKey: []*schema.Column{PurchaseOrderLinesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "purchaseorderline_tenant_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseOrderLinesColumns[3]},
+			},
+			{
+				Name:    "purchaseorderline_tenant_id_po_id",
+				Unique:  false,
+				Columns: []*schema.Column{PurchaseOrderLinesColumns[3], PurchaseOrderLinesColumns[4]},
+			},
+		},
+	}
+	// RecallRequestsColumns holds the columns for the "recall_requests" table.
+	RecallRequestsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "loan_id", Type: field.TypeUUID},
+		{Name: "hold_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "requested_by_member_id", Type: field.TypeUUID},
+		{Name: "new_due_at", Type: field.TypeTime},
+		{Name: "notify_sent_at", Type: field.TypeTime, Nullable: true},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"PENDING", "RETURNED", "CANCELLED"}, Default: "PENDING"},
+	}
+	// RecallRequestsTable holds the schema information for the "recall_requests" table.
+	RecallRequestsTable = &schema.Table{
+		Name:       "recall_requests",
+		Columns:    RecallRequestsColumns,
+		PrimaryKey: []*schema.Column{RecallRequestsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "recallrequest_tenant_id",
+				Unique:  false,
+				Columns: []*schema.Column{RecallRequestsColumns[3]},
+			},
+			{
+				Name:    "recallrequest_tenant_id_loan_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{RecallRequestsColumns[3], RecallRequestsColumns[4], RecallRequestsColumns[9]},
 			},
 		},
 	}
@@ -1005,14 +1376,60 @@ var (
 			},
 		},
 	}
+	// VendorsColumns holds the columns for the "vendors" table.
+	VendorsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "name", Type: field.TypeString},
+		{Name: "code", Type: field.TypeString, Nullable: true},
+		{Name: "contact_name", Type: field.TypeString, Nullable: true},
+		{Name: "contact_email", Type: field.TypeString, Nullable: true},
+		{Name: "contact_phone", Type: field.TypeString, Nullable: true},
+		{Name: "address", Type: field.TypeString, Nullable: true},
+		{Name: "website", Type: field.TypeString, Nullable: true},
+		{Name: "account_number", Type: field.TypeString, Nullable: true},
+		{Name: "payment_terms", Type: field.TypeEnum, Enums: []string{"NET_30", "NET_60", "COD", "PREPAID"}, Default: "NET_30"},
+		{Name: "notes", Type: field.TypeString, Nullable: true},
+		{Name: "is_active", Type: field.TypeBool, Default: true},
+	}
+	// VendorsTable holds the schema information for the "vendors" table.
+	VendorsTable = &schema.Table{
+		Name:       "vendors",
+		Columns:    VendorsColumns,
+		PrimaryKey: []*schema.Column{VendorsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "vendor_tenant_id",
+				Unique:  false,
+				Columns: []*schema.Column{VendorsColumns[3]},
+			},
+			{
+				Name:    "vendor_tenant_id_code",
+				Unique:  true,
+				Columns: []*schema.Column{VendorsColumns[3], VendorsColumns[5]},
+			},
+			{
+				Name:    "vendor_tenant_id_name",
+				Unique:  false,
+				Columns: []*schema.Column{VendorsColumns[3], VendorsColumns[4]},
+			},
+		},
+	}
 	// Tables holds all the tables in the schema.
 	Tables = []*schema.Table{
+		AcquisitionBudgetsTable,
+		AcquisitionFundsTable,
+		AcquisitionInvoicesTable,
 		AuditLogsTable,
 		AuthorsTable,
+		AuthorizedValuesTable,
 		BibRecordsTable,
 		BookCopiesTable,
 		BranchesTable,
 		CatalogTermsTable,
+		CirculationRulesTable,
 		CollectionsTable,
 		CopyTransfersTable,
 		DocumentSequencesTable,
@@ -1021,19 +1438,25 @@ var (
 		EbookPurchasesTable,
 		FinesTable,
 		HoldsTable,
+		LibraryHolidaysTable,
 		LibraryRolesTable,
 		LibraryUsersTable,
 		LoansTable,
 		LoanPoliciesTable,
 		MembersTable,
+		MemberNotificationPrefsTable,
 		MemberTiersTable,
 		MembershipFeesTable,
 		OutboxEventsTable,
 		PublishersTable,
+		PurchaseOrdersTable,
+		PurchaseOrderLinesTable,
+		RecallRequestsTable,
 		ServiceConfigsTable,
 		StockCountsTable,
 		SubjectsTable,
 		TenantsTable,
+		VendorsTable,
 	}
 )
 

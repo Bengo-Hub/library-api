@@ -238,6 +238,20 @@ func (_c *MemberCreate) SetNillableExpiresAt(v *time.Time) *MemberCreate {
 	return _c
 }
 
+// SetBirthDate sets the "birth_date" field.
+func (_c *MemberCreate) SetBirthDate(v time.Time) *MemberCreate {
+	_c.mutation.SetBirthDate(v)
+	return _c
+}
+
+// SetNillableBirthDate sets the "birth_date" field if the given value is not nil.
+func (_c *MemberCreate) SetNillableBirthDate(v *time.Time) *MemberCreate {
+	if v != nil {
+		_c.SetBirthDate(*v)
+	}
+	return _c
+}
+
 // SetID sets the "id" field.
 func (_c *MemberCreate) SetID(v uuid.UUID) *MemberCreate {
 	_c.mutation.SetID(v)
@@ -445,6 +459,10 @@ func (_c *MemberCreate) createSpec() (*Member, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ExpiresAt(); ok {
 		_spec.SetField(member.FieldExpiresAt, field.TypeTime, value)
 		_node.ExpiresAt = &value
+	}
+	if value, ok := _c.mutation.BirthDate(); ok {
+		_spec.SetField(member.FieldBirthDate, field.TypeTime, value)
+		_node.BirthDate = &value
 	}
 	return _node, _spec
 }
@@ -747,6 +765,24 @@ func (u *MemberUpsert) UpdateExpiresAt() *MemberUpsert {
 // ClearExpiresAt clears the value of the "expires_at" field.
 func (u *MemberUpsert) ClearExpiresAt() *MemberUpsert {
 	u.SetNull(member.FieldExpiresAt)
+	return u
+}
+
+// SetBirthDate sets the "birth_date" field.
+func (u *MemberUpsert) SetBirthDate(v time.Time) *MemberUpsert {
+	u.Set(member.FieldBirthDate, v)
+	return u
+}
+
+// UpdateBirthDate sets the "birth_date" field to the value that was provided on create.
+func (u *MemberUpsert) UpdateBirthDate() *MemberUpsert {
+	u.SetExcluded(member.FieldBirthDate)
+	return u
+}
+
+// ClearBirthDate clears the value of the "birth_date" field.
+func (u *MemberUpsert) ClearBirthDate() *MemberUpsert {
+	u.SetNull(member.FieldBirthDate)
 	return u
 }
 
@@ -1092,6 +1128,27 @@ func (u *MemberUpsertOne) UpdateExpiresAt() *MemberUpsertOne {
 func (u *MemberUpsertOne) ClearExpiresAt() *MemberUpsertOne {
 	return u.Update(func(s *MemberUpsert) {
 		s.ClearExpiresAt()
+	})
+}
+
+// SetBirthDate sets the "birth_date" field.
+func (u *MemberUpsertOne) SetBirthDate(v time.Time) *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.SetBirthDate(v)
+	})
+}
+
+// UpdateBirthDate sets the "birth_date" field to the value that was provided on create.
+func (u *MemberUpsertOne) UpdateBirthDate() *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.UpdateBirthDate()
+	})
+}
+
+// ClearBirthDate clears the value of the "birth_date" field.
+func (u *MemberUpsertOne) ClearBirthDate() *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.ClearBirthDate()
 	})
 }
 
@@ -1604,6 +1661,27 @@ func (u *MemberUpsertBulk) UpdateExpiresAt() *MemberUpsertBulk {
 func (u *MemberUpsertBulk) ClearExpiresAt() *MemberUpsertBulk {
 	return u.Update(func(s *MemberUpsert) {
 		s.ClearExpiresAt()
+	})
+}
+
+// SetBirthDate sets the "birth_date" field.
+func (u *MemberUpsertBulk) SetBirthDate(v time.Time) *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.SetBirthDate(v)
+	})
+}
+
+// UpdateBirthDate sets the "birth_date" field to the value that was provided on create.
+func (u *MemberUpsertBulk) UpdateBirthDate() *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.UpdateBirthDate()
+	})
+}
+
+// ClearBirthDate clears the value of the "birth_date" field.
+func (u *MemberUpsertBulk) ClearBirthDate() *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.ClearBirthDate()
 	})
 }
 

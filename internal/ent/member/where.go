@@ -135,6 +135,11 @@ func ExpiresAt(v time.Time) predicate.Member {
 	return predicate.Member(sql.FieldEQ(FieldExpiresAt, v))
 }
 
+// BirthDate applies equality check predicate on the "birth_date" field. It's identical to BirthDateEQ.
+func BirthDate(v time.Time) predicate.Member {
+	return predicate.Member(sql.FieldEQ(FieldBirthDate, v))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.Member {
 	return predicate.Member(sql.FieldEQ(FieldCreatedAt, v))
@@ -1013,6 +1018,56 @@ func ExpiresAtIsNil() predicate.Member {
 // ExpiresAtNotNil applies the NotNil predicate on the "expires_at" field.
 func ExpiresAtNotNil() predicate.Member {
 	return predicate.Member(sql.FieldNotNull(FieldExpiresAt))
+}
+
+// BirthDateEQ applies the EQ predicate on the "birth_date" field.
+func BirthDateEQ(v time.Time) predicate.Member {
+	return predicate.Member(sql.FieldEQ(FieldBirthDate, v))
+}
+
+// BirthDateNEQ applies the NEQ predicate on the "birth_date" field.
+func BirthDateNEQ(v time.Time) predicate.Member {
+	return predicate.Member(sql.FieldNEQ(FieldBirthDate, v))
+}
+
+// BirthDateIn applies the In predicate on the "birth_date" field.
+func BirthDateIn(vs ...time.Time) predicate.Member {
+	return predicate.Member(sql.FieldIn(FieldBirthDate, vs...))
+}
+
+// BirthDateNotIn applies the NotIn predicate on the "birth_date" field.
+func BirthDateNotIn(vs ...time.Time) predicate.Member {
+	return predicate.Member(sql.FieldNotIn(FieldBirthDate, vs...))
+}
+
+// BirthDateGT applies the GT predicate on the "birth_date" field.
+func BirthDateGT(v time.Time) predicate.Member {
+	return predicate.Member(sql.FieldGT(FieldBirthDate, v))
+}
+
+// BirthDateGTE applies the GTE predicate on the "birth_date" field.
+func BirthDateGTE(v time.Time) predicate.Member {
+	return predicate.Member(sql.FieldGTE(FieldBirthDate, v))
+}
+
+// BirthDateLT applies the LT predicate on the "birth_date" field.
+func BirthDateLT(v time.Time) predicate.Member {
+	return predicate.Member(sql.FieldLT(FieldBirthDate, v))
+}
+
+// BirthDateLTE applies the LTE predicate on the "birth_date" field.
+func BirthDateLTE(v time.Time) predicate.Member {
+	return predicate.Member(sql.FieldLTE(FieldBirthDate, v))
+}
+
+// BirthDateIsNil applies the IsNil predicate on the "birth_date" field.
+func BirthDateIsNil() predicate.Member {
+	return predicate.Member(sql.FieldIsNull(FieldBirthDate))
+}
+
+// BirthDateNotNil applies the NotNil predicate on the "birth_date" field.
+func BirthDateNotNil() predicate.Member {
+	return predicate.Member(sql.FieldNotNull(FieldBirthDate))
 }
 
 // And groups predicates with the AND operator between them.
