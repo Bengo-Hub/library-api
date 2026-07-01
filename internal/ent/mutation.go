@@ -46,6 +46,9 @@ import (
 	"github.com/bengobox/library-service/internal/ent/purchaseorder"
 	"github.com/bengobox/library-service/internal/ent/purchaseorderline"
 	"github.com/bengobox/library-service/internal/ent/recallrequest"
+	"github.com/bengobox/library-service/internal/ent/serialissue"
+	"github.com/bengobox/library-service/internal/ent/serialroutinglist"
+	"github.com/bengobox/library-service/internal/ent/serialsubscription"
 	"github.com/bengobox/library-service/internal/ent/serviceconfig"
 	"github.com/bengobox/library-service/internal/ent/stockcount"
 	"github.com/bengobox/library-service/internal/ent/subject"
@@ -97,6 +100,9 @@ const (
 	TypePurchaseOrder          = "PurchaseOrder"
 	TypePurchaseOrderLine      = "PurchaseOrderLine"
 	TypeRecallRequest          = "RecallRequest"
+	TypeSerialIssue            = "SerialIssue"
+	TypeSerialRoutingList      = "SerialRoutingList"
+	TypeSerialSubscription     = "SerialSubscription"
 	TypeServiceConfig          = "ServiceConfig"
 	TypeStockCount             = "StockCount"
 	TypeSubject                = "Subject"
@@ -33978,6 +33984,2673 @@ func (m *RecallRequestMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *RecallRequestMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown RecallRequest edge %s", name)
+}
+
+// SerialIssueMutation represents an operation that mutates the SerialIssue nodes in the graph.
+type SerialIssueMutation struct {
+	config
+	op              Op
+	typ             string
+	id              *uuid.UUID
+	created_at      *time.Time
+	updated_at      *time.Time
+	tenant_id       *uuid.UUID
+	subscription_id *uuid.UUID
+	volume          *string
+	issue_no        *string
+	expected_date   *time.Time
+	received_date   *time.Time
+	status          *serialissue.Status
+	copy_id         *uuid.UUID
+	notes           *string
+	clearedFields   map[string]struct{}
+	done            bool
+	oldValue        func(context.Context) (*SerialIssue, error)
+	predicates      []predicate.SerialIssue
+}
+
+var _ ent.Mutation = (*SerialIssueMutation)(nil)
+
+// serialissueOption allows management of the mutation configuration using functional options.
+type serialissueOption func(*SerialIssueMutation)
+
+// newSerialIssueMutation creates new mutation for the SerialIssue entity.
+func newSerialIssueMutation(c config, op Op, opts ...serialissueOption) *SerialIssueMutation {
+	m := &SerialIssueMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeSerialIssue,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withSerialIssueID sets the ID field of the mutation.
+func withSerialIssueID(id uuid.UUID) serialissueOption {
+	return func(m *SerialIssueMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *SerialIssue
+		)
+		m.oldValue = func(ctx context.Context) (*SerialIssue, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().SerialIssue.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withSerialIssue sets the old SerialIssue of the mutation.
+func withSerialIssue(node *SerialIssue) serialissueOption {
+	return func(m *SerialIssueMutation) {
+		m.oldValue = func(context.Context) (*SerialIssue, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m SerialIssueMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m SerialIssueMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of SerialIssue entities.
+func (m *SerialIssueMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *SerialIssueMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *SerialIssueMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().SerialIssue.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *SerialIssueMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *SerialIssueMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the SerialIssue entity.
+// If the SerialIssue object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialIssueMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *SerialIssueMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *SerialIssueMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *SerialIssueMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the SerialIssue entity.
+// If the SerialIssue object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialIssueMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *SerialIssueMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (m *SerialIssueMutation) SetTenantID(u uuid.UUID) {
+	m.tenant_id = &u
+}
+
+// TenantID returns the value of the "tenant_id" field in the mutation.
+func (m *SerialIssueMutation) TenantID() (r uuid.UUID, exists bool) {
+	v := m.tenant_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTenantID returns the old "tenant_id" field's value of the SerialIssue entity.
+// If the SerialIssue object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialIssueMutation) OldTenantID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTenantID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTenantID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTenantID: %w", err)
+	}
+	return oldValue.TenantID, nil
+}
+
+// ResetTenantID resets all changes to the "tenant_id" field.
+func (m *SerialIssueMutation) ResetTenantID() {
+	m.tenant_id = nil
+}
+
+// SetSubscriptionID sets the "subscription_id" field.
+func (m *SerialIssueMutation) SetSubscriptionID(u uuid.UUID) {
+	m.subscription_id = &u
+}
+
+// SubscriptionID returns the value of the "subscription_id" field in the mutation.
+func (m *SerialIssueMutation) SubscriptionID() (r uuid.UUID, exists bool) {
+	v := m.subscription_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubscriptionID returns the old "subscription_id" field's value of the SerialIssue entity.
+// If the SerialIssue object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialIssueMutation) OldSubscriptionID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubscriptionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubscriptionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubscriptionID: %w", err)
+	}
+	return oldValue.SubscriptionID, nil
+}
+
+// ResetSubscriptionID resets all changes to the "subscription_id" field.
+func (m *SerialIssueMutation) ResetSubscriptionID() {
+	m.subscription_id = nil
+}
+
+// SetVolume sets the "volume" field.
+func (m *SerialIssueMutation) SetVolume(s string) {
+	m.volume = &s
+}
+
+// Volume returns the value of the "volume" field in the mutation.
+func (m *SerialIssueMutation) Volume() (r string, exists bool) {
+	v := m.volume
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVolume returns the old "volume" field's value of the SerialIssue entity.
+// If the SerialIssue object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialIssueMutation) OldVolume(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVolume is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVolume requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVolume: %w", err)
+	}
+	return oldValue.Volume, nil
+}
+
+// ClearVolume clears the value of the "volume" field.
+func (m *SerialIssueMutation) ClearVolume() {
+	m.volume = nil
+	m.clearedFields[serialissue.FieldVolume] = struct{}{}
+}
+
+// VolumeCleared returns if the "volume" field was cleared in this mutation.
+func (m *SerialIssueMutation) VolumeCleared() bool {
+	_, ok := m.clearedFields[serialissue.FieldVolume]
+	return ok
+}
+
+// ResetVolume resets all changes to the "volume" field.
+func (m *SerialIssueMutation) ResetVolume() {
+	m.volume = nil
+	delete(m.clearedFields, serialissue.FieldVolume)
+}
+
+// SetIssueNo sets the "issue_no" field.
+func (m *SerialIssueMutation) SetIssueNo(s string) {
+	m.issue_no = &s
+}
+
+// IssueNo returns the value of the "issue_no" field in the mutation.
+func (m *SerialIssueMutation) IssueNo() (r string, exists bool) {
+	v := m.issue_no
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIssueNo returns the old "issue_no" field's value of the SerialIssue entity.
+// If the SerialIssue object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialIssueMutation) OldIssueNo(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIssueNo is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIssueNo requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIssueNo: %w", err)
+	}
+	return oldValue.IssueNo, nil
+}
+
+// ClearIssueNo clears the value of the "issue_no" field.
+func (m *SerialIssueMutation) ClearIssueNo() {
+	m.issue_no = nil
+	m.clearedFields[serialissue.FieldIssueNo] = struct{}{}
+}
+
+// IssueNoCleared returns if the "issue_no" field was cleared in this mutation.
+func (m *SerialIssueMutation) IssueNoCleared() bool {
+	_, ok := m.clearedFields[serialissue.FieldIssueNo]
+	return ok
+}
+
+// ResetIssueNo resets all changes to the "issue_no" field.
+func (m *SerialIssueMutation) ResetIssueNo() {
+	m.issue_no = nil
+	delete(m.clearedFields, serialissue.FieldIssueNo)
+}
+
+// SetExpectedDate sets the "expected_date" field.
+func (m *SerialIssueMutation) SetExpectedDate(t time.Time) {
+	m.expected_date = &t
+}
+
+// ExpectedDate returns the value of the "expected_date" field in the mutation.
+func (m *SerialIssueMutation) ExpectedDate() (r time.Time, exists bool) {
+	v := m.expected_date
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpectedDate returns the old "expected_date" field's value of the SerialIssue entity.
+// If the SerialIssue object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialIssueMutation) OldExpectedDate(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpectedDate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpectedDate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpectedDate: %w", err)
+	}
+	return oldValue.ExpectedDate, nil
+}
+
+// ResetExpectedDate resets all changes to the "expected_date" field.
+func (m *SerialIssueMutation) ResetExpectedDate() {
+	m.expected_date = nil
+}
+
+// SetReceivedDate sets the "received_date" field.
+func (m *SerialIssueMutation) SetReceivedDate(t time.Time) {
+	m.received_date = &t
+}
+
+// ReceivedDate returns the value of the "received_date" field in the mutation.
+func (m *SerialIssueMutation) ReceivedDate() (r time.Time, exists bool) {
+	v := m.received_date
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReceivedDate returns the old "received_date" field's value of the SerialIssue entity.
+// If the SerialIssue object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialIssueMutation) OldReceivedDate(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReceivedDate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReceivedDate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReceivedDate: %w", err)
+	}
+	return oldValue.ReceivedDate, nil
+}
+
+// ClearReceivedDate clears the value of the "received_date" field.
+func (m *SerialIssueMutation) ClearReceivedDate() {
+	m.received_date = nil
+	m.clearedFields[serialissue.FieldReceivedDate] = struct{}{}
+}
+
+// ReceivedDateCleared returns if the "received_date" field was cleared in this mutation.
+func (m *SerialIssueMutation) ReceivedDateCleared() bool {
+	_, ok := m.clearedFields[serialissue.FieldReceivedDate]
+	return ok
+}
+
+// ResetReceivedDate resets all changes to the "received_date" field.
+func (m *SerialIssueMutation) ResetReceivedDate() {
+	m.received_date = nil
+	delete(m.clearedFields, serialissue.FieldReceivedDate)
+}
+
+// SetStatus sets the "status" field.
+func (m *SerialIssueMutation) SetStatus(s serialissue.Status) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *SerialIssueMutation) Status() (r serialissue.Status, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the SerialIssue entity.
+// If the SerialIssue object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialIssueMutation) OldStatus(ctx context.Context) (v serialissue.Status, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *SerialIssueMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetCopyID sets the "copy_id" field.
+func (m *SerialIssueMutation) SetCopyID(u uuid.UUID) {
+	m.copy_id = &u
+}
+
+// CopyID returns the value of the "copy_id" field in the mutation.
+func (m *SerialIssueMutation) CopyID() (r uuid.UUID, exists bool) {
+	v := m.copy_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCopyID returns the old "copy_id" field's value of the SerialIssue entity.
+// If the SerialIssue object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialIssueMutation) OldCopyID(ctx context.Context) (v *uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCopyID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCopyID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCopyID: %w", err)
+	}
+	return oldValue.CopyID, nil
+}
+
+// ClearCopyID clears the value of the "copy_id" field.
+func (m *SerialIssueMutation) ClearCopyID() {
+	m.copy_id = nil
+	m.clearedFields[serialissue.FieldCopyID] = struct{}{}
+}
+
+// CopyIDCleared returns if the "copy_id" field was cleared in this mutation.
+func (m *SerialIssueMutation) CopyIDCleared() bool {
+	_, ok := m.clearedFields[serialissue.FieldCopyID]
+	return ok
+}
+
+// ResetCopyID resets all changes to the "copy_id" field.
+func (m *SerialIssueMutation) ResetCopyID() {
+	m.copy_id = nil
+	delete(m.clearedFields, serialissue.FieldCopyID)
+}
+
+// SetNotes sets the "notes" field.
+func (m *SerialIssueMutation) SetNotes(s string) {
+	m.notes = &s
+}
+
+// Notes returns the value of the "notes" field in the mutation.
+func (m *SerialIssueMutation) Notes() (r string, exists bool) {
+	v := m.notes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNotes returns the old "notes" field's value of the SerialIssue entity.
+// If the SerialIssue object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialIssueMutation) OldNotes(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNotes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNotes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNotes: %w", err)
+	}
+	return oldValue.Notes, nil
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (m *SerialIssueMutation) ClearNotes() {
+	m.notes = nil
+	m.clearedFields[serialissue.FieldNotes] = struct{}{}
+}
+
+// NotesCleared returns if the "notes" field was cleared in this mutation.
+func (m *SerialIssueMutation) NotesCleared() bool {
+	_, ok := m.clearedFields[serialissue.FieldNotes]
+	return ok
+}
+
+// ResetNotes resets all changes to the "notes" field.
+func (m *SerialIssueMutation) ResetNotes() {
+	m.notes = nil
+	delete(m.clearedFields, serialissue.FieldNotes)
+}
+
+// Where appends a list predicates to the SerialIssueMutation builder.
+func (m *SerialIssueMutation) Where(ps ...predicate.SerialIssue) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the SerialIssueMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *SerialIssueMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.SerialIssue, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *SerialIssueMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *SerialIssueMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (SerialIssue).
+func (m *SerialIssueMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *SerialIssueMutation) Fields() []string {
+	fields := make([]string, 0, 11)
+	if m.created_at != nil {
+		fields = append(fields, serialissue.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, serialissue.FieldUpdatedAt)
+	}
+	if m.tenant_id != nil {
+		fields = append(fields, serialissue.FieldTenantID)
+	}
+	if m.subscription_id != nil {
+		fields = append(fields, serialissue.FieldSubscriptionID)
+	}
+	if m.volume != nil {
+		fields = append(fields, serialissue.FieldVolume)
+	}
+	if m.issue_no != nil {
+		fields = append(fields, serialissue.FieldIssueNo)
+	}
+	if m.expected_date != nil {
+		fields = append(fields, serialissue.FieldExpectedDate)
+	}
+	if m.received_date != nil {
+		fields = append(fields, serialissue.FieldReceivedDate)
+	}
+	if m.status != nil {
+		fields = append(fields, serialissue.FieldStatus)
+	}
+	if m.copy_id != nil {
+		fields = append(fields, serialissue.FieldCopyID)
+	}
+	if m.notes != nil {
+		fields = append(fields, serialissue.FieldNotes)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *SerialIssueMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case serialissue.FieldCreatedAt:
+		return m.CreatedAt()
+	case serialissue.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case serialissue.FieldTenantID:
+		return m.TenantID()
+	case serialissue.FieldSubscriptionID:
+		return m.SubscriptionID()
+	case serialissue.FieldVolume:
+		return m.Volume()
+	case serialissue.FieldIssueNo:
+		return m.IssueNo()
+	case serialissue.FieldExpectedDate:
+		return m.ExpectedDate()
+	case serialissue.FieldReceivedDate:
+		return m.ReceivedDate()
+	case serialissue.FieldStatus:
+		return m.Status()
+	case serialissue.FieldCopyID:
+		return m.CopyID()
+	case serialissue.FieldNotes:
+		return m.Notes()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *SerialIssueMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case serialissue.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case serialissue.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case serialissue.FieldTenantID:
+		return m.OldTenantID(ctx)
+	case serialissue.FieldSubscriptionID:
+		return m.OldSubscriptionID(ctx)
+	case serialissue.FieldVolume:
+		return m.OldVolume(ctx)
+	case serialissue.FieldIssueNo:
+		return m.OldIssueNo(ctx)
+	case serialissue.FieldExpectedDate:
+		return m.OldExpectedDate(ctx)
+	case serialissue.FieldReceivedDate:
+		return m.OldReceivedDate(ctx)
+	case serialissue.FieldStatus:
+		return m.OldStatus(ctx)
+	case serialissue.FieldCopyID:
+		return m.OldCopyID(ctx)
+	case serialissue.FieldNotes:
+		return m.OldNotes(ctx)
+	}
+	return nil, fmt.Errorf("unknown SerialIssue field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *SerialIssueMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case serialissue.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case serialissue.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case serialissue.FieldTenantID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTenantID(v)
+		return nil
+	case serialissue.FieldSubscriptionID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubscriptionID(v)
+		return nil
+	case serialissue.FieldVolume:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVolume(v)
+		return nil
+	case serialissue.FieldIssueNo:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIssueNo(v)
+		return nil
+	case serialissue.FieldExpectedDate:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpectedDate(v)
+		return nil
+	case serialissue.FieldReceivedDate:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReceivedDate(v)
+		return nil
+	case serialissue.FieldStatus:
+		v, ok := value.(serialissue.Status)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case serialissue.FieldCopyID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCopyID(v)
+		return nil
+	case serialissue.FieldNotes:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNotes(v)
+		return nil
+	}
+	return fmt.Errorf("unknown SerialIssue field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *SerialIssueMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *SerialIssueMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *SerialIssueMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown SerialIssue numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *SerialIssueMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(serialissue.FieldVolume) {
+		fields = append(fields, serialissue.FieldVolume)
+	}
+	if m.FieldCleared(serialissue.FieldIssueNo) {
+		fields = append(fields, serialissue.FieldIssueNo)
+	}
+	if m.FieldCleared(serialissue.FieldReceivedDate) {
+		fields = append(fields, serialissue.FieldReceivedDate)
+	}
+	if m.FieldCleared(serialissue.FieldCopyID) {
+		fields = append(fields, serialissue.FieldCopyID)
+	}
+	if m.FieldCleared(serialissue.FieldNotes) {
+		fields = append(fields, serialissue.FieldNotes)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *SerialIssueMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *SerialIssueMutation) ClearField(name string) error {
+	switch name {
+	case serialissue.FieldVolume:
+		m.ClearVolume()
+		return nil
+	case serialissue.FieldIssueNo:
+		m.ClearIssueNo()
+		return nil
+	case serialissue.FieldReceivedDate:
+		m.ClearReceivedDate()
+		return nil
+	case serialissue.FieldCopyID:
+		m.ClearCopyID()
+		return nil
+	case serialissue.FieldNotes:
+		m.ClearNotes()
+		return nil
+	}
+	return fmt.Errorf("unknown SerialIssue nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *SerialIssueMutation) ResetField(name string) error {
+	switch name {
+	case serialissue.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case serialissue.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case serialissue.FieldTenantID:
+		m.ResetTenantID()
+		return nil
+	case serialissue.FieldSubscriptionID:
+		m.ResetSubscriptionID()
+		return nil
+	case serialissue.FieldVolume:
+		m.ResetVolume()
+		return nil
+	case serialissue.FieldIssueNo:
+		m.ResetIssueNo()
+		return nil
+	case serialissue.FieldExpectedDate:
+		m.ResetExpectedDate()
+		return nil
+	case serialissue.FieldReceivedDate:
+		m.ResetReceivedDate()
+		return nil
+	case serialissue.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case serialissue.FieldCopyID:
+		m.ResetCopyID()
+		return nil
+	case serialissue.FieldNotes:
+		m.ResetNotes()
+		return nil
+	}
+	return fmt.Errorf("unknown SerialIssue field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *SerialIssueMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *SerialIssueMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *SerialIssueMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *SerialIssueMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *SerialIssueMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *SerialIssueMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *SerialIssueMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown SerialIssue unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *SerialIssueMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown SerialIssue edge %s", name)
+}
+
+// SerialRoutingListMutation represents an operation that mutates the SerialRoutingList nodes in the graph.
+type SerialRoutingListMutation struct {
+	config
+	op              Op
+	typ             string
+	id              *uuid.UUID
+	created_at      *time.Time
+	updated_at      *time.Time
+	tenant_id       *uuid.UUID
+	subscription_id *uuid.UUID
+	member_id       *uuid.UUID
+	position        *int
+	addposition     *int
+	clearedFields   map[string]struct{}
+	done            bool
+	oldValue        func(context.Context) (*SerialRoutingList, error)
+	predicates      []predicate.SerialRoutingList
+}
+
+var _ ent.Mutation = (*SerialRoutingListMutation)(nil)
+
+// serialroutinglistOption allows management of the mutation configuration using functional options.
+type serialroutinglistOption func(*SerialRoutingListMutation)
+
+// newSerialRoutingListMutation creates new mutation for the SerialRoutingList entity.
+func newSerialRoutingListMutation(c config, op Op, opts ...serialroutinglistOption) *SerialRoutingListMutation {
+	m := &SerialRoutingListMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeSerialRoutingList,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withSerialRoutingListID sets the ID field of the mutation.
+func withSerialRoutingListID(id uuid.UUID) serialroutinglistOption {
+	return func(m *SerialRoutingListMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *SerialRoutingList
+		)
+		m.oldValue = func(ctx context.Context) (*SerialRoutingList, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().SerialRoutingList.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withSerialRoutingList sets the old SerialRoutingList of the mutation.
+func withSerialRoutingList(node *SerialRoutingList) serialroutinglistOption {
+	return func(m *SerialRoutingListMutation) {
+		m.oldValue = func(context.Context) (*SerialRoutingList, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m SerialRoutingListMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m SerialRoutingListMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of SerialRoutingList entities.
+func (m *SerialRoutingListMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *SerialRoutingListMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *SerialRoutingListMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().SerialRoutingList.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *SerialRoutingListMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *SerialRoutingListMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the SerialRoutingList entity.
+// If the SerialRoutingList object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialRoutingListMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *SerialRoutingListMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *SerialRoutingListMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *SerialRoutingListMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the SerialRoutingList entity.
+// If the SerialRoutingList object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialRoutingListMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *SerialRoutingListMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (m *SerialRoutingListMutation) SetTenantID(u uuid.UUID) {
+	m.tenant_id = &u
+}
+
+// TenantID returns the value of the "tenant_id" field in the mutation.
+func (m *SerialRoutingListMutation) TenantID() (r uuid.UUID, exists bool) {
+	v := m.tenant_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTenantID returns the old "tenant_id" field's value of the SerialRoutingList entity.
+// If the SerialRoutingList object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialRoutingListMutation) OldTenantID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTenantID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTenantID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTenantID: %w", err)
+	}
+	return oldValue.TenantID, nil
+}
+
+// ResetTenantID resets all changes to the "tenant_id" field.
+func (m *SerialRoutingListMutation) ResetTenantID() {
+	m.tenant_id = nil
+}
+
+// SetSubscriptionID sets the "subscription_id" field.
+func (m *SerialRoutingListMutation) SetSubscriptionID(u uuid.UUID) {
+	m.subscription_id = &u
+}
+
+// SubscriptionID returns the value of the "subscription_id" field in the mutation.
+func (m *SerialRoutingListMutation) SubscriptionID() (r uuid.UUID, exists bool) {
+	v := m.subscription_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSubscriptionID returns the old "subscription_id" field's value of the SerialRoutingList entity.
+// If the SerialRoutingList object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialRoutingListMutation) OldSubscriptionID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSubscriptionID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSubscriptionID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSubscriptionID: %w", err)
+	}
+	return oldValue.SubscriptionID, nil
+}
+
+// ResetSubscriptionID resets all changes to the "subscription_id" field.
+func (m *SerialRoutingListMutation) ResetSubscriptionID() {
+	m.subscription_id = nil
+}
+
+// SetMemberID sets the "member_id" field.
+func (m *SerialRoutingListMutation) SetMemberID(u uuid.UUID) {
+	m.member_id = &u
+}
+
+// MemberID returns the value of the "member_id" field in the mutation.
+func (m *SerialRoutingListMutation) MemberID() (r uuid.UUID, exists bool) {
+	v := m.member_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMemberID returns the old "member_id" field's value of the SerialRoutingList entity.
+// If the SerialRoutingList object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialRoutingListMutation) OldMemberID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMemberID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMemberID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMemberID: %w", err)
+	}
+	return oldValue.MemberID, nil
+}
+
+// ResetMemberID resets all changes to the "member_id" field.
+func (m *SerialRoutingListMutation) ResetMemberID() {
+	m.member_id = nil
+}
+
+// SetPosition sets the "position" field.
+func (m *SerialRoutingListMutation) SetPosition(i int) {
+	m.position = &i
+	m.addposition = nil
+}
+
+// Position returns the value of the "position" field in the mutation.
+func (m *SerialRoutingListMutation) Position() (r int, exists bool) {
+	v := m.position
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPosition returns the old "position" field's value of the SerialRoutingList entity.
+// If the SerialRoutingList object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialRoutingListMutation) OldPosition(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPosition is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPosition requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPosition: %w", err)
+	}
+	return oldValue.Position, nil
+}
+
+// AddPosition adds i to the "position" field.
+func (m *SerialRoutingListMutation) AddPosition(i int) {
+	if m.addposition != nil {
+		*m.addposition += i
+	} else {
+		m.addposition = &i
+	}
+}
+
+// AddedPosition returns the value that was added to the "position" field in this mutation.
+func (m *SerialRoutingListMutation) AddedPosition() (r int, exists bool) {
+	v := m.addposition
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetPosition resets all changes to the "position" field.
+func (m *SerialRoutingListMutation) ResetPosition() {
+	m.position = nil
+	m.addposition = nil
+}
+
+// Where appends a list predicates to the SerialRoutingListMutation builder.
+func (m *SerialRoutingListMutation) Where(ps ...predicate.SerialRoutingList) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the SerialRoutingListMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *SerialRoutingListMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.SerialRoutingList, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *SerialRoutingListMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *SerialRoutingListMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (SerialRoutingList).
+func (m *SerialRoutingListMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *SerialRoutingListMutation) Fields() []string {
+	fields := make([]string, 0, 6)
+	if m.created_at != nil {
+		fields = append(fields, serialroutinglist.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, serialroutinglist.FieldUpdatedAt)
+	}
+	if m.tenant_id != nil {
+		fields = append(fields, serialroutinglist.FieldTenantID)
+	}
+	if m.subscription_id != nil {
+		fields = append(fields, serialroutinglist.FieldSubscriptionID)
+	}
+	if m.member_id != nil {
+		fields = append(fields, serialroutinglist.FieldMemberID)
+	}
+	if m.position != nil {
+		fields = append(fields, serialroutinglist.FieldPosition)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *SerialRoutingListMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case serialroutinglist.FieldCreatedAt:
+		return m.CreatedAt()
+	case serialroutinglist.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case serialroutinglist.FieldTenantID:
+		return m.TenantID()
+	case serialroutinglist.FieldSubscriptionID:
+		return m.SubscriptionID()
+	case serialroutinglist.FieldMemberID:
+		return m.MemberID()
+	case serialroutinglist.FieldPosition:
+		return m.Position()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *SerialRoutingListMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case serialroutinglist.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case serialroutinglist.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case serialroutinglist.FieldTenantID:
+		return m.OldTenantID(ctx)
+	case serialroutinglist.FieldSubscriptionID:
+		return m.OldSubscriptionID(ctx)
+	case serialroutinglist.FieldMemberID:
+		return m.OldMemberID(ctx)
+	case serialroutinglist.FieldPosition:
+		return m.OldPosition(ctx)
+	}
+	return nil, fmt.Errorf("unknown SerialRoutingList field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *SerialRoutingListMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case serialroutinglist.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case serialroutinglist.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case serialroutinglist.FieldTenantID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTenantID(v)
+		return nil
+	case serialroutinglist.FieldSubscriptionID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSubscriptionID(v)
+		return nil
+	case serialroutinglist.FieldMemberID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMemberID(v)
+		return nil
+	case serialroutinglist.FieldPosition:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPosition(v)
+		return nil
+	}
+	return fmt.Errorf("unknown SerialRoutingList field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *SerialRoutingListMutation) AddedFields() []string {
+	var fields []string
+	if m.addposition != nil {
+		fields = append(fields, serialroutinglist.FieldPosition)
+	}
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *SerialRoutingListMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	case serialroutinglist.FieldPosition:
+		return m.AddedPosition()
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *SerialRoutingListMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	case serialroutinglist.FieldPosition:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddPosition(v)
+		return nil
+	}
+	return fmt.Errorf("unknown SerialRoutingList numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *SerialRoutingListMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *SerialRoutingListMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *SerialRoutingListMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown SerialRoutingList nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *SerialRoutingListMutation) ResetField(name string) error {
+	switch name {
+	case serialroutinglist.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case serialroutinglist.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case serialroutinglist.FieldTenantID:
+		m.ResetTenantID()
+		return nil
+	case serialroutinglist.FieldSubscriptionID:
+		m.ResetSubscriptionID()
+		return nil
+	case serialroutinglist.FieldMemberID:
+		m.ResetMemberID()
+		return nil
+	case serialroutinglist.FieldPosition:
+		m.ResetPosition()
+		return nil
+	}
+	return fmt.Errorf("unknown SerialRoutingList field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *SerialRoutingListMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *SerialRoutingListMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *SerialRoutingListMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *SerialRoutingListMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *SerialRoutingListMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *SerialRoutingListMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *SerialRoutingListMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown SerialRoutingList unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *SerialRoutingListMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown SerialRoutingList edge %s", name)
+}
+
+// SerialSubscriptionMutation represents an operation that mutates the SerialSubscription nodes in the graph.
+type SerialSubscriptionMutation struct {
+	config
+	op            Op
+	typ           string
+	id            *uuid.UUID
+	created_at    *time.Time
+	updated_at    *time.Time
+	tenant_id     *uuid.UUID
+	bib_record_id *uuid.UUID
+	vendor_id     *uuid.UUID
+	fund_id       *uuid.UUID
+	start_date    *time.Time
+	end_date      *time.Time
+	frequency     *serialsubscription.Frequency
+	price         *decimal.Decimal
+	currency_code *string
+	status        *serialsubscription.Status
+	notes         *string
+	clearedFields map[string]struct{}
+	done          bool
+	oldValue      func(context.Context) (*SerialSubscription, error)
+	predicates    []predicate.SerialSubscription
+}
+
+var _ ent.Mutation = (*SerialSubscriptionMutation)(nil)
+
+// serialsubscriptionOption allows management of the mutation configuration using functional options.
+type serialsubscriptionOption func(*SerialSubscriptionMutation)
+
+// newSerialSubscriptionMutation creates new mutation for the SerialSubscription entity.
+func newSerialSubscriptionMutation(c config, op Op, opts ...serialsubscriptionOption) *SerialSubscriptionMutation {
+	m := &SerialSubscriptionMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeSerialSubscription,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withSerialSubscriptionID sets the ID field of the mutation.
+func withSerialSubscriptionID(id uuid.UUID) serialsubscriptionOption {
+	return func(m *SerialSubscriptionMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *SerialSubscription
+		)
+		m.oldValue = func(ctx context.Context) (*SerialSubscription, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().SerialSubscription.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withSerialSubscription sets the old SerialSubscription of the mutation.
+func withSerialSubscription(node *SerialSubscription) serialsubscriptionOption {
+	return func(m *SerialSubscriptionMutation) {
+		m.oldValue = func(context.Context) (*SerialSubscription, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m SerialSubscriptionMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m SerialSubscriptionMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of SerialSubscription entities.
+func (m *SerialSubscriptionMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *SerialSubscriptionMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *SerialSubscriptionMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().SerialSubscription.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *SerialSubscriptionMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *SerialSubscriptionMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the SerialSubscription entity.
+// If the SerialSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialSubscriptionMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *SerialSubscriptionMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *SerialSubscriptionMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *SerialSubscriptionMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the SerialSubscription entity.
+// If the SerialSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialSubscriptionMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *SerialSubscriptionMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (m *SerialSubscriptionMutation) SetTenantID(u uuid.UUID) {
+	m.tenant_id = &u
+}
+
+// TenantID returns the value of the "tenant_id" field in the mutation.
+func (m *SerialSubscriptionMutation) TenantID() (r uuid.UUID, exists bool) {
+	v := m.tenant_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTenantID returns the old "tenant_id" field's value of the SerialSubscription entity.
+// If the SerialSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialSubscriptionMutation) OldTenantID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTenantID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTenantID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTenantID: %w", err)
+	}
+	return oldValue.TenantID, nil
+}
+
+// ResetTenantID resets all changes to the "tenant_id" field.
+func (m *SerialSubscriptionMutation) ResetTenantID() {
+	m.tenant_id = nil
+}
+
+// SetBibRecordID sets the "bib_record_id" field.
+func (m *SerialSubscriptionMutation) SetBibRecordID(u uuid.UUID) {
+	m.bib_record_id = &u
+}
+
+// BibRecordID returns the value of the "bib_record_id" field in the mutation.
+func (m *SerialSubscriptionMutation) BibRecordID() (r uuid.UUID, exists bool) {
+	v := m.bib_record_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldBibRecordID returns the old "bib_record_id" field's value of the SerialSubscription entity.
+// If the SerialSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialSubscriptionMutation) OldBibRecordID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldBibRecordID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldBibRecordID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldBibRecordID: %w", err)
+	}
+	return oldValue.BibRecordID, nil
+}
+
+// ResetBibRecordID resets all changes to the "bib_record_id" field.
+func (m *SerialSubscriptionMutation) ResetBibRecordID() {
+	m.bib_record_id = nil
+}
+
+// SetVendorID sets the "vendor_id" field.
+func (m *SerialSubscriptionMutation) SetVendorID(u uuid.UUID) {
+	m.vendor_id = &u
+}
+
+// VendorID returns the value of the "vendor_id" field in the mutation.
+func (m *SerialSubscriptionMutation) VendorID() (r uuid.UUID, exists bool) {
+	v := m.vendor_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVendorID returns the old "vendor_id" field's value of the SerialSubscription entity.
+// If the SerialSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialSubscriptionMutation) OldVendorID(ctx context.Context) (v *uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVendorID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVendorID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVendorID: %w", err)
+	}
+	return oldValue.VendorID, nil
+}
+
+// ClearVendorID clears the value of the "vendor_id" field.
+func (m *SerialSubscriptionMutation) ClearVendorID() {
+	m.vendor_id = nil
+	m.clearedFields[serialsubscription.FieldVendorID] = struct{}{}
+}
+
+// VendorIDCleared returns if the "vendor_id" field was cleared in this mutation.
+func (m *SerialSubscriptionMutation) VendorIDCleared() bool {
+	_, ok := m.clearedFields[serialsubscription.FieldVendorID]
+	return ok
+}
+
+// ResetVendorID resets all changes to the "vendor_id" field.
+func (m *SerialSubscriptionMutation) ResetVendorID() {
+	m.vendor_id = nil
+	delete(m.clearedFields, serialsubscription.FieldVendorID)
+}
+
+// SetFundID sets the "fund_id" field.
+func (m *SerialSubscriptionMutation) SetFundID(u uuid.UUID) {
+	m.fund_id = &u
+}
+
+// FundID returns the value of the "fund_id" field in the mutation.
+func (m *SerialSubscriptionMutation) FundID() (r uuid.UUID, exists bool) {
+	v := m.fund_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFundID returns the old "fund_id" field's value of the SerialSubscription entity.
+// If the SerialSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialSubscriptionMutation) OldFundID(ctx context.Context) (v *uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFundID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFundID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFundID: %w", err)
+	}
+	return oldValue.FundID, nil
+}
+
+// ClearFundID clears the value of the "fund_id" field.
+func (m *SerialSubscriptionMutation) ClearFundID() {
+	m.fund_id = nil
+	m.clearedFields[serialsubscription.FieldFundID] = struct{}{}
+}
+
+// FundIDCleared returns if the "fund_id" field was cleared in this mutation.
+func (m *SerialSubscriptionMutation) FundIDCleared() bool {
+	_, ok := m.clearedFields[serialsubscription.FieldFundID]
+	return ok
+}
+
+// ResetFundID resets all changes to the "fund_id" field.
+func (m *SerialSubscriptionMutation) ResetFundID() {
+	m.fund_id = nil
+	delete(m.clearedFields, serialsubscription.FieldFundID)
+}
+
+// SetStartDate sets the "start_date" field.
+func (m *SerialSubscriptionMutation) SetStartDate(t time.Time) {
+	m.start_date = &t
+}
+
+// StartDate returns the value of the "start_date" field in the mutation.
+func (m *SerialSubscriptionMutation) StartDate() (r time.Time, exists bool) {
+	v := m.start_date
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStartDate returns the old "start_date" field's value of the SerialSubscription entity.
+// If the SerialSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialSubscriptionMutation) OldStartDate(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStartDate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStartDate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStartDate: %w", err)
+	}
+	return oldValue.StartDate, nil
+}
+
+// ResetStartDate resets all changes to the "start_date" field.
+func (m *SerialSubscriptionMutation) ResetStartDate() {
+	m.start_date = nil
+}
+
+// SetEndDate sets the "end_date" field.
+func (m *SerialSubscriptionMutation) SetEndDate(t time.Time) {
+	m.end_date = &t
+}
+
+// EndDate returns the value of the "end_date" field in the mutation.
+func (m *SerialSubscriptionMutation) EndDate() (r time.Time, exists bool) {
+	v := m.end_date
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEndDate returns the old "end_date" field's value of the SerialSubscription entity.
+// If the SerialSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialSubscriptionMutation) OldEndDate(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEndDate is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEndDate requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEndDate: %w", err)
+	}
+	return oldValue.EndDate, nil
+}
+
+// ClearEndDate clears the value of the "end_date" field.
+func (m *SerialSubscriptionMutation) ClearEndDate() {
+	m.end_date = nil
+	m.clearedFields[serialsubscription.FieldEndDate] = struct{}{}
+}
+
+// EndDateCleared returns if the "end_date" field was cleared in this mutation.
+func (m *SerialSubscriptionMutation) EndDateCleared() bool {
+	_, ok := m.clearedFields[serialsubscription.FieldEndDate]
+	return ok
+}
+
+// ResetEndDate resets all changes to the "end_date" field.
+func (m *SerialSubscriptionMutation) ResetEndDate() {
+	m.end_date = nil
+	delete(m.clearedFields, serialsubscription.FieldEndDate)
+}
+
+// SetFrequency sets the "frequency" field.
+func (m *SerialSubscriptionMutation) SetFrequency(s serialsubscription.Frequency) {
+	m.frequency = &s
+}
+
+// Frequency returns the value of the "frequency" field in the mutation.
+func (m *SerialSubscriptionMutation) Frequency() (r serialsubscription.Frequency, exists bool) {
+	v := m.frequency
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFrequency returns the old "frequency" field's value of the SerialSubscription entity.
+// If the SerialSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialSubscriptionMutation) OldFrequency(ctx context.Context) (v serialsubscription.Frequency, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFrequency is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFrequency requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFrequency: %w", err)
+	}
+	return oldValue.Frequency, nil
+}
+
+// ResetFrequency resets all changes to the "frequency" field.
+func (m *SerialSubscriptionMutation) ResetFrequency() {
+	m.frequency = nil
+}
+
+// SetPrice sets the "price" field.
+func (m *SerialSubscriptionMutation) SetPrice(d decimal.Decimal) {
+	m.price = &d
+}
+
+// Price returns the value of the "price" field in the mutation.
+func (m *SerialSubscriptionMutation) Price() (r decimal.Decimal, exists bool) {
+	v := m.price
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPrice returns the old "price" field's value of the SerialSubscription entity.
+// If the SerialSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialSubscriptionMutation) OldPrice(ctx context.Context) (v decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPrice is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPrice requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPrice: %w", err)
+	}
+	return oldValue.Price, nil
+}
+
+// ResetPrice resets all changes to the "price" field.
+func (m *SerialSubscriptionMutation) ResetPrice() {
+	m.price = nil
+}
+
+// SetCurrencyCode sets the "currency_code" field.
+func (m *SerialSubscriptionMutation) SetCurrencyCode(s string) {
+	m.currency_code = &s
+}
+
+// CurrencyCode returns the value of the "currency_code" field in the mutation.
+func (m *SerialSubscriptionMutation) CurrencyCode() (r string, exists bool) {
+	v := m.currency_code
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCurrencyCode returns the old "currency_code" field's value of the SerialSubscription entity.
+// If the SerialSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialSubscriptionMutation) OldCurrencyCode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCurrencyCode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCurrencyCode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCurrencyCode: %w", err)
+	}
+	return oldValue.CurrencyCode, nil
+}
+
+// ResetCurrencyCode resets all changes to the "currency_code" field.
+func (m *SerialSubscriptionMutation) ResetCurrencyCode() {
+	m.currency_code = nil
+}
+
+// SetStatus sets the "status" field.
+func (m *SerialSubscriptionMutation) SetStatus(s serialsubscription.Status) {
+	m.status = &s
+}
+
+// Status returns the value of the "status" field in the mutation.
+func (m *SerialSubscriptionMutation) Status() (r serialsubscription.Status, exists bool) {
+	v := m.status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldStatus returns the old "status" field's value of the SerialSubscription entity.
+// If the SerialSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialSubscriptionMutation) OldStatus(ctx context.Context) (v serialsubscription.Status, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldStatus: %w", err)
+	}
+	return oldValue.Status, nil
+}
+
+// ResetStatus resets all changes to the "status" field.
+func (m *SerialSubscriptionMutation) ResetStatus() {
+	m.status = nil
+}
+
+// SetNotes sets the "notes" field.
+func (m *SerialSubscriptionMutation) SetNotes(s string) {
+	m.notes = &s
+}
+
+// Notes returns the value of the "notes" field in the mutation.
+func (m *SerialSubscriptionMutation) Notes() (r string, exists bool) {
+	v := m.notes
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNotes returns the old "notes" field's value of the SerialSubscription entity.
+// If the SerialSubscription object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SerialSubscriptionMutation) OldNotes(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNotes is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNotes requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNotes: %w", err)
+	}
+	return oldValue.Notes, nil
+}
+
+// ClearNotes clears the value of the "notes" field.
+func (m *SerialSubscriptionMutation) ClearNotes() {
+	m.notes = nil
+	m.clearedFields[serialsubscription.FieldNotes] = struct{}{}
+}
+
+// NotesCleared returns if the "notes" field was cleared in this mutation.
+func (m *SerialSubscriptionMutation) NotesCleared() bool {
+	_, ok := m.clearedFields[serialsubscription.FieldNotes]
+	return ok
+}
+
+// ResetNotes resets all changes to the "notes" field.
+func (m *SerialSubscriptionMutation) ResetNotes() {
+	m.notes = nil
+	delete(m.clearedFields, serialsubscription.FieldNotes)
+}
+
+// Where appends a list predicates to the SerialSubscriptionMutation builder.
+func (m *SerialSubscriptionMutation) Where(ps ...predicate.SerialSubscription) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the SerialSubscriptionMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *SerialSubscriptionMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.SerialSubscription, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *SerialSubscriptionMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *SerialSubscriptionMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (SerialSubscription).
+func (m *SerialSubscriptionMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *SerialSubscriptionMutation) Fields() []string {
+	fields := make([]string, 0, 13)
+	if m.created_at != nil {
+		fields = append(fields, serialsubscription.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, serialsubscription.FieldUpdatedAt)
+	}
+	if m.tenant_id != nil {
+		fields = append(fields, serialsubscription.FieldTenantID)
+	}
+	if m.bib_record_id != nil {
+		fields = append(fields, serialsubscription.FieldBibRecordID)
+	}
+	if m.vendor_id != nil {
+		fields = append(fields, serialsubscription.FieldVendorID)
+	}
+	if m.fund_id != nil {
+		fields = append(fields, serialsubscription.FieldFundID)
+	}
+	if m.start_date != nil {
+		fields = append(fields, serialsubscription.FieldStartDate)
+	}
+	if m.end_date != nil {
+		fields = append(fields, serialsubscription.FieldEndDate)
+	}
+	if m.frequency != nil {
+		fields = append(fields, serialsubscription.FieldFrequency)
+	}
+	if m.price != nil {
+		fields = append(fields, serialsubscription.FieldPrice)
+	}
+	if m.currency_code != nil {
+		fields = append(fields, serialsubscription.FieldCurrencyCode)
+	}
+	if m.status != nil {
+		fields = append(fields, serialsubscription.FieldStatus)
+	}
+	if m.notes != nil {
+		fields = append(fields, serialsubscription.FieldNotes)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *SerialSubscriptionMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case serialsubscription.FieldCreatedAt:
+		return m.CreatedAt()
+	case serialsubscription.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case serialsubscription.FieldTenantID:
+		return m.TenantID()
+	case serialsubscription.FieldBibRecordID:
+		return m.BibRecordID()
+	case serialsubscription.FieldVendorID:
+		return m.VendorID()
+	case serialsubscription.FieldFundID:
+		return m.FundID()
+	case serialsubscription.FieldStartDate:
+		return m.StartDate()
+	case serialsubscription.FieldEndDate:
+		return m.EndDate()
+	case serialsubscription.FieldFrequency:
+		return m.Frequency()
+	case serialsubscription.FieldPrice:
+		return m.Price()
+	case serialsubscription.FieldCurrencyCode:
+		return m.CurrencyCode()
+	case serialsubscription.FieldStatus:
+		return m.Status()
+	case serialsubscription.FieldNotes:
+		return m.Notes()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *SerialSubscriptionMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case serialsubscription.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case serialsubscription.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case serialsubscription.FieldTenantID:
+		return m.OldTenantID(ctx)
+	case serialsubscription.FieldBibRecordID:
+		return m.OldBibRecordID(ctx)
+	case serialsubscription.FieldVendorID:
+		return m.OldVendorID(ctx)
+	case serialsubscription.FieldFundID:
+		return m.OldFundID(ctx)
+	case serialsubscription.FieldStartDate:
+		return m.OldStartDate(ctx)
+	case serialsubscription.FieldEndDate:
+		return m.OldEndDate(ctx)
+	case serialsubscription.FieldFrequency:
+		return m.OldFrequency(ctx)
+	case serialsubscription.FieldPrice:
+		return m.OldPrice(ctx)
+	case serialsubscription.FieldCurrencyCode:
+		return m.OldCurrencyCode(ctx)
+	case serialsubscription.FieldStatus:
+		return m.OldStatus(ctx)
+	case serialsubscription.FieldNotes:
+		return m.OldNotes(ctx)
+	}
+	return nil, fmt.Errorf("unknown SerialSubscription field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *SerialSubscriptionMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case serialsubscription.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case serialsubscription.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case serialsubscription.FieldTenantID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTenantID(v)
+		return nil
+	case serialsubscription.FieldBibRecordID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetBibRecordID(v)
+		return nil
+	case serialsubscription.FieldVendorID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVendorID(v)
+		return nil
+	case serialsubscription.FieldFundID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFundID(v)
+		return nil
+	case serialsubscription.FieldStartDate:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStartDate(v)
+		return nil
+	case serialsubscription.FieldEndDate:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEndDate(v)
+		return nil
+	case serialsubscription.FieldFrequency:
+		v, ok := value.(serialsubscription.Frequency)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFrequency(v)
+		return nil
+	case serialsubscription.FieldPrice:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPrice(v)
+		return nil
+	case serialsubscription.FieldCurrencyCode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCurrencyCode(v)
+		return nil
+	case serialsubscription.FieldStatus:
+		v, ok := value.(serialsubscription.Status)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetStatus(v)
+		return nil
+	case serialsubscription.FieldNotes:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNotes(v)
+		return nil
+	}
+	return fmt.Errorf("unknown SerialSubscription field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *SerialSubscriptionMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *SerialSubscriptionMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *SerialSubscriptionMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown SerialSubscription numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *SerialSubscriptionMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(serialsubscription.FieldVendorID) {
+		fields = append(fields, serialsubscription.FieldVendorID)
+	}
+	if m.FieldCleared(serialsubscription.FieldFundID) {
+		fields = append(fields, serialsubscription.FieldFundID)
+	}
+	if m.FieldCleared(serialsubscription.FieldEndDate) {
+		fields = append(fields, serialsubscription.FieldEndDate)
+	}
+	if m.FieldCleared(serialsubscription.FieldNotes) {
+		fields = append(fields, serialsubscription.FieldNotes)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *SerialSubscriptionMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *SerialSubscriptionMutation) ClearField(name string) error {
+	switch name {
+	case serialsubscription.FieldVendorID:
+		m.ClearVendorID()
+		return nil
+	case serialsubscription.FieldFundID:
+		m.ClearFundID()
+		return nil
+	case serialsubscription.FieldEndDate:
+		m.ClearEndDate()
+		return nil
+	case serialsubscription.FieldNotes:
+		m.ClearNotes()
+		return nil
+	}
+	return fmt.Errorf("unknown SerialSubscription nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *SerialSubscriptionMutation) ResetField(name string) error {
+	switch name {
+	case serialsubscription.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case serialsubscription.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case serialsubscription.FieldTenantID:
+		m.ResetTenantID()
+		return nil
+	case serialsubscription.FieldBibRecordID:
+		m.ResetBibRecordID()
+		return nil
+	case serialsubscription.FieldVendorID:
+		m.ResetVendorID()
+		return nil
+	case serialsubscription.FieldFundID:
+		m.ResetFundID()
+		return nil
+	case serialsubscription.FieldStartDate:
+		m.ResetStartDate()
+		return nil
+	case serialsubscription.FieldEndDate:
+		m.ResetEndDate()
+		return nil
+	case serialsubscription.FieldFrequency:
+		m.ResetFrequency()
+		return nil
+	case serialsubscription.FieldPrice:
+		m.ResetPrice()
+		return nil
+	case serialsubscription.FieldCurrencyCode:
+		m.ResetCurrencyCode()
+		return nil
+	case serialsubscription.FieldStatus:
+		m.ResetStatus()
+		return nil
+	case serialsubscription.FieldNotes:
+		m.ResetNotes()
+		return nil
+	}
+	return fmt.Errorf("unknown SerialSubscription field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *SerialSubscriptionMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *SerialSubscriptionMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *SerialSubscriptionMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *SerialSubscriptionMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *SerialSubscriptionMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *SerialSubscriptionMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *SerialSubscriptionMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown SerialSubscription unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *SerialSubscriptionMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown SerialSubscription edge %s", name)
 }
 
 // ServiceConfigMutation represents an operation that mutates the ServiceConfig nodes in the graph.

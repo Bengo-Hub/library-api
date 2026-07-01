@@ -35,6 +35,7 @@ const (
 	EventLoanRecalled     = "loan.recalled"
 	EventMemberExpired    = "member.expired"
 	EventMemberGraduated  = "member.graduated"
+	EventSerialIssueLate  = "serial.issue_late"
 )
 
 // Publisher inserts outbox rows. oc is either client.OutboxEvent or tx.OutboxEvent.

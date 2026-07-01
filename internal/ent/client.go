@@ -48,6 +48,9 @@ import (
 	"github.com/bengobox/library-service/internal/ent/purchaseorder"
 	"github.com/bengobox/library-service/internal/ent/purchaseorderline"
 	"github.com/bengobox/library-service/internal/ent/recallrequest"
+	"github.com/bengobox/library-service/internal/ent/serialissue"
+	"github.com/bengobox/library-service/internal/ent/serialroutinglist"
+	"github.com/bengobox/library-service/internal/ent/serialsubscription"
 	"github.com/bengobox/library-service/internal/ent/serviceconfig"
 	"github.com/bengobox/library-service/internal/ent/stockcount"
 	"github.com/bengobox/library-service/internal/ent/subject"
@@ -126,6 +129,12 @@ type Client struct {
 	PurchaseOrderLine *PurchaseOrderLineClient
 	// RecallRequest is the client for interacting with the RecallRequest builders.
 	RecallRequest *RecallRequestClient
+	// SerialIssue is the client for interacting with the SerialIssue builders.
+	SerialIssue *SerialIssueClient
+	// SerialRoutingList is the client for interacting with the SerialRoutingList builders.
+	SerialRoutingList *SerialRoutingListClient
+	// SerialSubscription is the client for interacting with the SerialSubscription builders.
+	SerialSubscription *SerialSubscriptionClient
 	// ServiceConfig is the client for interacting with the ServiceConfig builders.
 	ServiceConfig *ServiceConfigClient
 	// StockCount is the client for interacting with the StockCount builders.
@@ -180,6 +189,9 @@ func (c *Client) init() {
 	c.PurchaseOrder = NewPurchaseOrderClient(c.config)
 	c.PurchaseOrderLine = NewPurchaseOrderLineClient(c.config)
 	c.RecallRequest = NewRecallRequestClient(c.config)
+	c.SerialIssue = NewSerialIssueClient(c.config)
+	c.SerialRoutingList = NewSerialRoutingListClient(c.config)
+	c.SerialSubscription = NewSerialSubscriptionClient(c.config)
 	c.ServiceConfig = NewServiceConfigClient(c.config)
 	c.StockCount = NewStockCountClient(c.config)
 	c.Subject = NewSubjectClient(c.config)
@@ -310,6 +322,9 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PurchaseOrder:          NewPurchaseOrderClient(cfg),
 		PurchaseOrderLine:      NewPurchaseOrderLineClient(cfg),
 		RecallRequest:          NewRecallRequestClient(cfg),
+		SerialIssue:            NewSerialIssueClient(cfg),
+		SerialRoutingList:      NewSerialRoutingListClient(cfg),
+		SerialSubscription:     NewSerialSubscriptionClient(cfg),
 		ServiceConfig:          NewServiceConfigClient(cfg),
 		StockCount:             NewStockCountClient(cfg),
 		Subject:                NewSubjectClient(cfg),
@@ -367,6 +382,9 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PurchaseOrder:          NewPurchaseOrderClient(cfg),
 		PurchaseOrderLine:      NewPurchaseOrderLineClient(cfg),
 		RecallRequest:          NewRecallRequestClient(cfg),
+		SerialIssue:            NewSerialIssueClient(cfg),
+		SerialRoutingList:      NewSerialRoutingListClient(cfg),
+		SerialSubscription:     NewSerialSubscriptionClient(cfg),
 		ServiceConfig:          NewServiceConfigClient(cfg),
 		StockCount:             NewStockCountClient(cfg),
 		Subject:                NewSubjectClient(cfg),
@@ -407,8 +425,9 @@ func (c *Client) Use(hooks ...Hook) {
 		c.EbookLoan, c.EbookPurchase, c.Fine, c.Hold, c.LibraryHoliday, c.LibraryRole,
 		c.LibraryUser, c.Loan, c.LoanPolicy, c.Member, c.MemberNotificationPref,
 		c.MemberTier, c.MembershipFee, c.OutboxEvent, c.Publisher, c.PurchaseOrder,
-		c.PurchaseOrderLine, c.RecallRequest, c.ServiceConfig, c.StockCount, c.Subject,
-		c.Tenant, c.Vendor,
+		c.PurchaseOrderLine, c.RecallRequest, c.SerialIssue, c.SerialRoutingList,
+		c.SerialSubscription, c.ServiceConfig, c.StockCount, c.Subject, c.Tenant,
+		c.Vendor,
 	} {
 		n.Use(hooks...)
 	}
@@ -424,8 +443,9 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.EbookLoan, c.EbookPurchase, c.Fine, c.Hold, c.LibraryHoliday, c.LibraryRole,
 		c.LibraryUser, c.Loan, c.LoanPolicy, c.Member, c.MemberNotificationPref,
 		c.MemberTier, c.MembershipFee, c.OutboxEvent, c.Publisher, c.PurchaseOrder,
-		c.PurchaseOrderLine, c.RecallRequest, c.ServiceConfig, c.StockCount, c.Subject,
-		c.Tenant, c.Vendor,
+		c.PurchaseOrderLine, c.RecallRequest, c.SerialIssue, c.SerialRoutingList,
+		c.SerialSubscription, c.ServiceConfig, c.StockCount, c.Subject, c.Tenant,
+		c.Vendor,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -500,6 +520,12 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.PurchaseOrderLine.mutate(ctx, m)
 	case *RecallRequestMutation:
 		return c.RecallRequest.mutate(ctx, m)
+	case *SerialIssueMutation:
+		return c.SerialIssue.mutate(ctx, m)
+	case *SerialRoutingListMutation:
+		return c.SerialRoutingList.mutate(ctx, m)
+	case *SerialSubscriptionMutation:
+		return c.SerialSubscription.mutate(ctx, m)
 	case *ServiceConfigMutation:
 		return c.ServiceConfig.mutate(ctx, m)
 	case *StockCountMutation:
@@ -4904,6 +4930,405 @@ func (c *RecallRequestClient) mutate(ctx context.Context, m *RecallRequestMutati
 	}
 }
 
+// SerialIssueClient is a client for the SerialIssue schema.
+type SerialIssueClient struct {
+	config
+}
+
+// NewSerialIssueClient returns a client for the SerialIssue from the given config.
+func NewSerialIssueClient(c config) *SerialIssueClient {
+	return &SerialIssueClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `serialissue.Hooks(f(g(h())))`.
+func (c *SerialIssueClient) Use(hooks ...Hook) {
+	c.hooks.SerialIssue = append(c.hooks.SerialIssue, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `serialissue.Intercept(f(g(h())))`.
+func (c *SerialIssueClient) Intercept(interceptors ...Interceptor) {
+	c.inters.SerialIssue = append(c.inters.SerialIssue, interceptors...)
+}
+
+// Create returns a builder for creating a SerialIssue entity.
+func (c *SerialIssueClient) Create() *SerialIssueCreate {
+	mutation := newSerialIssueMutation(c.config, OpCreate)
+	return &SerialIssueCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of SerialIssue entities.
+func (c *SerialIssueClient) CreateBulk(builders ...*SerialIssueCreate) *SerialIssueCreateBulk {
+	return &SerialIssueCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *SerialIssueClient) MapCreateBulk(slice any, setFunc func(*SerialIssueCreate, int)) *SerialIssueCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &SerialIssueCreateBulk{err: fmt.Errorf("calling to SerialIssueClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*SerialIssueCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &SerialIssueCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for SerialIssue.
+func (c *SerialIssueClient) Update() *SerialIssueUpdate {
+	mutation := newSerialIssueMutation(c.config, OpUpdate)
+	return &SerialIssueUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *SerialIssueClient) UpdateOne(_m *SerialIssue) *SerialIssueUpdateOne {
+	mutation := newSerialIssueMutation(c.config, OpUpdateOne, withSerialIssue(_m))
+	return &SerialIssueUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *SerialIssueClient) UpdateOneID(id uuid.UUID) *SerialIssueUpdateOne {
+	mutation := newSerialIssueMutation(c.config, OpUpdateOne, withSerialIssueID(id))
+	return &SerialIssueUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for SerialIssue.
+func (c *SerialIssueClient) Delete() *SerialIssueDelete {
+	mutation := newSerialIssueMutation(c.config, OpDelete)
+	return &SerialIssueDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *SerialIssueClient) DeleteOne(_m *SerialIssue) *SerialIssueDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *SerialIssueClient) DeleteOneID(id uuid.UUID) *SerialIssueDeleteOne {
+	builder := c.Delete().Where(serialissue.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &SerialIssueDeleteOne{builder}
+}
+
+// Query returns a query builder for SerialIssue.
+func (c *SerialIssueClient) Query() *SerialIssueQuery {
+	return &SerialIssueQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeSerialIssue},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a SerialIssue entity by its id.
+func (c *SerialIssueClient) Get(ctx context.Context, id uuid.UUID) (*SerialIssue, error) {
+	return c.Query().Where(serialissue.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *SerialIssueClient) GetX(ctx context.Context, id uuid.UUID) *SerialIssue {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *SerialIssueClient) Hooks() []Hook {
+	return c.hooks.SerialIssue
+}
+
+// Interceptors returns the client interceptors.
+func (c *SerialIssueClient) Interceptors() []Interceptor {
+	return c.inters.SerialIssue
+}
+
+func (c *SerialIssueClient) mutate(ctx context.Context, m *SerialIssueMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&SerialIssueCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&SerialIssueUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&SerialIssueUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&SerialIssueDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown SerialIssue mutation op: %q", m.Op())
+	}
+}
+
+// SerialRoutingListClient is a client for the SerialRoutingList schema.
+type SerialRoutingListClient struct {
+	config
+}
+
+// NewSerialRoutingListClient returns a client for the SerialRoutingList from the given config.
+func NewSerialRoutingListClient(c config) *SerialRoutingListClient {
+	return &SerialRoutingListClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `serialroutinglist.Hooks(f(g(h())))`.
+func (c *SerialRoutingListClient) Use(hooks ...Hook) {
+	c.hooks.SerialRoutingList = append(c.hooks.SerialRoutingList, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `serialroutinglist.Intercept(f(g(h())))`.
+func (c *SerialRoutingListClient) Intercept(interceptors ...Interceptor) {
+	c.inters.SerialRoutingList = append(c.inters.SerialRoutingList, interceptors...)
+}
+
+// Create returns a builder for creating a SerialRoutingList entity.
+func (c *SerialRoutingListClient) Create() *SerialRoutingListCreate {
+	mutation := newSerialRoutingListMutation(c.config, OpCreate)
+	return &SerialRoutingListCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of SerialRoutingList entities.
+func (c *SerialRoutingListClient) CreateBulk(builders ...*SerialRoutingListCreate) *SerialRoutingListCreateBulk {
+	return &SerialRoutingListCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *SerialRoutingListClient) MapCreateBulk(slice any, setFunc func(*SerialRoutingListCreate, int)) *SerialRoutingListCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &SerialRoutingListCreateBulk{err: fmt.Errorf("calling to SerialRoutingListClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*SerialRoutingListCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &SerialRoutingListCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for SerialRoutingList.
+func (c *SerialRoutingListClient) Update() *SerialRoutingListUpdate {
+	mutation := newSerialRoutingListMutation(c.config, OpUpdate)
+	return &SerialRoutingListUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *SerialRoutingListClient) UpdateOne(_m *SerialRoutingList) *SerialRoutingListUpdateOne {
+	mutation := newSerialRoutingListMutation(c.config, OpUpdateOne, withSerialRoutingList(_m))
+	return &SerialRoutingListUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *SerialRoutingListClient) UpdateOneID(id uuid.UUID) *SerialRoutingListUpdateOne {
+	mutation := newSerialRoutingListMutation(c.config, OpUpdateOne, withSerialRoutingListID(id))
+	return &SerialRoutingListUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for SerialRoutingList.
+func (c *SerialRoutingListClient) Delete() *SerialRoutingListDelete {
+	mutation := newSerialRoutingListMutation(c.config, OpDelete)
+	return &SerialRoutingListDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *SerialRoutingListClient) DeleteOne(_m *SerialRoutingList) *SerialRoutingListDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *SerialRoutingListClient) DeleteOneID(id uuid.UUID) *SerialRoutingListDeleteOne {
+	builder := c.Delete().Where(serialroutinglist.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &SerialRoutingListDeleteOne{builder}
+}
+
+// Query returns a query builder for SerialRoutingList.
+func (c *SerialRoutingListClient) Query() *SerialRoutingListQuery {
+	return &SerialRoutingListQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeSerialRoutingList},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a SerialRoutingList entity by its id.
+func (c *SerialRoutingListClient) Get(ctx context.Context, id uuid.UUID) (*SerialRoutingList, error) {
+	return c.Query().Where(serialroutinglist.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *SerialRoutingListClient) GetX(ctx context.Context, id uuid.UUID) *SerialRoutingList {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *SerialRoutingListClient) Hooks() []Hook {
+	return c.hooks.SerialRoutingList
+}
+
+// Interceptors returns the client interceptors.
+func (c *SerialRoutingListClient) Interceptors() []Interceptor {
+	return c.inters.SerialRoutingList
+}
+
+func (c *SerialRoutingListClient) mutate(ctx context.Context, m *SerialRoutingListMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&SerialRoutingListCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&SerialRoutingListUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&SerialRoutingListUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&SerialRoutingListDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown SerialRoutingList mutation op: %q", m.Op())
+	}
+}
+
+// SerialSubscriptionClient is a client for the SerialSubscription schema.
+type SerialSubscriptionClient struct {
+	config
+}
+
+// NewSerialSubscriptionClient returns a client for the SerialSubscription from the given config.
+func NewSerialSubscriptionClient(c config) *SerialSubscriptionClient {
+	return &SerialSubscriptionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `serialsubscription.Hooks(f(g(h())))`.
+func (c *SerialSubscriptionClient) Use(hooks ...Hook) {
+	c.hooks.SerialSubscription = append(c.hooks.SerialSubscription, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `serialsubscription.Intercept(f(g(h())))`.
+func (c *SerialSubscriptionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.SerialSubscription = append(c.inters.SerialSubscription, interceptors...)
+}
+
+// Create returns a builder for creating a SerialSubscription entity.
+func (c *SerialSubscriptionClient) Create() *SerialSubscriptionCreate {
+	mutation := newSerialSubscriptionMutation(c.config, OpCreate)
+	return &SerialSubscriptionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of SerialSubscription entities.
+func (c *SerialSubscriptionClient) CreateBulk(builders ...*SerialSubscriptionCreate) *SerialSubscriptionCreateBulk {
+	return &SerialSubscriptionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *SerialSubscriptionClient) MapCreateBulk(slice any, setFunc func(*SerialSubscriptionCreate, int)) *SerialSubscriptionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &SerialSubscriptionCreateBulk{err: fmt.Errorf("calling to SerialSubscriptionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*SerialSubscriptionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &SerialSubscriptionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for SerialSubscription.
+func (c *SerialSubscriptionClient) Update() *SerialSubscriptionUpdate {
+	mutation := newSerialSubscriptionMutation(c.config, OpUpdate)
+	return &SerialSubscriptionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *SerialSubscriptionClient) UpdateOne(_m *SerialSubscription) *SerialSubscriptionUpdateOne {
+	mutation := newSerialSubscriptionMutation(c.config, OpUpdateOne, withSerialSubscription(_m))
+	return &SerialSubscriptionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *SerialSubscriptionClient) UpdateOneID(id uuid.UUID) *SerialSubscriptionUpdateOne {
+	mutation := newSerialSubscriptionMutation(c.config, OpUpdateOne, withSerialSubscriptionID(id))
+	return &SerialSubscriptionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for SerialSubscription.
+func (c *SerialSubscriptionClient) Delete() *SerialSubscriptionDelete {
+	mutation := newSerialSubscriptionMutation(c.config, OpDelete)
+	return &SerialSubscriptionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *SerialSubscriptionClient) DeleteOne(_m *SerialSubscription) *SerialSubscriptionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *SerialSubscriptionClient) DeleteOneID(id uuid.UUID) *SerialSubscriptionDeleteOne {
+	builder := c.Delete().Where(serialsubscription.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &SerialSubscriptionDeleteOne{builder}
+}
+
+// Query returns a query builder for SerialSubscription.
+func (c *SerialSubscriptionClient) Query() *SerialSubscriptionQuery {
+	return &SerialSubscriptionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeSerialSubscription},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a SerialSubscription entity by its id.
+func (c *SerialSubscriptionClient) Get(ctx context.Context, id uuid.UUID) (*SerialSubscription, error) {
+	return c.Query().Where(serialsubscription.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *SerialSubscriptionClient) GetX(ctx context.Context, id uuid.UUID) *SerialSubscription {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *SerialSubscriptionClient) Hooks() []Hook {
+	return c.hooks.SerialSubscription
+}
+
+// Interceptors returns the client interceptors.
+func (c *SerialSubscriptionClient) Interceptors() []Interceptor {
+	return c.inters.SerialSubscription
+}
+
+func (c *SerialSubscriptionClient) mutate(ctx context.Context, m *SerialSubscriptionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&SerialSubscriptionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&SerialSubscriptionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&SerialSubscriptionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&SerialSubscriptionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown SerialSubscription mutation op: %q", m.Op())
+	}
+}
+
 // ServiceConfigClient is a client for the ServiceConfig schema.
 type ServiceConfigClient struct {
 	config
@@ -5577,8 +6002,9 @@ type (
 		Collection, CopyTransfer, DocumentSequence, Ebook, EbookLoan, EbookPurchase,
 		Fine, Hold, LibraryHoliday, LibraryRole, LibraryUser, Loan, LoanPolicy, Member,
 		MemberNotificationPref, MemberTier, MembershipFee, OutboxEvent, Publisher,
-		PurchaseOrder, PurchaseOrderLine, RecallRequest, ServiceConfig, StockCount,
-		Subject, Tenant, Vendor []ent.Hook
+		PurchaseOrder, PurchaseOrderLine, RecallRequest, SerialIssue,
+		SerialRoutingList, SerialSubscription, ServiceConfig, StockCount, Subject,
+		Tenant, Vendor []ent.Hook
 	}
 	inters struct {
 		AcquisitionBudget, AcquisitionFund, AcquisitionInvoice, AuditLog, Author,
@@ -5586,7 +6012,8 @@ type (
 		Collection, CopyTransfer, DocumentSequence, Ebook, EbookLoan, EbookPurchase,
 		Fine, Hold, LibraryHoliday, LibraryRole, LibraryUser, Loan, LoanPolicy, Member,
 		MemberNotificationPref, MemberTier, MembershipFee, OutboxEvent, Publisher,
-		PurchaseOrder, PurchaseOrderLine, RecallRequest, ServiceConfig, StockCount,
-		Subject, Tenant, Vendor []ent.Interceptor
+		PurchaseOrder, PurchaseOrderLine, RecallRequest, SerialIssue,
+		SerialRoutingList, SerialSubscription, ServiceConfig, StockCount, Subject,
+		Tenant, Vendor []ent.Interceptor
 	}
 )

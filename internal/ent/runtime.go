@@ -39,6 +39,9 @@ import (
 	"github.com/bengobox/library-service/internal/ent/purchaseorderline"
 	"github.com/bengobox/library-service/internal/ent/recallrequest"
 	"github.com/bengobox/library-service/internal/ent/schema"
+	"github.com/bengobox/library-service/internal/ent/serialissue"
+	"github.com/bengobox/library-service/internal/ent/serialroutinglist"
+	"github.com/bengobox/library-service/internal/ent/serialsubscription"
 	"github.com/bengobox/library-service/internal/ent/serviceconfig"
 	"github.com/bengobox/library-service/internal/ent/stockcount"
 	"github.com/bengobox/library-service/internal/ent/subject"
@@ -1066,6 +1069,75 @@ func init() {
 	recallrequestDescID := recallrequestMixinFields0[0].Descriptor()
 	// recallrequest.DefaultID holds the default value on creation for the id field.
 	recallrequest.DefaultID = recallrequestDescID.Default.(func() uuid.UUID)
+	serialissueMixin := schema.SerialIssue{}.Mixin()
+	serialissueMixinFields0 := serialissueMixin[0].Fields()
+	_ = serialissueMixinFields0
+	serialissueFields := schema.SerialIssue{}.Fields()
+	_ = serialissueFields
+	// serialissueDescCreatedAt is the schema descriptor for created_at field.
+	serialissueDescCreatedAt := serialissueMixinFields0[1].Descriptor()
+	// serialissue.DefaultCreatedAt holds the default value on creation for the created_at field.
+	serialissue.DefaultCreatedAt = serialissueDescCreatedAt.Default.(func() time.Time)
+	// serialissueDescUpdatedAt is the schema descriptor for updated_at field.
+	serialissueDescUpdatedAt := serialissueMixinFields0[2].Descriptor()
+	// serialissue.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	serialissue.DefaultUpdatedAt = serialissueDescUpdatedAt.Default.(func() time.Time)
+	// serialissue.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	serialissue.UpdateDefaultUpdatedAt = serialissueDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// serialissueDescID is the schema descriptor for id field.
+	serialissueDescID := serialissueMixinFields0[0].Descriptor()
+	// serialissue.DefaultID holds the default value on creation for the id field.
+	serialissue.DefaultID = serialissueDescID.Default.(func() uuid.UUID)
+	serialroutinglistMixin := schema.SerialRoutingList{}.Mixin()
+	serialroutinglistMixinFields0 := serialroutinglistMixin[0].Fields()
+	_ = serialroutinglistMixinFields0
+	serialroutinglistFields := schema.SerialRoutingList{}.Fields()
+	_ = serialroutinglistFields
+	// serialroutinglistDescCreatedAt is the schema descriptor for created_at field.
+	serialroutinglistDescCreatedAt := serialroutinglistMixinFields0[1].Descriptor()
+	// serialroutinglist.DefaultCreatedAt holds the default value on creation for the created_at field.
+	serialroutinglist.DefaultCreatedAt = serialroutinglistDescCreatedAt.Default.(func() time.Time)
+	// serialroutinglistDescUpdatedAt is the schema descriptor for updated_at field.
+	serialroutinglistDescUpdatedAt := serialroutinglistMixinFields0[2].Descriptor()
+	// serialroutinglist.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	serialroutinglist.DefaultUpdatedAt = serialroutinglistDescUpdatedAt.Default.(func() time.Time)
+	// serialroutinglist.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	serialroutinglist.UpdateDefaultUpdatedAt = serialroutinglistDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// serialroutinglistDescPosition is the schema descriptor for position field.
+	serialroutinglistDescPosition := serialroutinglistFields[2].Descriptor()
+	// serialroutinglist.DefaultPosition holds the default value on creation for the position field.
+	serialroutinglist.DefaultPosition = serialroutinglistDescPosition.Default.(int)
+	// serialroutinglistDescID is the schema descriptor for id field.
+	serialroutinglistDescID := serialroutinglistMixinFields0[0].Descriptor()
+	// serialroutinglist.DefaultID holds the default value on creation for the id field.
+	serialroutinglist.DefaultID = serialroutinglistDescID.Default.(func() uuid.UUID)
+	serialsubscriptionMixin := schema.SerialSubscription{}.Mixin()
+	serialsubscriptionMixinFields0 := serialsubscriptionMixin[0].Fields()
+	_ = serialsubscriptionMixinFields0
+	serialsubscriptionFields := schema.SerialSubscription{}.Fields()
+	_ = serialsubscriptionFields
+	// serialsubscriptionDescCreatedAt is the schema descriptor for created_at field.
+	serialsubscriptionDescCreatedAt := serialsubscriptionMixinFields0[1].Descriptor()
+	// serialsubscription.DefaultCreatedAt holds the default value on creation for the created_at field.
+	serialsubscription.DefaultCreatedAt = serialsubscriptionDescCreatedAt.Default.(func() time.Time)
+	// serialsubscriptionDescUpdatedAt is the schema descriptor for updated_at field.
+	serialsubscriptionDescUpdatedAt := serialsubscriptionMixinFields0[2].Descriptor()
+	// serialsubscription.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	serialsubscription.DefaultUpdatedAt = serialsubscriptionDescUpdatedAt.Default.(func() time.Time)
+	// serialsubscription.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	serialsubscription.UpdateDefaultUpdatedAt = serialsubscriptionDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// serialsubscriptionDescPrice is the schema descriptor for price field.
+	serialsubscriptionDescPrice := serialsubscriptionFields[6].Descriptor()
+	// serialsubscription.DefaultPrice holds the default value on creation for the price field.
+	serialsubscription.DefaultPrice = serialsubscriptionDescPrice.Default.(decimal.Decimal)
+	// serialsubscriptionDescCurrencyCode is the schema descriptor for currency_code field.
+	serialsubscriptionDescCurrencyCode := serialsubscriptionFields[7].Descriptor()
+	// serialsubscription.DefaultCurrencyCode holds the default value on creation for the currency_code field.
+	serialsubscription.DefaultCurrencyCode = serialsubscriptionDescCurrencyCode.Default.(string)
+	// serialsubscriptionDescID is the schema descriptor for id field.
+	serialsubscriptionDescID := serialsubscriptionMixinFields0[0].Descriptor()
+	// serialsubscription.DefaultID holds the default value on creation for the id field.
+	serialsubscription.DefaultID = serialsubscriptionDescID.Default.(func() uuid.UUID)
 	serviceconfigFields := schema.ServiceConfig{}.Fields()
 	_ = serviceconfigFields
 	// serviceconfigDescConfigKey is the schema descriptor for config_key field.

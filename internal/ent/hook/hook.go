@@ -405,6 +405,42 @@ func (f RecallRequestFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Valu
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RecallRequestMutation", m)
 }
 
+// The SerialIssueFunc type is an adapter to allow the use of ordinary
+// function as SerialIssue mutator.
+type SerialIssueFunc func(context.Context, *ent.SerialIssueMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f SerialIssueFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.SerialIssueMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SerialIssueMutation", m)
+}
+
+// The SerialRoutingListFunc type is an adapter to allow the use of ordinary
+// function as SerialRoutingList mutator.
+type SerialRoutingListFunc func(context.Context, *ent.SerialRoutingListMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f SerialRoutingListFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.SerialRoutingListMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SerialRoutingListMutation", m)
+}
+
+// The SerialSubscriptionFunc type is an adapter to allow the use of ordinary
+// function as SerialSubscription mutator.
+type SerialSubscriptionFunc func(context.Context, *ent.SerialSubscriptionMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f SerialSubscriptionFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.SerialSubscriptionMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.SerialSubscriptionMutation", m)
+}
+
 // The ServiceConfigFunc type is an adapter to allow the use of ordinary
 // function as ServiceConfig mutator.
 type ServiceConfigFunc func(context.Context, *ent.ServiceConfigMutation) (ent.Value, error)

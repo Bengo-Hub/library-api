@@ -78,6 +78,12 @@ type Tx struct {
 	PurchaseOrderLine *PurchaseOrderLineClient
 	// RecallRequest is the client for interacting with the RecallRequest builders.
 	RecallRequest *RecallRequestClient
+	// SerialIssue is the client for interacting with the SerialIssue builders.
+	SerialIssue *SerialIssueClient
+	// SerialRoutingList is the client for interacting with the SerialRoutingList builders.
+	SerialRoutingList *SerialRoutingListClient
+	// SerialSubscription is the client for interacting with the SerialSubscription builders.
+	SerialSubscription *SerialSubscriptionClient
 	// ServiceConfig is the client for interacting with the ServiceConfig builders.
 	ServiceConfig *ServiceConfigClient
 	// StockCount is the client for interacting with the StockCount builders.
@@ -252,6 +258,9 @@ func (tx *Tx) init() {
 	tx.PurchaseOrder = NewPurchaseOrderClient(tx.config)
 	tx.PurchaseOrderLine = NewPurchaseOrderLineClient(tx.config)
 	tx.RecallRequest = NewRecallRequestClient(tx.config)
+	tx.SerialIssue = NewSerialIssueClient(tx.config)
+	tx.SerialRoutingList = NewSerialRoutingListClient(tx.config)
+	tx.SerialSubscription = NewSerialSubscriptionClient(tx.config)
 	tx.ServiceConfig = NewServiceConfigClient(tx.config)
 	tx.StockCount = NewStockCountClient(tx.config)
 	tx.Subject = NewSubjectClient(tx.config)

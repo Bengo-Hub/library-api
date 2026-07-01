@@ -54,6 +54,7 @@ type App struct {
 	circulation           *circulation.Service
 	membership            *membership.Service
 	patronCategoryScheduler *membership.PatronCategoryScheduler
+	serialIssueScheduler    *handlers.SerialIssueScheduler
 	paymentConsumer       *consumers.PaymentConsumer
 }
 
@@ -200,6 +201,7 @@ func New(ctx context.Context) (*App, error) {
 		Holiday:          handlers.NewHolidayHandler(ormClient, calendarCalc, log),
 		AuthorizedValues: handlers.NewAuthorizedValueHandler(ormClient, log),
 		Acquisition:      handlers.NewAcquisitionHandler(ormClient, treasuryClient, log),
+		Serial:           handlers.NewSerialHandler(ormClient, log),
 		RBAC:           rbacService,
 		AllowedOrigins: cfg.HTTP.AllowedOrigins,
 		MediaRoot:      cfg.Media.Root,
@@ -243,6 +245,7 @@ func New(ctx context.Context) (*App, error) {
 		circulation:             circulationSvc,
 		membership:              membershipSvc,
 		patronCategoryScheduler: membership.NewPatronCategoryScheduler(ormClient, log),
+		serialIssueScheduler:    handlers.NewSerialIssueScheduler(ormClient, log),
 		paymentConsumer:         consumers.NewPaymentConsumer(ormClient, log),
 	}, nil
 }
@@ -260,6 +263,9 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Patron category auto-transition scheduler (daily; expires cards + graduates patrons by age).
 	a.patronCategoryScheduler.Start(ctx, 24*time.Hour)
+
+	// Serial issue late-detection scheduler (daily; marks EXPECTED issues past due as LATE).
+	a.serialIssueScheduler.Start(ctx, 24*time.Hour)
 
 	// Treasury payment reconcile consumer.
 	if a.events != nil && a.paymentConsumer != nil {

@@ -45,6 +45,9 @@ import (
 	"github.com/bengobox/library-service/internal/ent/purchaseorder"
 	"github.com/bengobox/library-service/internal/ent/purchaseorderline"
 	"github.com/bengobox/library-service/internal/ent/recallrequest"
+	"github.com/bengobox/library-service/internal/ent/serialissue"
+	"github.com/bengobox/library-service/internal/ent/serialroutinglist"
+	"github.com/bengobox/library-service/internal/ent/serialsubscription"
 	"github.com/bengobox/library-service/internal/ent/serviceconfig"
 	"github.com/bengobox/library-service/internal/ent/stockcount"
 	"github.com/bengobox/library-service/internal/ent/subject"
@@ -143,6 +146,9 @@ func checkColumn(t, c string) error {
 			purchaseorder.Table:          purchaseorder.ValidColumn,
 			purchaseorderline.Table:      purchaseorderline.ValidColumn,
 			recallrequest.Table:          recallrequest.ValidColumn,
+			serialissue.Table:            serialissue.ValidColumn,
+			serialroutinglist.Table:      serialroutinglist.ValidColumn,
+			serialsubscription.Table:     serialsubscription.ValidColumn,
 			serviceconfig.Table:          serviceconfig.ValidColumn,
 			stockcount.Table:             stockcount.ValidColumn,
 			subject.Table:                subject.ValidColumn,

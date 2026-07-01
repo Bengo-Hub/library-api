@@ -105,6 +105,15 @@ type PurchaseOrderLine func(*sql.Selector)
 // RecallRequest is the predicate function for recallrequest builders.
 type RecallRequest func(*sql.Selector)
 
+// SerialIssue is the predicate function for serialissue builders.
+type SerialIssue func(*sql.Selector)
+
+// SerialRoutingList is the predicate function for serialroutinglist builders.
+type SerialRoutingList func(*sql.Selector)
+
+// SerialSubscription is the predicate function for serialsubscription builders.
+type SerialSubscription func(*sql.Selector)
+
 // ServiceConfig is the predicate function for serviceconfig builders.
 type ServiceConfig func(*sql.Selector)
 

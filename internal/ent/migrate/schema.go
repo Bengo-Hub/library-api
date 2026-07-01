@@ -1255,6 +1255,122 @@ var (
 			},
 		},
 	}
+	// SerialIssuesColumns holds the columns for the "serial_issues" table.
+	SerialIssuesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "subscription_id", Type: field.TypeUUID},
+		{Name: "volume", Type: field.TypeString, Nullable: true},
+		{Name: "issue_no", Type: field.TypeString, Nullable: true},
+		{Name: "expected_date", Type: field.TypeTime},
+		{Name: "received_date", Type: field.TypeTime, Nullable: true},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"EXPECTED", "RECEIVED", "LATE", "MISSING", "CLAIMED"}, Default: "EXPECTED"},
+		{Name: "copy_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "notes", Type: field.TypeString, Nullable: true},
+	}
+	// SerialIssuesTable holds the schema information for the "serial_issues" table.
+	SerialIssuesTable = &schema.Table{
+		Name:       "serial_issues",
+		Columns:    SerialIssuesColumns,
+		PrimaryKey: []*schema.Column{SerialIssuesColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "serialissue_tenant_id",
+				Unique:  false,
+				Columns: []*schema.Column{SerialIssuesColumns[3]},
+			},
+			{
+				Name:    "serialissue_tenant_id_subscription_id",
+				Unique:  false,
+				Columns: []*schema.Column{SerialIssuesColumns[3], SerialIssuesColumns[4]},
+			},
+			{
+				Name:    "serialissue_tenant_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{SerialIssuesColumns[3], SerialIssuesColumns[9]},
+			},
+			{
+				Name:    "serialissue_tenant_id_expected_date",
+				Unique:  false,
+				Columns: []*schema.Column{SerialIssuesColumns[3], SerialIssuesColumns[7]},
+			},
+		},
+	}
+	// SerialRoutingListsColumns holds the columns for the "serial_routing_lists" table.
+	SerialRoutingListsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "subscription_id", Type: field.TypeUUID},
+		{Name: "member_id", Type: field.TypeUUID},
+		{Name: "position", Type: field.TypeInt, Default: 0},
+	}
+	// SerialRoutingListsTable holds the schema information for the "serial_routing_lists" table.
+	SerialRoutingListsTable = &schema.Table{
+		Name:       "serial_routing_lists",
+		Columns:    SerialRoutingListsColumns,
+		PrimaryKey: []*schema.Column{SerialRoutingListsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "serialroutinglist_tenant_id",
+				Unique:  false,
+				Columns: []*schema.Column{SerialRoutingListsColumns[3]},
+			},
+			{
+				Name:    "serialroutinglist_tenant_id_subscription_id_member_id",
+				Unique:  true,
+				Columns: []*schema.Column{SerialRoutingListsColumns[3], SerialRoutingListsColumns[4], SerialRoutingListsColumns[5]},
+			},
+			{
+				Name:    "serialroutinglist_tenant_id_subscription_id_position",
+				Unique:  false,
+				Columns: []*schema.Column{SerialRoutingListsColumns[3], SerialRoutingListsColumns[4], SerialRoutingListsColumns[6]},
+			},
+		},
+	}
+	// SerialSubscriptionsColumns holds the columns for the "serial_subscriptions" table.
+	SerialSubscriptionsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "bib_record_id", Type: field.TypeUUID},
+		{Name: "vendor_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "fund_id", Type: field.TypeUUID, Nullable: true},
+		{Name: "start_date", Type: field.TypeTime},
+		{Name: "end_date", Type: field.TypeTime, Nullable: true},
+		{Name: "frequency", Type: field.TypeEnum, Enums: []string{"DAILY", "WEEKLY", "MONTHLY", "QUARTERLY", "ANNUAL"}},
+		{Name: "price", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "currency_code", Type: field.TypeString, Default: "KES"},
+		{Name: "status", Type: field.TypeEnum, Enums: []string{"ACTIVE", "EXPIRED", "CANCELLED"}, Default: "ACTIVE"},
+		{Name: "notes", Type: field.TypeString, Nullable: true},
+	}
+	// SerialSubscriptionsTable holds the schema information for the "serial_subscriptions" table.
+	SerialSubscriptionsTable = &schema.Table{
+		Name:       "serial_subscriptions",
+		Columns:    SerialSubscriptionsColumns,
+		PrimaryKey: []*schema.Column{SerialSubscriptionsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "serialsubscription_tenant_id",
+				Unique:  false,
+				Columns: []*schema.Column{SerialSubscriptionsColumns[3]},
+			},
+			{
+				Name:    "serialsubscription_tenant_id_bib_record_id",
+				Unique:  false,
+				Columns: []*schema.Column{SerialSubscriptionsColumns[3], SerialSubscriptionsColumns[4]},
+			},
+			{
+				Name:    "serialsubscription_tenant_id_status",
+				Unique:  false,
+				Columns: []*schema.Column{SerialSubscriptionsColumns[3], SerialSubscriptionsColumns[12]},
+			},
+		},
+	}
 	// ServiceConfigsColumns holds the columns for the "service_configs" table.
 	ServiceConfigsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeUUID},
@@ -1452,6 +1568,9 @@ var (
 		PurchaseOrdersTable,
 		PurchaseOrderLinesTable,
 		RecallRequestsTable,
+		SerialIssuesTable,
+		SerialRoutingListsTable,
+		SerialSubscriptionsTable,
 		ServiceConfigsTable,
 		StockCountsTable,
 		SubjectsTable,

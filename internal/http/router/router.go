@@ -39,6 +39,7 @@ type Deps struct {
 	Holiday          *handlers.HolidayHandler
 	AuthorizedValues *handlers.AuthorizedValueHandler
 	Acquisition      *handlers.AcquisitionHandler
+	Serial           *handlers.SerialHandler
 	AuthMiddleware   *authclient.AuthMiddleware
 	RBAC           *rbac.Service
 	AllowedOrigins []string
@@ -296,6 +297,22 @@ func New(d Deps) http.Handler {
 			lib.With(act("settings", "manage")).Post("/admin/authorized-values", d.AuthorizedValues.Create)
 			lib.With(act("settings", "manage")).Put("/admin/authorized-values/{id}", d.AuthorizedValues.Update)
 			lib.With(act("settings", "manage")).Delete("/admin/authorized-values/{id}", d.AuthorizedValues.Delete)
+		}
+
+		// Serials — subscriptions, issues, routing lists.
+		if d.Serial != nil {
+			lib.With(view("serials")).Get("/serials/subscriptions", d.Serial.ListSubscriptions)
+			lib.With(act("serials", "add")).Post("/serials/subscriptions", d.Serial.CreateSubscription)
+			lib.With(view("serials")).Get("/serials/subscriptions/{id}", d.Serial.GetSubscription)
+			lib.With(act("serials", "change")).Put("/serials/subscriptions/{id}", d.Serial.UpdateSubscription)
+			lib.With(view("serials")).Post("/serials/subscriptions/{id}/predict", d.Serial.PredictIssues)
+			lib.With(view("serials")).Get("/serials/subscriptions/{id}/routing", d.Serial.ListRouting)
+			lib.With(act("serials", "change")).Post("/serials/subscriptions/{id}/routing", d.Serial.AddRouting)
+
+			lib.With(view("serials")).Get("/serials/issues", d.Serial.ListIssues)
+			lib.With(act("serials", "add")).Post("/serials/issues", d.Serial.CreateIssue)
+			lib.With(act("serials", "change")).Post("/serials/issues/{id}/receive", d.Serial.ReceiveIssue)
+			lib.With(act("serials", "change")).Post("/serials/issues/{id}/claim", d.Serial.ClaimIssue)
 		}
 
 		// Acquisitions — vendors, budgets/funds, purchase orders, invoices.
