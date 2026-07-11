@@ -90,11 +90,10 @@ func (c *PaymentConsumer) Start(ctx context.Context, js nats.JetStreamContext) e
 }
 
 func (c *PaymentConsumer) handle(ctx context.Context, m *nats.Msg) {
-	defer func() { _ = m.Ack() }()
-
 	var env envelope
 	if err := json.Unmarshal(m.Data, &env); err != nil {
 		c.log.Warn("payment event: bad envelope", zap.Error(err))
+		_ = m.Ack() // poison — never retry
 		return
 	}
 	var p paymentPayload
@@ -103,6 +102,7 @@ func (c *PaymentConsumer) handle(ctx context.Context, m *nats.Msg) {
 		src = m.Data // some publishers send the flat payload
 	}
 	if err := json.Unmarshal(src, &p); err != nil {
+		_ = m.Ack() // poison
 		return
 	}
 	intentID := p.IntentID
@@ -113,22 +113,34 @@ func (c *PaymentConsumer) handle(ctx context.Context, m *nats.Msg) {
 	// bare-UUID reference); intentID remains the primary, robust match.
 	entityID := entityIDFromReference(p.ReferenceID, p.Metadata)
 	if intentID == "" && entityID == "" {
+		_ = m.Ack() // nothing to match — drop
 		return
 	}
 
+	var err error
 	switch p.ReferenceType {
 	case "library_fine", "":
-		c.reconcileFine(ctx, intentID, entityID)
+		err = c.reconcileFine(ctx, intentID, entityID)
 	case "membership_fee":
-		c.reconcileFee(ctx, intentID, entityID)
+		err = c.reconcileFee(ctx, intentID, entityID)
 	case "ebook_sale":
-		c.reconcilePurchase(ctx, intentID, entityID)
+		err = c.reconcilePurchase(ctx, intentID, entityID)
 	case "acquisition_invoice":
-		c.reconcileAcqInvoice(ctx, intentID, entityID)
+		err = c.reconcileAcqInvoice(ctx, intentID, entityID)
 	}
+	if err != nil {
+		// Transient failure (e.g. a DB write blip) — Nak so JetStream redelivers rather
+		// than silently dropping the payment reconciliation (leaving the fine/fee/sale
+		// stuck unpaid). Not-found / already-paid are treated as success (nil) above.
+		c.log.Error("payment reconcile failed; will retry",
+			zap.String("reference_type", p.ReferenceType), zap.Error(err))
+		_ = m.Nak()
+		return
+	}
+	_ = m.Ack()
 }
 
-func (c *PaymentConsumer) reconcilePurchase(ctx context.Context, intentID, referenceID string) {
+func (c *PaymentConsumer) reconcilePurchase(ctx context.Context, intentID, referenceID string) error {
 	q := c.db.EbookPurchase.Query()
 	switch {
 	case intentID != "":
@@ -137,21 +149,24 @@ func (c *PaymentConsumer) reconcilePurchase(ctx context.Context, intentID, refer
 		if id, err := uuid.Parse(referenceID); err == nil {
 			q = q.Where(ebookpurchase.IDEQ(id))
 		} else {
-			return
+			return nil
 		}
 	default:
-		return
+		return nil
 	}
 	p, err := q.Only(ctx)
 	if err != nil || p.Status == ebookpurchase.StatusPAID {
-		return
+		return nil // not ours / already paid — do not retry
 	}
-	_, _ = c.db.EbookPurchase.UpdateOneID(p.ID).SetStatus(ebookpurchase.StatusPAID).SetPurchasedAt(time.Now()).Save(ctx)
+	if _, err := c.db.EbookPurchase.UpdateOneID(p.ID).SetStatus(ebookpurchase.StatusPAID).SetPurchasedAt(time.Now()).Save(ctx); err != nil {
+		return err // transient
+	}
 	c.log.Info("ebook purchase reconciled to PAID", zap.String("purchase", p.ID.String()))
+	return nil
 }
 
 // reconcileFine marks the matching fine PAID (by intent id, else by fine id reference).
-func (c *PaymentConsumer) reconcileFine(ctx context.Context, intentID, referenceID string) {
+func (c *PaymentConsumer) reconcileFine(ctx context.Context, intentID, referenceID string) error {
 	q := c.db.Fine.Query()
 	switch {
 	case intentID != "":
@@ -160,22 +175,21 @@ func (c *PaymentConsumer) reconcileFine(ctx context.Context, intentID, reference
 		if id, err := uuid.Parse(referenceID); err == nil {
 			q = q.Where(fine.IDEQ(id))
 		} else {
-			return
+			return nil
 		}
 	default:
-		return
+		return nil
 	}
 	f, err := q.Only(ctx)
 	if err != nil {
-		return // not ours / not found — ignore
+		return nil // not ours / not found — ignore
 	}
 	if f.Status == fine.StatusPAID {
-		return // idempotent
+		return nil // idempotent
 	}
 	if _, err := c.db.Fine.UpdateOneID(f.ID).
 		SetStatus(fine.StatusPAID).SetAmountPaid(f.Amount).SetPaidAt(time.Now()).Save(ctx); err != nil {
-		c.log.Warn("fine reconcile failed", zap.Error(err))
-		return
+		return err // transient — Nak + retry
 	}
 	payload := map[string]any{
 		"fine_id": f.ID, "intent_id": intentID, "amount": f.Amount.String(),
@@ -186,9 +200,10 @@ func (c *PaymentConsumer) reconcileFine(ctx context.Context, intentID, reference
 	}
 	_ = events.Publish(ctx, c.db.OutboxEvent, f.TenantID, f.ID.String(), events.EventFinePaid, payload)
 	c.log.Info("fine reconciled to PAID", zap.String("fine", f.ID.String()))
+	return nil
 }
 
-func (c *PaymentConsumer) reconcileFee(ctx context.Context, intentID, referenceID string) {
+func (c *PaymentConsumer) reconcileFee(ctx context.Context, intentID, referenceID string) error {
 	q := c.db.MembershipFee.Query()
 	switch {
 	case intentID != "":
@@ -197,19 +212,22 @@ func (c *PaymentConsumer) reconcileFee(ctx context.Context, intentID, referenceI
 		if id, err := uuid.Parse(referenceID); err == nil {
 			q = q.Where(membershipfee.IDEQ(id))
 		} else {
-			return
+			return nil
 		}
 	default:
-		return
+		return nil
 	}
 	fee, err := q.Only(ctx)
 	if err != nil || fee.Status == membershipfee.StatusPAID {
-		return
+		return nil
 	}
-	_, _ = c.db.MembershipFee.UpdateOneID(fee.ID).SetStatus(membershipfee.StatusPAID).SetPaidAt(time.Now()).Save(ctx)
+	if _, err := c.db.MembershipFee.UpdateOneID(fee.ID).SetStatus(membershipfee.StatusPAID).SetPaidAt(time.Now()).Save(ctx); err != nil {
+		return err
+	}
+	return nil
 }
 
-func (c *PaymentConsumer) reconcileAcqInvoice(ctx context.Context, intentID, referenceID string) {
+func (c *PaymentConsumer) reconcileAcqInvoice(ctx context.Context, intentID, referenceID string) error {
 	// Primary match: treasury_invoice_id == intentID (UUID stored at invoice creation).
 	if intentID != "" {
 		if tid, err := uuid.Parse(intentID); err == nil {
@@ -217,9 +235,11 @@ func (c *PaymentConsumer) reconcileAcqInvoice(ctx context.Context, intentID, ref
 				Where(acquisitioninvoice.TreasuryInvoiceIDEQ(tid), acquisitioninvoice.StatusEQ(acquisitioninvoice.StatusPENDING)).
 				Only(ctx)
 			if err == nil {
-				_, _ = c.db.AcquisitionInvoice.UpdateOneID(inv.ID).SetStatus(acquisitioninvoice.StatusPAID).Save(ctx)
+				if _, uerr := c.db.AcquisitionInvoice.UpdateOneID(inv.ID).SetStatus(acquisitioninvoice.StatusPAID).Save(ctx); uerr != nil {
+					return uerr // transient
+				}
 				c.log.Info("acquisition invoice reconciled to PAID", zap.String("invoice", inv.ID.String()))
-				return
+				return nil
 			}
 		}
 	}
@@ -230,9 +250,12 @@ func (c *PaymentConsumer) reconcileAcqInvoice(ctx context.Context, intentID, ref
 				Where(acquisitioninvoice.IDEQ(id), acquisitioninvoice.StatusEQ(acquisitioninvoice.StatusPENDING)).
 				Only(ctx)
 			if err == nil {
-				_, _ = c.db.AcquisitionInvoice.UpdateOneID(inv.ID).SetStatus(acquisitioninvoice.StatusPAID).Save(ctx)
+				if _, uerr := c.db.AcquisitionInvoice.UpdateOneID(inv.ID).SetStatus(acquisitioninvoice.StatusPAID).Save(ctx); uerr != nil {
+					return uerr // transient
+				}
 				c.log.Info("acquisition invoice reconciled to PAID (ref-fallback)", zap.String("invoice", inv.ID.String()))
 			}
 		}
 	}
+	return nil
 }
