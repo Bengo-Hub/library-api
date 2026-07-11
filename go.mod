@@ -10,7 +10,7 @@ require (
 	entgo.io/ent v0.14.5
 	github.com/Bengo-Hub/httpware v0.5.0
 	github.com/Bengo-Hub/shared-auth-client v0.0.0-00010101000000-000000000000
-	github.com/Bengo-Hub/shared-events v0.6.0
+	github.com/Bengo-Hub/shared-events v0.6.1
 	github.com/boombuler/barcode v1.1.0
 	github.com/go-chi/chi/v5 v5.0.12
 	github.com/go-chi/cors v1.2.1
@@ -57,7 +57,6 @@ require (
 	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
-	github.com/lib/pq v1.12.3 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mitchellh/go-wordwrap v1.0.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
