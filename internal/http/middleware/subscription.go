@@ -13,23 +13,12 @@ import (
 // SSO tokens (see pin_auth.go), so gating is uniform across both. When no claims are
 // present the request passes through so the outer auth layer decides. Emits the standard
 // {error,code,upgrade} envelope the library-ui parses.
+//
+// Delegates to the canonical authclient.RequireFeatureCode. NOTE: the old body also
+// bypassed on claims.IsSuperuser(); dropping that is intentional and correct (platform
+// SEC-3 policy: tenant superusers do NOT bypass subscription/feature gating).
 func RequireFeature(featureCode string) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			claims, ok := authclient.ClaimsFromContext(r.Context())
-			if !ok || claims == nil {
-				next.ServeHTTP(w, r)
-				return
-			}
-			if claims.IsSuperuser() || claims.IsGatingExempt() || claims.HasFeature(featureCode) {
-				next.ServeHTTP(w, r)
-				return
-			}
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusForbidden)
-			_, _ = w.Write([]byte(`{"error":"feature_not_available","code":"feature_not_available","required_feature":"` + featureCode + `","upgrade":true}`))
-		})
-	}
+	return authclient.RequireFeatureCode(featureCode)
 }
 
 // RequireActiveSubscriptionForMutations passes all GET/OPTIONS through; for mutations it

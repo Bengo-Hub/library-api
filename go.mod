@@ -3,7 +3,7 @@ module github.com/bengobox/library-service
 go 1.26.0
 
 // Use online tagged auth-client (same as inventory-service / ordering-backend)
-replace github.com/Bengo-Hub/shared-auth-client => github.com/Bengo-Hub/auth-client v0.10.0
+replace github.com/Bengo-Hub/shared-auth-client => github.com/Bengo-Hub/auth-client v0.11.0
 
 require (
 	ariga.io/atlas v1.1.0

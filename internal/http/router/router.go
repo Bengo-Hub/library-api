@@ -111,8 +111,9 @@ func New(d Deps) http.Handler {
 				})
 			})
 		}
-		// Mutations-only subscription gate (GET always passes).
-		lib.Use(libmw.RequireActiveSubscriptionForMutations)
+		// Mutations-only subscription gate (GET always passes). Uniform 7-day grace
+		// for EXPIRED tenants via the shared grace-aware middleware.
+		lib.Use(authclient.RequireActiveSubscriptionForMutationsWithGrace(7))
 
 		lib.Get("/auth/me", d.Auth.Me)
 		if d.PINAuth != nil {
