@@ -119,9 +119,14 @@ func New(ctx context.Context) (*App, error) {
 	// Transactional outbox poller.
 	var outboxPublisher *eventslib.OutboxPoller
 	if natsConn != nil && cfg.Events.OutboxEnabled {
+		// JetStream (not core) so publishes are ACKed into the library stream — the
+		// notifications-api consumer is a durable JS subscriber and needs replay.
+		js, jsErr := natsConn.JetStream()
+		if jsErr != nil {
+			return nil, fmt.Errorf("jetstream init for outbox poller: %w", jsErr)
+		}
 		outboxRepo := eventslib.NewSQLOutboxRepository(sqlDB)
-		outboxNatsPublisher := eventslib.NewNATSAdapter(natsConn, log)
-		outboxPublisher = eventslib.NewOutboxPoller(outboxRepo, outboxNatsPublisher, log, eventslib.PollerConfig{
+		outboxPublisher = eventslib.NewOutboxPoller(outboxRepo, eventslib.NewJetStreamAdapter(js, log), log, eventslib.PollerConfig{
 			BatchSize:  cfg.Events.OutboxBatchSize,
 			PollPeriod: cfg.Events.OutboxPollPeriod,
 		})

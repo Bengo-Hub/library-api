@@ -2,12 +2,18 @@
 // an outbox_events row (within the domain's Ent transaction); the shared-events OutboxPoller
 // wired in app.go drains it to NATS. Subject = {aggregate_type}.{event_type}; aggregate_type
 // for this service is always "library".
+//
+// The payload column MUST hold the FULL shared-events envelope (Event.ToJSON()): the poller
+// rebuilds the event solely via FromJSON(payload) and derives the subject from the
+// deserialized envelope — a bare business payload publishes to subject "." and is lost.
 package events
 
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
+	eventslib "github.com/Bengo-Hub/shared-events"
 	"github.com/google/uuid"
 
 	"github.com/bengobox/library-service/internal/ent"
@@ -44,18 +50,38 @@ type Publisher interface {
 }
 
 // Publish writes one outbox event row. Pass tx.OutboxEvent to publish atomically with the
-// domain write, or client.OutboxEvent for a standalone publish.
+// domain write, or client.OutboxEvent for a standalone publish. aggregateID should be the
+// aggregate's UUID string; a non-UUID ref is mapped to a stable tenant-namespaced SHA1 UUID
+// (the shared poller scans aggregate_id into uuid.UUID — one bad row jams the whole batch).
 func Publish(ctx context.Context, oc Publisher, tenantID uuid.UUID, aggregateID, eventType string, payload any) error {
+	// Normalize the business payload to the map the shared envelope carries.
 	b, err := json.Marshal(payload)
 	if err != nil {
-		return err
+		return fmt.Errorf("events: marshal payload: %w", err)
 	}
+	var payloadMap map[string]interface{}
+	if err := json.Unmarshal(b, &payloadMap); err != nil {
+		return fmt.Errorf("events: payload must be a JSON object: %w", err)
+	}
+
+	aggUUID, err := uuid.Parse(aggregateID)
+	if err != nil {
+		aggUUID = uuid.NewSHA1(tenantID, []byte(aggregateID))
+	}
+
+	ev := eventslib.NewEvent(eventType, AggregateType, aggUUID, tenantID, payloadMap)
+	raw, err := ev.ToJSON()
+	if err != nil {
+		return fmt.Errorf("events: marshal envelope: %w", err)
+	}
+
 	_, err = oc.Create().
+		SetID(ev.ID).
 		SetTenantID(tenantID).
 		SetAggregateType(AggregateType).
-		SetAggregateID(aggregateID).
+		SetAggregateID(aggUUID.String()).
 		SetEventType(eventType).
-		SetPayload(json.RawMessage(b)).
+		SetPayload(json.RawMessage(raw)).
 		Save(ctx)
 	return err
 }
