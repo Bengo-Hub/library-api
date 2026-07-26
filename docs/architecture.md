@@ -5,7 +5,7 @@
 **ORM:** Ent (entgo.io/ent v0.14) + Atlas versioned migrations
 **HTTP Router:** chi/v5
 **Port:** 4010
-**Production:** `libraryapi.codevertexitsolutions.com`
+**Production:** `libraryapi.codevertexafrica.com`
 **Last updated:** 2026-06-26
 **Status:** Phase 1 shipped. 24+ Ent schemas, 15 handler files, 3 global RBAC roles, transactional outbox publishing, treasury reconcile consumer + overdue scheduler wired.
 
@@ -94,7 +94,7 @@ library-api/
 Every tenant request flows through the same ordered middleware stack mounted once under `/api/v1/{tenant}/library` (`router.go`):
 
 1. **Global middleware** — `RequestID`, `RealIP`, `httpware.Logging`/`Recover`, 30s `Timeout`, 50 MB `RequestSize` (e-book uploads), CORS.
-2. **`RequireAuth`** (`shared-auth-client`) — validates the Bearer JWT against JWKS (`sso.codevertexitsolutions.com`), or an `X-API-Key` for S2S. Claims land in request context.
+2. **`RequireAuth`** (`shared-auth-client`) — validates the Bearer JWT against JWKS (`sso.codevertexafrica.com`), or an `X-API-Key` for S2S. Claims land in request context.
 3. **JIT heal** — `rbac.Service.EnsureUserFromToken` upserts the local `LibraryUser` from JWT claims and re-applies mapped roles **on every request** (not only first-create), so a user provisioned before a role mapping existed self-heals (treasury #30 gotcha).
 4. **Mutations-only subscription gate** — `RequireActiveSubscriptionForMutations`: GET/HEAD/OPTIONS always pass; mutations require an active subscription, with superuser / platform-owner / demo / PAYG (`IsGatingExempt`) bypass. Emits the standard `{error,code:"subscription_inactive",upgrade:true}` envelope frontends parse.
 5. **`RequireServicePermission(perms…)`** (where mounted) — union RBAC: (a) superuser/platform-owner bypass → (b) JWT-carried permission → (c) local RBAC fallback (`HasAnyPermission`) → else 403 `permission_denied`.
@@ -194,7 +194,7 @@ E-book lending (`ebooks.go`) takes a `ForUpdate()` row lock on the `ebook` row, 
 
 ## Authentication
 
-- **JWT validation** via `shared-auth-client` (JWKS from `sso.codevertexitsolutions.com`, cached 1h, refreshed 5m).
+- **JWT validation** via `shared-auth-client` (JWKS from `sso.codevertexafrica.com`, cached 1h, refreshed 5m).
 - **API-key auth** for S2S calls (`AUTH_ENABLE_API_KEY_AUTH`, shared `INTERNAL_SERVICE_KEY` via `X-API-Key`).
 - All `/api/v1/{tenant}/library` routes require auth; health/metrics/media are open.
 
@@ -207,10 +207,10 @@ E-book lending (`ebooks.go`) takes a `ForUpdate()` row lock on the `ebook` row, 
 | PostgreSQL | `POSTGRES_URL`, `POSTGRES_MAX_OPEN_CONNS`, `POSTGRES_RUN_MIGRATIONS` | `localhost:5432/library` |
 | Redis | `REDIS_ADDR`, `REDIS_PASSWORD`, … | `localhost:6380` |
 | NATS JetStream | `EVENTS_NATS_URL`, `NATS_STREAM=library`, `NATS_DELIVER_GROUP=library-workers` | `nats://localhost:4222` |
-| Auth/JWKS | `AUTH_JWKS_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `INTERNAL_SERVICE_KEY` | `sso.codevertexitsolutions.com` |
-| Treasury | `TREASURY_SERVICE_URL` | `booksapi.codevertexitsolutions.com` |
-| Notifications | `NOTIFICATIONS_SERVICE_URL` | `notificationsapi.codevertexitsolutions.com` |
-| Subscriptions | `SUBSCRIPTIONS_SERVICE_URL` | `pricingapi.codevertexitsolutions.com` |
+| Auth/JWKS | `AUTH_JWKS_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `INTERNAL_SERVICE_KEY` | `sso.codevertexafrica.com` |
+| Treasury | `TREASURY_SERVICE_URL` | `booksapi.codevertexafrica.com` |
+| Notifications | `NOTIFICATIONS_SERVICE_URL` | `notificationsapi.codevertexafrica.com` |
+| Subscriptions | `SUBSCRIPTIONS_SERVICE_URL` | `pricingapi.codevertexafrica.com` |
 | Media / E-books | `MEDIA_ROOT`, `MEDIA_URL_BASE`, `EBOOK_ROOT` | per-tenant PVC |
 | HTTP | `HTTP_HOST`, `HTTP_PORT`, `HTTP_ALLOWED_ORIGINS` | `0.0.0.0:4010` |
 | Backups | `BACKUP_DIR`, `BACKUP_SCHEDULE_ENABLED`, `BACKUP_RETENTION_DAYS` | PVC fallback |

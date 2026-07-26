@@ -2,7 +2,7 @@
 
 **Service:** library-api
 **Language:** Go 1.26
-**Production domain:** `libraryapi.codevertexitsolutions.com`
+**Production domain:** `libraryapi.codevertexafrica.com`
 **Last updated:** 2026-06-26
 **Status:** Phase 1 (MVP) shipped — full backend + frontend. Catalog/OPAC, circulation (checkout/return/renew + holds + in-house reading), members/tiers/policies, fines + membership fees, and e-books (in-browser reader + Controlled Digital Lending) are live, with auth/SSO, treasury, notifications, subscriptions and outbox plumbing wired.
 

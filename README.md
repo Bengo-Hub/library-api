@@ -51,7 +51,7 @@ go build ./... && go run ./cmd/api
 SEED_TENANT_ID=<tenant-uuid> go run ./cmd/seed
 ```
 
-Default port is `4010` (`HTTP_PORT`). Production: `https://libraryapi.codevertexitsolutions.com`.
+Default port is `4010` (`HTTP_PORT`). Production: `https://libraryapi.codevertexafrica.com`.
 
 ## Environment
 

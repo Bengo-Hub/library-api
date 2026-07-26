@@ -2,7 +2,7 @@
 
 This is the grouped endpoint reference for library-api. **Every route below is registered in `internal/http/router/router.go`** under the single mount `/api/v1/{tenant}/library`. `{tenant}` is the tenant **slug**; it must match the tenant claim in the JWT.
 
-**Base URL:** `https://libraryapi.codevertexitsolutions.com/api/v1/{tenant}/library`
+**Base URL:** `https://libraryapi.codevertexafrica.com/api/v1/{tenant}/library`
 
 ---
 

@@ -29,7 +29,7 @@ type Config struct {
 // mutations + NATS data sync by tenant entitlement. APIKey reuses the shared
 // INTERNAL_SERVICE_KEY (same value every library S2S client uses).
 type SubscriptionsConfig struct {
-	ServiceURL     string        `envconfig:"SUBSCRIPTIONS_SERVICE_URL" default:"https://pricingapi.codevertexitsolutions.com"`
+	ServiceURL     string        `envconfig:"SUBSCRIPTIONS_SERVICE_URL" default:"https://pricingapi.codevertexafrica.com"`
 	RequestTimeout time.Duration `envconfig:"SUBSCRIPTIONS_REQUEST_TIMEOUT" default:"10s"`
 	APIKey         string        `envconfig:"INTERNAL_SERVICE_KEY" default:""`
 }
@@ -65,7 +65,7 @@ type HTTPConfig struct {
 	IdleTimeout    time.Duration `envconfig:"HTTP_IDLE_TIMEOUT" default:"90s"`
 	TLSCertFile    string        `envconfig:"TLS_CERT_FILE"`
 	TLSKeyFile     string        `envconfig:"TLS_KEY_FILE"`
-	AllowedOrigins []string      `envconfig:"HTTP_ALLOWED_ORIGINS" default:"https://library.codevertexitsolutions.com,https://accounts.codevertexitsolutions.com"`
+	AllowedOrigins []string      `envconfig:"HTTP_ALLOWED_ORIGINS" default:"https://library.codevertexafrica.com,https://accounts.codevertexafrica.com"`
 }
 
 type PostgresConfig struct {
@@ -108,19 +108,19 @@ type TelemetryConfig struct {
 type ServicesConfig struct {
 	// TreasuryURL is the treasury-api base — fines, e-book sales and membership fees
 	// are charged via treasury payment intents (S2S).
-	TreasuryURL string `envconfig:"TREASURY_SERVICE_URL" default:"https://booksapi.codevertexitsolutions.com"`
+	TreasuryURL string `envconfig:"TREASURY_SERVICE_URL" default:"https://booksapi.codevertexafrica.com"`
 	// NotificationsURL is the notifications-api base — REST fallback when an outbox
 	// event path is not used.
-	NotificationsURL string `envconfig:"NOTIFICATIONS_SERVICE_URL" default:"https://notificationsapi.codevertexitsolutions.com"`
+	NotificationsURL string `envconfig:"NOTIFICATIONS_SERVICE_URL" default:"https://notificationsapi.codevertexafrica.com"`
 	// MarketflowURL is the marketflow (CRM) base — optional member profile enrich.
-	MarketflowURL string `envconfig:"MARKETFLOW_SERVICE_URL" default:"https://marketflowapi.codevertexitsolutions.com"`
+	MarketflowURL string `envconfig:"MARKETFLOW_SERVICE_URL" default:"https://marketflowapi.codevertexafrica.com"`
 }
 
 type AuthConfig struct {
-	ServiceURL          string        `envconfig:"AUTH_SERVICE_URL" default:"https://sso.codevertexitsolutions.com"`
-	Issuer              string        `envconfig:"AUTH_ISSUER" default:"https://sso.codevertexitsolutions.com"`
+	ServiceURL          string        `envconfig:"AUTH_SERVICE_URL" default:"https://sso.codevertexafrica.com"`
+	Issuer              string        `envconfig:"AUTH_ISSUER" default:"https://sso.codevertexafrica.com"`
 	Audience            string        `envconfig:"AUTH_AUDIENCE" default:"codevertex"`
-	JWKSUrl             string        `envconfig:"AUTH_JWKS_URL" default:"https://sso.codevertexitsolutions.com/api/v1/.well-known/jwks.json"`
+	JWKSUrl             string        `envconfig:"AUTH_JWKS_URL" default:"https://sso.codevertexafrica.com/api/v1/.well-known/jwks.json"`
 	JWKSCacheTTL        time.Duration `envconfig:"AUTH_JWKS_CACHE_TTL" default:"3600s"`
 	JWKSRefreshInterval time.Duration `envconfig:"AUTH_JWKS_REFRESH_INTERVAL" default:"300s"`
 	EnableAPIKeyAuth    bool          `envconfig:"AUTH_ENABLE_API_KEY_AUTH" default:"true"`

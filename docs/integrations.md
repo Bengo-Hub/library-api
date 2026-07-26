@@ -21,7 +21,7 @@ This document maps every cross-service integration for library-api: the auth/SSO
 
 **Integration type:** OIDC/OAuth2 (PKCE for the UI) + JWT validation + S2S API key.
 
-- **JWT validation** via `shared-auth-client`: JWKS fetched from `AUTH_JWKS_URL` (`sso.codevertexitsolutions.com/api/v1/.well-known/jwks.json`), cached 1h, refreshed 5m. Issuer/audience from `AUTH_ISSUER`/`AUTH_AUDIENCE` (`codevertex`).
+- **JWT validation** via `shared-auth-client`: JWKS fetched from `AUTH_JWKS_URL` (`sso.codevertexafrica.com/api/v1/.well-known/jwks.json`), cached 1h, refreshed 5m. Issuer/audience from `AUTH_ISSUER`/`AUTH_AUDIENCE` (`codevertex`).
 - **All `/api/v1/{tenant}/library` routes** require a Bearer JWT (or an `X-API-Key` for S2S when `AUTH_ENABLE_API_KEY_AUTH=true`).
 - **JIT provisioning (heal-existing-users):** on every authenticated request, `rbac.EnsureUserFromToken` upserts the local `LibraryUser` from claims and re-applies mapped roles. Existing users self-heal when a role mapping changes (treasury #30 gotcha) — there is no "first-login only" gap.
 - **Role mapping:** SSO global roles → library roles (`MapGlobalRoles`): `superuser`/`admin`/`owner`/`platform_owner` → `library_admin`; `staff`/`cashier`/`manager` → `library_staff`; everything else → `library_member`.
@@ -56,7 +56,7 @@ Library charges (overdue/lost/damage **fines**, **membership fees**, and **e-boo
 
 **Reconcile path (NATS):** the `library-payment-reconcile` durable queue consumer subscribes to **`treasury.payment.succeeded`** and, switching on `reference_type`, flips the matching **fine** (`library_fine`), **membership fee** (`membership_fee`), or **e-book purchase** (`ebook_sale`) to **PAID** — matched by `treasury_intent_id`, else `reference_id`; idempotent on the intent id (already-PAID is a no-op). For fines it then publishes `library.fine.paid`.
 
-**Env:** `TREASURY_SERVICE_URL` (default `booksapi.codevertexitsolutions.com`), `INTERNAL_SERVICE_KEY`.
+**Env:** `TREASURY_SERVICE_URL` (default `booksapi.codevertexafrica.com`), `INTERNAL_SERVICE_KEY`.
 
 ---
 
@@ -90,7 +90,7 @@ Library charges (overdue/lost/damage **fines**, **membership fees**, and **e-boo
 - **Consumer gating (S2S):** `subscriptions.Client.ConsumerHasFeature(tenant_id, feature_code)` mirrors the inventory-api client — cached (60s) and **fail-open** (a subscriptions outage never drops event processing). Demo-bypass and `billing_mode=service_charge` (PAYG) tenants are always allowed.
 - Feature catalog uses `library_*` codes (e.g. `library_circulation`, `library_ebooks`).
 
-**Env:** `SUBSCRIPTIONS_SERVICE_URL` (default `pricingapi.codevertexitsolutions.com`), `INTERNAL_SERVICE_KEY`. Endpoint: `GET /api/v1/tenants/{id}/subscription` (tenant-scoped S2S — not `/subscription`).
+**Env:** `SUBSCRIPTIONS_SERVICE_URL` (default `pricingapi.codevertexafrica.com`), `INTERNAL_SERVICE_KEY`. Endpoint: `GET /api/v1/tenants/{id}/subscription` (tenant-scoped S2S — not `/subscription`).
 
 ---
 
@@ -101,7 +101,7 @@ Library charges (overdue/lost/damage **fines**, **membership fees**, and **e-boo
 - A `Member` may carry a `crm_contact_id` referencing a marketflow contact. **Marketflow is the customer SoT** (`crm_data_ownership_sync`); library-api stores only the reference plus a cached `display_name`/contact for desk UX.
 - No PII is duplicated: phone/email cached on `Member` are a convenience cache, not the source of truth.
 
-**Env:** `MARKETFLOW_SERVICE_URL` (default `marketflowapi.codevertexitsolutions.com`).
+**Env:** `MARKETFLOW_SERVICE_URL` (default `marketflowapi.codevertexafrica.com`).
 
 ---
 
