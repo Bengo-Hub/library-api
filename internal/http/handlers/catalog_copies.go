@@ -242,16 +242,16 @@ func (h *CatalogHandler) ListCopies(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "bad id", "invalid_request")
 		return
 	}
-	rows, err := h.db.BookCopy.Query().
-		Where(bookcopy.TenantID(tenantID), bookcopy.BibRecordID(bibID)).
-		Order(ent.Asc(bookcopy.FieldBarcode)).
-		All(r.Context())
+	q := h.db.BookCopy.Query().Where(bookcopy.TenantID(tenantID), bookcopy.BibRecordID(bibID))
+	params := sharedpagination.Parse(r)
+	total, _ := q.Clone().Count(r.Context())
+	rows, err := q.Order(ent.Asc(bookcopy.FieldBarcode)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
 	out := h.buildCopyResponses(r, tenantID, rows)
-	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(out, total, params))
 }
 
 // CreateCopy adds a physical copy, auto-allocating an accession number when none is given.

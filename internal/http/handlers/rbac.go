@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 
@@ -28,14 +29,18 @@ func (h *RBACHandler) ListRoles(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	params := sharedpagination.Parse(r)
+	page, total := paginateSlice(rows, params)
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(page, total, params))
 }
 
 // ListPermissions godoc
 // @Router /{tenant}/library/rbac/permissions [get]
 func (h *RBACHandler) ListPermissions(w http.ResponseWriter, r *http.Request) {
 	cat := rbac.PermissionCatalog()
-	respondJSON(w, http.StatusOK, listEnvelope{Data: cat, Total: len(cat)})
+	params := sharedpagination.Parse(r)
+	page, total := paginateSlice(cat, params)
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(page, total, params))
 }
 
 type roleRequest struct {
@@ -123,7 +128,9 @@ func (h *RBACHandler) ListTeam(w http.ResponseWriter, r *http.Request) {
 			"has_pin":    u.PinHash != nil && *u.PinHash != "",
 		})
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
+	params := sharedpagination.Parse(r)
+	page, total := paginateSlice(out, params)
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(page, total, params))
 }
 
 // AssignBranches godoc

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -116,7 +117,9 @@ func (h *PINAuthHandler) PINBranches(w http.ResponseWriter, r *http.Request) {
 	for _, b := range rows {
 		out = append(out, branchJSON(b))
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
+	// The branch picker must show every active branch (it's a pre-auth login control with no
+	// paging affordance), so the envelope is standardized without truncating the list.
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(out, len(out), sharedpagination.Parse(r)))
 }
 
 func (h *PINAuthHandler) terminalClaimsFor(ctx context.Context, t *ent.Tenant, u *ent.LibraryUser) terminalClaims {
@@ -507,5 +510,7 @@ func (h *PINAuthHandler) StaffProfiles(w http.ResponseWriter, r *http.Request) {
 			"has_pin": true, "is_admin": isLibraryAdmin(u.Roles),
 		})
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
+	// The keypad picker must show every eligible staff profile (pre-auth, no paging UI),
+	// so the envelope is standardized without truncating the list.
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(out, len(out), sharedpagination.Parse(r)))
 }

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -49,12 +50,14 @@ func (h *AcquisitionHandler) ListVendors(w http.ResponseWriter, r *http.Request)
 	if active := r.URL.Query().Get("active"); active == "true" {
 		q = q.Where(vendor.IsActive(true))
 	}
-	rows, err := q.Order(vendor.ByName()).All(r.Context())
+	params := sharedpagination.Parse(r)
+	total, _ := q.Clone().Count(r.Context())
+	rows, err := q.Order(vendor.ByName()).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to list vendors", "internal")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 func (h *AcquisitionHandler) GetVendor(w http.ResponseWriter, r *http.Request) {

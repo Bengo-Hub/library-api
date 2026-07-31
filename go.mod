@@ -8,10 +8,13 @@ replace github.com/Bengo-Hub/shared-auth-client => github.com/Bengo-Hub/auth-cli
 require (
 	ariga.io/atlas v1.1.0
 	entgo.io/ent v0.14.5
+	github.com/Bengo-Hub/cache v0.4.0
 	github.com/Bengo-Hub/httpware v0.5.0
+	github.com/Bengo-Hub/pagination v0.3.0
 	github.com/Bengo-Hub/shared-auth-client v0.0.0-00010101000000-000000000000
 	github.com/Bengo-Hub/shared-events v0.6.1
 	github.com/boombuler/barcode v1.1.0
+	github.com/disintegration/imaging v1.6.2
 	github.com/go-chi/chi/v5 v5.0.12
 	github.com/go-chi/cors v1.2.1
 	github.com/go-pdf/fpdf v0.9.0
@@ -30,8 +33,6 @@ require (
 )
 
 require (
-	github.com/Bengo-Hub/cache v0.4.0 // indirect
-	github.com/Bengo-Hub/pagination v0.3.0 // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/apparentlymart/go-textseg/v15 v15.0.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
@@ -41,7 +42,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
-	github.com/disintegration/imaging v1.6.2 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.8 // indirect
 	github.com/gin-contrib/sse v1.1.0 // indirect
 	github.com/gin-gonic/gin v1.11.0 // indirect

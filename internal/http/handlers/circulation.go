@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -238,7 +239,7 @@ func (h *CirculationHandler) Renew(w http.ResponseWriter, r *http.Request) {
 // @Router /{tenant}/library/circulation/loans [get]
 func (h *CirculationHandler) ListLoans(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := TenantUUID(r)
-	limit, offset := PageParams(r)
+	params := sharedpagination.Parse(r)
 	q := h.db.Loan.Query().Where(loan.TenantID(tenantID))
 	if s := r.URL.Query().Get("status"); s != "" {
 		// "overdue" is a derived view of ACTIVE loans past due, not a stored status.
@@ -257,12 +258,12 @@ func (h *CirculationHandler) ListLoans(w http.ResponseWriter, r *http.Request) {
 		q = q.Where(loan.StatusEQ(loan.StatusACTIVE), loan.DueAtLT(time.Now()))
 	}
 	total, _ := q.Clone().Count(r.Context())
-	rows, err := q.Order(ent.Desc(loan.FieldCheckoutAt)).Limit(limit).Offset(offset).All(r.Context())
+	rows, err := q.Order(ent.Desc(loan.FieldCheckoutAt)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: h.buildLoanResponses(r, tenantID, rows), Total: total})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(h.buildLoanResponses(r, tenantID, rows), total, params))
 }
 
 func (h *CirculationHandler) resolveCopyID(r *http.Request, tenantID uuid.UUID, copyID, barcode string) (uuid.UUID, error) {

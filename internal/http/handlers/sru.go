@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	sharedpagination "github.com/Bengo-Hub/pagination"
 )
 
 // SRU (Search/Retrieve via URL) copy-cataloging import. Unlike binary Z39.50, SRU is plain
@@ -68,7 +70,9 @@ func (h *CatalogHandler) SRUSearch(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadGateway, err.Error(), "sru_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: previews, Total: len(previews)})
+	// The external SRU target is already capped at maximumRecords=10; standardize the envelope
+	// without introducing our own offset pagination over an upstream single-shot search.
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(previews, len(previews), sharedpagination.Params{Limit: len(previews), Offset: 0, Page: 1}))
 }
 
 func fetchSRU(ctx context.Context, target, q string) ([]sruPreview, error) {

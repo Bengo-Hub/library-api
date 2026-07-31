@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -102,12 +103,14 @@ func (h *FineHandler) List(w http.ResponseWriter, r *http.Request) {
 			q = q.Where(fine.MemberID(id))
 		}
 	}
-	rows, err := q.Order(ent.Desc(fine.FieldCreatedAt)).All(r.Context())
+	params := sharedpagination.Parse(r)
+	total, _ := q.Clone().Count(r.Context())
+	rows, err := q.Order(ent.Desc(fine.FieldCreatedAt)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: h.buildFineResponses(r, tenantID, rows), Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(h.buildFineResponses(r, tenantID, rows), total, params))
 }
 
 // AssessMembershipFee creates a membership fee as a fine (type=membership) with a manual amount.

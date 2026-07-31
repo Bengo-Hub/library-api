@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -82,12 +83,14 @@ func (h *CirculationRuleHandler) List(w http.ResponseWriter, r *http.Request) {
 			q = q.Where(cr.BranchIDEQ(id))
 		}
 	}
-	rows, err := q.Order(ent.Asc(cr.FieldBranchID), ent.Asc(cr.FieldTierID)).All(r.Context())
+	params := sharedpagination.Parse(r)
+	total, _ := q.Clone().Count(r.Context())
+	rows, err := q.Order(ent.Asc(cr.FieldBranchID), ent.Asc(cr.FieldTierID)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 // Create inserts a new circulation rule.

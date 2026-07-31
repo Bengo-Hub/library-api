@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -166,7 +167,7 @@ func (h *MemberHandler) singleMemberResponse(r *http.Request, tenantID uuid.UUID
 // @Router /{tenant}/library/members [get]
 func (h *MemberHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := TenantUUID(r)
-	limit, offset := PageParams(r)
+	params := sharedpagination.Parse(r)
 	q := h.db.Member.Query().Where(member.TenantID(tenantID))
 	if s := r.URL.Query().Get("q"); s != "" {
 		q = q.Where(member.Or(member.DisplayNameContainsFold(s), member.MembershipNoContainsFold(s), member.ContactPhoneContainsFold(s), member.ContactEmailContainsFold(s)))
@@ -175,12 +176,12 @@ func (h *MemberHandler) ListMembers(w http.ResponseWriter, r *http.Request) {
 		q = q.Where(member.StatusEQ(member.Status(strings.ToUpper(st))))
 	}
 	total, _ := q.Clone().Count(r.Context())
-	rows, err := q.Order(ent.Desc(member.FieldCreatedAt)).Limit(limit).Offset(offset).All(r.Context())
+	rows, err := q.Order(ent.Desc(member.FieldCreatedAt)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: h.buildMemberResponses(r, tenantID, rows), Total: total})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(h.buildMemberResponses(r, tenantID, rows), total, params))
 }
 
 // CreateMember registers a member, allocating membership_no and emitting member.registered.
@@ -426,14 +427,15 @@ func (h *MemberHandler) MemberLoans(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "bad id", "invalid_request")
 		return
 	}
-	rows, err := h.db.Loan.Query().
-		Where(loan.TenantID(tenantID), loan.MemberID(id)).
-		Order(ent.Desc(loan.FieldCheckoutAt)).All(r.Context())
+	lq := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.MemberID(id))
+	params := sharedpagination.Parse(r)
+	total, _ := lq.Clone().Count(r.Context())
+	rows, err := lq.Order(ent.Desc(loan.FieldCheckoutAt)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 // MemberFines lists a member's fines.
@@ -445,14 +447,15 @@ func (h *MemberHandler) MemberFines(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "bad id", "invalid_request")
 		return
 	}
-	rows, err := h.db.Fine.Query().
-		Where(fine.TenantID(tenantID), fine.MemberID(id)).
-		Order(ent.Desc(fine.FieldCreatedAt)).All(r.Context())
+	fq := h.db.Fine.Query().Where(fine.TenantID(tenantID), fine.MemberID(id))
+	params := sharedpagination.Parse(r)
+	total, _ := fq.Clone().Count(r.Context())
+	rows, err := fq.Order(ent.Desc(fine.FieldCreatedAt)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 // resolveTier returns the explicit tier or a default: tenant default → global default → any

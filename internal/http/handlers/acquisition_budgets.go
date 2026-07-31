@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -39,12 +40,14 @@ func (h *AcquisitionHandler) ListBudgets(w http.ResponseWriter, r *http.Request)
 			q = q.Where(acquisitionbudget.FiscalYearEQ(n))
 		}
 	}
-	rows, err := q.Order(acquisitionbudget.ByFiscalYear()).All(r.Context())
+	params := sharedpagination.Parse(r)
+	total, _ := q.Clone().Count(r.Context())
+	rows, err := q.Order(acquisitionbudget.ByFiscalYear()).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to list budgets", "internal")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 func (h *AcquisitionHandler) CreateBudget(w http.ResponseWriter, r *http.Request) {
@@ -123,14 +126,15 @@ func (h *AcquisitionHandler) ListFunds(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "invalid budget id", "invalid_id")
 		return
 	}
-	rows, err := h.db.AcquisitionFund.Query().
-		Where(acquisitionfund.TenantIDEQ(tenantID), acquisitionfund.BudgetIDEQ(budgetID)).
-		Order(acquisitionfund.ByName()).All(r.Context())
+	fq := h.db.AcquisitionFund.Query().Where(acquisitionfund.TenantIDEQ(tenantID), acquisitionfund.BudgetIDEQ(budgetID))
+	params := sharedpagination.Parse(r)
+	total, _ := fq.Clone().Count(r.Context())
+	rows, err := fq.Order(acquisitionfund.ByName()).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to list funds", "internal")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 func (h *AcquisitionHandler) CreateFund(w http.ResponseWriter, r *http.Request) {

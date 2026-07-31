@@ -17,14 +17,16 @@ import (
 // well beyond one cataloging batch — Avery L7160 at 21/sheet is ~24 sheets, still fast).
 const maxBulkLabels = 500
 
-// printCopyLabelsRequest selects copies to print holding labels for. Exactly one of CopyIDs
-// or BibID must be given as the primary selector; BranchID/Status are optional additional
-// filters layered on top.
+// printCopyLabelsRequest selects copies to print holding labels for. CopyIDs/BibID narrow to a
+// specific set/title when given; BranchID/Status are additional filters that also work ALONE
+// (e.g. "print labels for every available copy at this branch", the library-ui Copies page's
+// "print for current filters" action, which supplies neither CopyIDs nor BibID) — the
+// maxBulkLabels cap below is what actually bounds an unscoped request, not a required selector.
 type printCopyLabelsRequest struct {
 	CopyIDs  []string `json:"copy_ids,omitempty"`
 	BibID    string   `json:"bib_id,omitempty"`    // all copies of one title
-	BranchID string   `json:"branch_id,omitempty"` // combine with status/bib as an additional filter
-	Status   string   `json:"status,omitempty"`    // e.g. "available" — filter by bookcopy status
+	BranchID string   `json:"branch_id,omitempty"` // filters alone or combined with copy_ids/bib_id
+	Status   string   `json:"status,omitempty"`    // e.g. "available" — filters alone or combined
 	Sheet    string   `json:"sheet,omitempty"`     // "l7160" (default) | "5160"
 }
 
@@ -46,16 +48,10 @@ func (h *CatalogHandler) PrintCopyLabels(w http.ResponseWriter, r *http.Request)
 		respondError(w, http.StatusBadRequest, "bad body", "invalid_request")
 		return
 	}
-	hasCopyIDs := len(req.CopyIDs) > 0
-	hasBibID := strings.TrimSpace(req.BibID) != ""
-	if hasCopyIDs == hasBibID {
-		respondError(w, http.StatusBadRequest, "exactly one of copy_ids or bib_id is required", "invalid_request")
-		return
-	}
 
 	q := h.db.BookCopy.Query().Where(bookcopy.TenantID(tenantID))
 
-	if hasCopyIDs {
+	if len(req.CopyIDs) > 0 {
 		ids := make([]uuid.UUID, 0, len(req.CopyIDs))
 		for _, s := range req.CopyIDs {
 			id, err := uuid.Parse(s)
@@ -66,8 +62,8 @@ func (h *CatalogHandler) PrintCopyLabels(w http.ResponseWriter, r *http.Request)
 			ids = append(ids, id)
 		}
 		q = q.Where(bookcopy.IDIn(ids...))
-	} else {
-		bibID, err := uuid.Parse(req.BibID)
+	} else if bibIDStr := strings.TrimSpace(req.BibID); bibIDStr != "" {
+		bibID, err := uuid.Parse(bibIDStr)
 		if err != nil {
 			respondError(w, http.StatusBadRequest, "bad bib_id", "invalid_request")
 			return

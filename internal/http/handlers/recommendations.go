@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"sort"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
@@ -26,7 +27,7 @@ func (h *CatalogHandler) Recommend(w http.ResponseWriter, r *http.Request) {
 	// Copies of this title.
 	copyIDs, _ := h.db.BookCopy.Query().Where(bookcopy.TenantID(tenantID), bookcopy.BibRecordID(bibID)).IDs(ctx)
 	if len(copyIDs) == 0 {
-		respondJSON(w, http.StatusOK, listEnvelope{Data: []any{}, Total: 0})
+		respondJSON(w, http.StatusOK, sharedpagination.NewResponse([]any{}, 0, sharedpagination.Parse(r)))
 		return
 	}
 	// Members who borrowed any copy of this title.
@@ -36,7 +37,7 @@ func (h *CatalogHandler) Recommend(w http.ResponseWriter, r *http.Request) {
 		memberSet[l.MemberID.String()] = true
 	}
 	if len(memberSet) == 0 {
-		respondJSON(w, http.StatusOK, listEnvelope{Data: []any{}, Total: 0})
+		respondJSON(w, http.StatusOK, sharedpagination.NewResponse([]any{}, 0, sharedpagination.Parse(r)))
 		return
 	}
 	memberIDs := make([]string, 0, len(memberSet))
@@ -87,5 +88,5 @@ func (h *CatalogHandler) Recommend(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: recs, Total: len(recs)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(recs, len(recs), sharedpagination.Parse(r)))
 }

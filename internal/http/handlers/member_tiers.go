@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/shopspring/decimal"
 
@@ -99,7 +100,9 @@ func (h *MemberHandler) ListTiers(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, toTierResponse(t))
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
+	params := sharedpagination.Parse(r)
+	page, total := paginateSlice(out, params)
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(page, total, params))
 }
 
 func applyTier(c *ent.MemberTierCreate, req tierRequest) {
@@ -263,7 +266,9 @@ func (h *MemberHandler) ListPolicies(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, toPolicyResponse(p))
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
+	params := sharedpagination.Parse(r)
+	page, total := paginateSlice(out, params)
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(page, total, params))
 }
 
 // CreatePolicy godoc

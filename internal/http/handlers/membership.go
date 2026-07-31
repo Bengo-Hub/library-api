@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 
@@ -38,7 +39,11 @@ func (h *MembershipHandler) List(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	// ListFees returns the full tenant result set from the service layer (query/filter logic
+	// owned by internal/modules/membership), so pagination is applied to the slice here.
+	params := sharedpagination.Parse(r)
+	page, total := paginateSlice(rows, params)
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(page, total, params))
 }
 
 // Issue godoc

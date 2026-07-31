@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 
@@ -95,7 +96,9 @@ func (h *SequenceHandler) List(w http.ResponseWriter, r *http.Request) {
 	for _, s := range rows {
 		out = append(out, toSequenceResponse(s, labelFor(s.Kind)))
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
+	params := sharedpagination.Parse(r)
+	page, total := paginateSlice(out, params)
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(page, total, params))
 }
 
 type sequenceUpdateRequest struct {

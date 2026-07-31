@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/shopspring/decimal"
 
 	"github.com/bengobox/library-service/internal/ent/acquisitionfund"
@@ -84,7 +85,7 @@ func (h *ReportsHandler) MemberActivity(w http.ResponseWriter, r *http.Request) 
 		writeCSV(w, "member-activity.csv", []string{"membership_no", "name", "loans"}, csvRows)
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, len(rows), sharedpagination.Params{Limit: limit, Offset: 0, Page: 1}))
 }
 
 // OverdueAging godoc
@@ -133,7 +134,7 @@ func (h *ReportsHandler) OverdueAging(w http.ResponseWriter, r *http.Request) {
 		writeCSV(w, "overdue-aging.csv", []string{"days_overdue", "count"}, csvRows)
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, len(rows), sharedpagination.Params{Limit: len(rows), Offset: 0, Page: 1}))
 }
 
 // ItemMovement godoc
@@ -188,7 +189,7 @@ func (h *ReportsHandler) ItemMovement(w http.ResponseWriter, r *http.Request) {
 		writeCSV(w, "item-movement.csv", []string{"barcode", "title", "checkouts"}, csvRows)
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, len(rows), sharedpagination.Params{Limit: limit, Offset: 0, Page: 1}))
 }
 
 // FineAging godoc
@@ -239,7 +240,7 @@ func (h *ReportsHandler) FineAging(w http.ResponseWriter, r *http.Request) {
 		writeCSV(w, "fine-aging.csv", []string{"membership_no", "name", "days_old", "outstanding"}, csvRows)
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, len(rows), sharedpagination.Params{Limit: len(rows), Offset: 0, Page: 1}))
 }
 
 // AcquisitionSpend godoc
@@ -456,5 +457,5 @@ func (h *ReportsHandler) MemberActivityTrend(w http.ResponseWriter, r *http.Requ
 		d := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
 		out = append(out, point{Date: d, Count: byDay[d]})
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(out, len(out), sharedpagination.Params{Limit: len(out), Offset: 0, Page: 1}))
 }

@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -55,12 +56,14 @@ func (h *HolidayHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	rows, err := q.Order(ent.Asc(libraryholiday.FieldHolidayDate)).All(r.Context())
+	params := sharedpagination.Parse(r)
+	total, _ := q.Clone().Count(r.Context())
+	rows, err := q.Order(ent.Asc(libraryholiday.FieldHolidayDate)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 // Create inserts a new holiday.

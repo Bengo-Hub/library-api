@@ -8,6 +8,7 @@ import (
 	"time"
 
 	sharedcache "github.com/Bengo-Hub/cache"
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
@@ -224,7 +225,10 @@ func (h *ReportsHandler) Popular(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	// "limit" here is this report's own top-N cutoff (default 10, capped at 50 above), not
+	// generic offset pagination — reuse the shared envelope shape without reinterpreting it
+	// via sharedpagination.Parse (which has different defaults/caps).
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, len(rows), sharedpagination.Params{Limit: limit, Offset: 0, Page: 1}))
 }
 
 // Circulation godoc
@@ -256,7 +260,7 @@ func (h *ReportsHandler) Circulation(w http.ResponseWriter, r *http.Request) {
 		d := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
 		out = append(out, point{Date: d, Checkouts: checkouts[d], Returns: returns[d]})
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(out, len(out), sharedpagination.Params{Limit: len(out), Offset: 0, Page: 1}))
 }
 
 // Overdue godoc
@@ -266,8 +270,10 @@ func (h *ReportsHandler) Circulation(w http.ResponseWriter, r *http.Request) {
 func (h *ReportsHandler) Overdue(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := TenantUUID(r)
 	ctx := r.Context()
-	rows, _ := h.db.Loan.Query().
-		Where(loan.TenantID(tenantID), loan.StatusIn(loan.StatusACTIVE, loan.StatusOVERDUE), loan.DueAtLT(time.Now())).
-		Order(ent.Asc(loan.FieldDueAt)).Limit(200).All(ctx)
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	q := h.db.Loan.Query().
+		Where(loan.TenantID(tenantID), loan.StatusIn(loan.StatusACTIVE, loan.StatusOVERDUE), loan.DueAtLT(time.Now()))
+	params := sharedpagination.Parse(r)
+	total, _ := q.Clone().Count(ctx)
+	rows, _ := q.Order(ent.Asc(loan.FieldDueAt)).Limit(params.Limit).Offset(params.Offset).All(ctx)
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }

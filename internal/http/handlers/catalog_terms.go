@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/google/uuid"
 
 	"github.com/bengobox/library-service/internal/ent"
@@ -52,7 +53,9 @@ func (h *CatalogHandler) ListTerms(w http.ResponseWriter, r *http.Request) {
 		seen[t.Value] = true
 		out = append(out, termResponse{Value: t.Value})
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
+	// This is a fixed-size (<=50) typeahead suggestion list, not a navigable page — the
+	// envelope is standardized for the UI but the underlying query cap is left as-is.
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(out, len(out), sharedpagination.Parse(r)))
 }
 
 // CreateTerm adds a dictionary value (idempotent) so it appears in future pickers.

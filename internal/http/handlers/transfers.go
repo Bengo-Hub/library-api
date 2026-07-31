@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
@@ -22,12 +23,14 @@ func (h *CatalogHandler) ListTransfers(w http.ResponseWriter, r *http.Request) {
 	if s := r.URL.Query().Get("status"); s != "" {
 		q = q.Where(copytransfer.StatusEQ(copytransfer.Status(s)))
 	}
-	rows, err := q.Order(ent.Desc(copytransfer.FieldCreatedAt)).All(r.Context())
+	params := sharedpagination.Parse(r)
+	total, _ := q.Clone().Count(r.Context())
+	rows, err := q.Order(ent.Desc(copytransfer.FieldCreatedAt)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 // CreateTransfer godoc

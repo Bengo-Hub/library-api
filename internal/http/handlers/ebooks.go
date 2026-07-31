@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"time"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -40,12 +41,15 @@ func NewEbookHandler(db *ent.Client, treasuryClient *treasury.Client, ebookRoot 
 // @Router /{tenant}/library/ebooks [get]
 func (h *EbookHandler) List(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := TenantUUID(r)
-	rows, err := h.db.Ebook.Query().Where(ebook.TenantID(tenantID)).All(r.Context())
+	q := h.db.Ebook.Query().Where(ebook.TenantID(tenantID))
+	params := sharedpagination.Parse(r)
+	total, _ := q.Clone().Count(r.Context())
+	rows, err := q.Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 type ebookRequest struct {

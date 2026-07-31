@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -56,12 +57,14 @@ func (h *SerialHandler) ListSubscriptions(w http.ResponseWriter, r *http.Request
 	if s := r.URL.Query().Get("status"); s != "" {
 		q = q.Where(serialsubscription.StatusEQ(serialsubscription.Status(s)))
 	}
-	rows, err := q.Order(serialsubscription.ByStartDate()).All(r.Context())
+	params := sharedpagination.Parse(r)
+	total, _ := q.Clone().Count(r.Context())
+	rows, err := q.Order(serialsubscription.ByStartDate()).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to list subscriptions", "internal")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 func (h *SerialHandler) GetSubscription(w http.ResponseWriter, r *http.Request) {
@@ -255,12 +258,14 @@ func (h *SerialHandler) ListIssues(w http.ResponseWriter, r *http.Request) {
 	if s := r.URL.Query().Get("status"); s != "" {
 		q = q.Where(serialissue.StatusEQ(serialissue.Status(s)))
 	}
-	rows, err := q.Order(serialissue.ByExpectedDate()).All(r.Context())
+	params := sharedpagination.Parse(r)
+	total, _ := q.Clone().Count(r.Context())
+	rows, err := q.Order(serialissue.ByExpectedDate()).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to list issues", "internal")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 func (h *SerialHandler) CreateIssue(w http.ResponseWriter, r *http.Request) {
@@ -430,14 +435,15 @@ func (h *SerialHandler) ListRouting(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "invalid id", "invalid_id")
 		return
 	}
-	rows, err := h.db.SerialRoutingList.Query().
-		Where(serialroutinglist.TenantIDEQ(tenantID), serialroutinglist.SubscriptionIDEQ(subID)).
-		Order(serialroutinglist.ByPosition()).All(r.Context())
+	rq := h.db.SerialRoutingList.Query().Where(serialroutinglist.TenantIDEQ(tenantID), serialroutinglist.SubscriptionIDEQ(subID))
+	params := sharedpagination.Parse(r)
+	total, _ := rq.Clone().Count(r.Context())
+	rows, err := rq.Order(serialroutinglist.ByPosition()).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to list routing", "internal")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 func (h *SerialHandler) AddRouting(w http.ResponseWriter, r *http.Request) {

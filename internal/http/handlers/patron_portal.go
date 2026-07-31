@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -74,11 +75,11 @@ func (h *PatronPortalHandler) MyLoans(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tenantID, _ := TenantUUID(r)
-	rows, _ := h.db.Loan.Query().
-		Where(loan.TenantID(tenantID), loan.MemberID(m.ID)).
-		Order(ent.Desc(loan.FieldCheckoutAt)).
-		Limit(50).All(r.Context())
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	lq := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.MemberID(m.ID))
+	params := sharedpagination.Parse(r)
+	total, _ := lq.Clone().Count(r.Context())
+	rows, _ := lq.Order(ent.Desc(loan.FieldCheckoutAt)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 // MyHolds godoc
@@ -91,11 +92,11 @@ func (h *PatronPortalHandler) MyHolds(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tenantID, _ := TenantUUID(r)
-	rows, _ := h.db.Hold.Query().
-		Where(hold.TenantID(tenantID), hold.MemberID(m.ID), hold.StatusIn(hold.StatusWAITING, hold.StatusREADY)).
-		Order(ent.Asc(hold.FieldPlacedAt)).
-		Limit(50).All(r.Context())
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	hq := h.db.Hold.Query().Where(hold.TenantID(tenantID), hold.MemberID(m.ID), hold.StatusIn(hold.StatusWAITING, hold.StatusREADY))
+	params := sharedpagination.Parse(r)
+	total, _ := hq.Clone().Count(r.Context())
+	rows, _ := hq.Order(ent.Asc(hold.FieldPlacedAt)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 // MyFines godoc
@@ -108,11 +109,11 @@ func (h *PatronPortalHandler) MyFines(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tenantID, _ := TenantUUID(r)
-	rows, _ := h.db.Fine.Query().
-		Where(fine.TenantID(tenantID), fine.MemberID(m.ID), fine.StatusIn(fine.StatusUNPAID, fine.StatusPARTIAL)).
-		Order(ent.Desc(fine.FieldAssessedAt)).
-		Limit(50).All(r.Context())
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	fq := h.db.Fine.Query().Where(fine.TenantID(tenantID), fine.MemberID(m.ID), fine.StatusIn(fine.StatusUNPAID, fine.StatusPARTIAL))
+	params := sharedpagination.Parse(r)
+	total, _ := fq.Clone().Count(r.Context())
+	rows, _ := fq.Order(ent.Desc(fine.FieldAssessedAt)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 // MyPlaceHold godoc

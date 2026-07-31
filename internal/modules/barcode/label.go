@@ -1,6 +1,13 @@
 // Package barcode renders spine/holding labels (CODE128 barcode + call number + title) as
 // PDF, for printing on a standard label printer. Mirrors the inventory-api barcode module's
 // approach (boombuler/barcode + go-pdf/fpdf); kept lean for the library label use case.
+//
+// Single-label (RenderPDF) and bulk-sheet (RenderSheet, in sheet.go) printing share ONE card
+// layout — drawCopyLabelCell in sheet.go — so a layout/content fix only needs to happen once.
+// Before this, RenderPDF had its own separate encode+draw logic that had silently drifted (it
+// never disabled fpdf's auto page-break, which on a page this small caused each row — barcode
+// image, human-readable text, call number, title — to land on its own PAGE instead of stacking
+// in one label; see docs/barcode-labels.md).
 package barcode
 
 import (
@@ -9,7 +16,6 @@ import (
 	"image/png"
 
 	"github.com/boombuler/barcode"
-	"github.com/boombuler/barcode/code128"
 	"github.com/go-pdf/fpdf"
 )
 
@@ -22,41 +28,22 @@ type CopyLabel struct {
 }
 
 // RenderPDF returns a single-label PDF (62mm × 29mm) with a CODE128 barcode and the
-// human-readable barcode, call number and (truncated) title.
+// human-readable barcode, call number and (truncated) title — drawn by the same
+// drawCopyLabelCell used for every cell of a bulk sheet (see RenderSheet in sheet.go), with no
+// tenant-name row (real spine labels carry no branding — see docs/barcode-labels.md).
 func RenderPDF(l CopyLabel) ([]byte, error) {
 	if l.Barcode == "" {
 		return nil, fmt.Errorf("barcode is required")
 	}
-	bc, err := code128.Encode(l.Barcode)
-	if err != nil {
-		return nil, fmt.Errorf("encode barcode: %w", err)
-	}
-	scaled, err := barcode.Scale(bc, 480, 120)
-	if err != nil {
-		return nil, fmt.Errorf("scale barcode: %w", err)
-	}
-	var bcPNG buf
-	if err := encodePNG(&bcPNG, scaled); err != nil {
-		return nil, err
-	}
-
-	pdf := fpdf.NewCustom(&fpdf.InitType{UnitStr: "mm", Size: fpdf.SizeType{Wd: 62, Ht: 29}})
-	pdf.SetMargins(2, 2, 2)
+	const w, h = 62.0, 29.0
+	pdf := fpdf.NewCustom(&fpdf.InitType{UnitStr: "mm", Size: fpdf.SizeType{Wd: w, Ht: h}})
+	pdf.SetMargins(0, 0, 0)
+	pdf.SetAutoPageBreak(false, 0) // the actual bug: without this, fpdf's default break margin
+	// exceeds this label's own height, so every row after the first silently started a new page.
 	pdf.AddPage()
-	opt := fpdf.ImageOptions{ImageType: "PNG", ReadDpi: false}
-	pdf.RegisterImageOptionsReader("bc", opt, bytes.NewReader(bcPNG.Bytes()))
-	pdf.ImageOptions("bc", 4, 3, 54, 12, false, opt, 0, "")
-
-	pdf.SetXY(2, 16)
-	pdf.SetFont("Helvetica", "B", 8)
-	pdf.CellFormat(58, 4, l.Barcode, "", 2, "C", false, 0, "")
-	pdf.SetFont("Helvetica", "", 7)
-	if l.CallNumber != "" {
-		pdf.CellFormat(58, 3.5, trunc(l.CallNumber, 40), "", 2, "C", false, 0, "")
-	}
-	if l.Title != "" {
-		pdf.CellFormat(58, 3.5, trunc(l.Title, 42), "", 2, "C", false, 0, "")
-	}
+	tr := pdf.UnicodeTranslatorFromDescriptor("")
+	imgSeq := 0
+	drawCopyLabelCell(pdf, tr, l, "", 0, 0, w, h, &imgSeq)
 
 	var out bytes.Buffer
 	if err := pdf.Output(&out); err != nil {

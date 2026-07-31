@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
@@ -18,12 +19,15 @@ import (
 // @Router /{tenant}/library/catalog/stocktake [get]
 func (h *CatalogHandler) ListStocktakes(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := TenantUUID(r)
-	rows, err := h.db.StockCount.Query().Where(stockcount.TenantID(tenantID)).Order(ent.Desc(stockcount.FieldCreatedAt)).All(r.Context())
+	q := h.db.StockCount.Query().Where(stockcount.TenantID(tenantID))
+	params := sharedpagination.Parse(r)
+	total, _ := q.Clone().Count(r.Context())
+	rows, err := q.Order(ent.Desc(stockcount.FieldCreatedAt)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 // StartStocktake godoc

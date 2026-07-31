@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
@@ -68,7 +69,11 @@ func (h *CatalogHandler) ListCollections(w http.ResponseWriter, r *http.Request)
 			out = append(out, toCollectionResponse(c))
 		}
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
+	// Global-then-tenant ordering is computed in-memory, so pagination is applied to the
+	// final slice rather than the underlying query.
+	params := sharedpagination.Parse(r)
+	page, total := paginateSlice(out, params)
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(page, total, params))
 }
 
 // CreateCollection godoc

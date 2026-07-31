@@ -3,8 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
-	"strconv"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	authclient "github.com/Bengo-Hub/shared-auth-client"
 	"github.com/google/uuid"
 )
@@ -50,32 +50,31 @@ func Decode(r *http.Request, dst any) error {
 	return json.NewDecoder(r.Body).Decode(dst)
 }
 
-// PageParams parses ?limit & ?offset with sane defaults/caps.
-func PageParams(r *http.Request) (limit, offset int) {
-	limit, offset = 50, 0
-	if v := r.URL.Query().Get("limit"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			limit = n
-		}
-	}
-	if limit > 200 {
-		limit = 200
-	}
-	if v := r.URL.Query().Get("offset"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
-			offset = n
-		}
-	}
-	return limit, offset
-}
-
 // ParseUUIDParam parses a URL path param as a UUID.
 func ParseUUIDParam(v string) (uuid.UUID, error) {
 	return uuid.Parse(v)
 }
 
-// listEnvelope is the uniform list response shape (UI maps `data` + `total`).
-type listEnvelope struct {
-	Data  any `json:"data"`
-	Total int `json:"total"`
+// NOTE: pagination is now handled uniformly via github.com/Bengo-Hub/pagination
+// (see sharedpagination.Parse / sharedpagination.NewResponse). The old PageParams
+// helper and listEnvelope type have been removed in favor of calling the shared
+// package directly at each list-handler call site.
+
+// paginateSlice applies offset/limit pagination to a slice that was already fully
+// materialized in memory (e.g. because the handler dedupes/derives/re-orders rows
+// after fetching them, so DB-level LIMIT/OFFSET can't be applied to the raw query
+// without changing what the page actually represents). The returned sub-slice, together
+// with the original total length, is meant to be passed straight into
+// sharedpagination.NewResponse(page, total, p).
+func paginateSlice[T any](items []T, p sharedpagination.Params) (page []T, total int) {
+	total = len(items)
+	start := p.Offset
+	if start > total {
+		start = total
+	}
+	end := start + p.Limit
+	if end > total {
+		end = total
+	}
+	return items[start:end], total
 }

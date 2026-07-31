@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -53,7 +54,11 @@ func (h *AuthorizedValueHandler) ListCategories(w http.ResponseWriter, r *http.R
 			cats = append(cats, av.Category)
 		}
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: cats, Total: len(cats)})
+	// Categories are derived in-memory (deduped from the raw rows), so pagination is
+	// applied to the final slice rather than the underlying query.
+	params := sharedpagination.Parse(r)
+	page, total := paginateSlice(cats, params)
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(page, total, params))
 }
 
 // List returns all authorized values for a given category.
@@ -70,12 +75,14 @@ func (h *AuthorizedValueHandler) List(w http.ResponseWriter, r *http.Request) {
 		q = q.Where(authorizedvalue.CategoryEQ(cat))
 	}
 
-	rows, err := q.All(r.Context())
+	params := sharedpagination.Parse(r)
+	total, _ := q.Clone().Count(r.Context())
+	rows, err := q.Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: len(rows)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 // Create inserts a new authorized value (tenant-scoped, never global).

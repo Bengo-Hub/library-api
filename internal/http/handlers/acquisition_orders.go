@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
@@ -59,14 +60,14 @@ func (h *AcquisitionHandler) ListOrders(w http.ResponseWriter, r *http.Request) 
 			q = q.Where(purchaseorder.VendorIDEQ(id))
 		}
 	}
-	limit, offset := PageParams(r)
-	total, _ := q.Count(r.Context())
-	rows, err := q.Limit(limit).Offset(offset).Order(purchaseorder.ByCreatedAt()).All(r.Context())
+	params := sharedpagination.Parse(r)
+	total, _ := q.Clone().Count(r.Context())
+	rows, err := q.Limit(params.Limit).Offset(params.Offset).Order(purchaseorder.ByCreatedAt()).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, "failed to list orders", "internal")
 		return
 	}
-	respondJSON(w, http.StatusOK, map[string]any{"data": rows, "total": total})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 func (h *AcquisitionHandler) GetOrder(w http.ResponseWriter, r *http.Request) {

@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	sharedcache "github.com/Bengo-Hub/cache"
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -65,7 +66,7 @@ type bibRequest struct {
 // @Produce json
 // @Param q query string false "Title search"
 // @Param format query string false "PHYSICAL|EBOOK|AUDIOBOOK|PERIODICAL"
-// @Success 200 {object} listEnvelope
+// @Success 200 {object} sharedpagination.Response
 // @Router /{tenant}/library/catalog/bibs [get]
 func (h *CatalogHandler) ListBibs(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := TenantUUID(r)
@@ -73,7 +74,7 @@ func (h *CatalogHandler) ListBibs(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusUnauthorized, "missing tenant", "unauthorized")
 		return
 	}
-	limit, offset := PageParams(r)
+	params := sharedpagination.Parse(r)
 	q := h.db.BibRecord.Query().Where(bibrecord.TenantID(tenantID))
 	if s := r.URL.Query().Get("q"); s != "" {
 		q = q.Where(bibrecord.Or(
@@ -86,12 +87,12 @@ func (h *CatalogHandler) ListBibs(w http.ResponseWriter, r *http.Request) {
 		q = q.Where(bibrecord.FormatEQ(bibrecord.Format(f)))
 	}
 	total, _ := q.Clone().Count(r.Context())
-	rows, err := q.Order(ent.Desc(bibrecord.FieldCreatedAt)).Limit(limit).Offset(offset).All(r.Context())
+	rows, err := q.Order(ent.Desc(bibrecord.FieldCreatedAt)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: rows, Total: total})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
 }
 
 // CreateBib godoc
@@ -239,7 +240,7 @@ type opacRow struct {
 // @Router /{tenant}/library/catalog/search [get]
 func (h *CatalogHandler) Search(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := TenantUUID(r)
-	limit, offset := PageParams(r)
+	params := sharedpagination.Parse(r)
 	qp := r.URL.Query()
 	s := qp.Get("q")
 
@@ -289,7 +290,7 @@ func (h *CatalogHandler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	total, _ := q.Clone().Count(r.Context())
-	rows, err := q.Order(ent.Desc(bibrecord.FieldCreatedAt)).Limit(limit).Offset(offset).All(r.Context())
+	rows, err := q.Order(ent.Desc(bibrecord.FieldCreatedAt)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "search_failed")
 		return
@@ -304,7 +305,7 @@ func (h *CatalogHandler) Search(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, opacRow{BibRecord: b, TotalCopies: totalByBib[b.ID], AvailableCopies: avail})
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: total})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(out, total, params))
 }
 
 // copyCountsByBib batch-resolves total and available copy counts for a page of bib rows via two

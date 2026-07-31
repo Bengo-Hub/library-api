@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -73,7 +74,9 @@ func (h *HoldHandler) List(w http.ResponseWriter, r *http.Request) {
 			q = q.Where(hold.MemberID(id))
 		}
 	}
-	rows, err := q.Order(ent.Asc(hold.FieldQueuePosition)).All(ctx)
+	params := sharedpagination.Parse(r)
+	total, _ := q.Clone().Count(ctx)
+	rows, err := q.Order(ent.Asc(hold.FieldQueuePosition)).Limit(params.Limit).Offset(params.Offset).All(ctx)
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
@@ -118,7 +121,7 @@ func (h *HoldHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 		out = append(out, resp)
 	}
-	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: len(out)})
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(out, total, params))
 }
 
 type holdRequest struct {
