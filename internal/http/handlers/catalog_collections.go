@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 
 	"github.com/bengobox/library-service/internal/ent"
 	"github.com/bengobox/library-service/internal/ent/bibrecord"
@@ -103,6 +105,7 @@ func (h *CatalogHandler) CreateCollection(w http.ResponseWriter, r *http.Request
 		respondError(w, http.StatusInternalServerError, err.Error(), "create_failed")
 		return
 	}
+	h.invalidateFacets(r.Context(), tenantID)
 	respondJSON(w, http.StatusCreated, toCollectionResponse(row))
 }
 
@@ -147,6 +150,7 @@ func (h *CatalogHandler) UpdateCollection(w http.ResponseWriter, r *http.Request
 		respondError(w, http.StatusInternalServerError, err.Error(), "update_failed")
 		return
 	}
+	h.invalidateFacets(r.Context(), tenantID)
 	respondJSON(w, http.StatusOK, toCollectionResponse(row))
 }
 
@@ -186,5 +190,16 @@ func (h *CatalogHandler) DeleteCollection(w http.ResponseWriter, r *http.Request
 		respondError(w, http.StatusInternalServerError, err.Error(), "delete_failed")
 		return
 	}
+	h.invalidateFacets(r.Context(), tenantID)
 	respondJSON(w, http.StatusOK, map[string]any{"deleted": true})
+}
+
+// invalidateFacets drops the cached Facets payload after a collection add/edit/delete so the
+// OPAC filter UI reflects the change immediately instead of waiting out the TTL. No-op when the
+// cache is unconfigured.
+func (h *CatalogHandler) invalidateFacets(ctx context.Context, tenantID uuid.UUID) {
+	if h.cache == nil {
+		return
+	}
+	h.cache.Invalidate(ctx, facetsCacheKey(tenantID))
 }

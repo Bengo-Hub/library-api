@@ -3,7 +3,7 @@
 **Service:** library-api
 **Language:** Go 1.26
 **Production domain:** `libraryapi.codevertexafrica.com`
-**Last updated:** 2026-06-26
+**Last updated:** 2026-07-31
 **Status:** Phase 1 (MVP) shipped — full backend + frontend. Catalog/OPAC, circulation (checkout/return/renew + holds + in-house reading), members/tiers/policies, fines + membership fees, and e-books (in-browser reader + Controlled Digital Lending) are live, with auth/SSO, treasury, notifications, subscriptions and outbox plumbing wired.
 
 ---
@@ -70,8 +70,8 @@ All four pillars + full platform plumbing.
 | 1 | E-book one-time purchase (`ebookpurchase`) settled via treasury `ebook_sale` intent (`POST /ebooks/{id}/purchase`) | ✅ Done |
 | 2 | Token-gated secured download (`GET /ebooks/{id}/download`, PAID-purchase + `download_count`); treasury reconcile extended to `ebook_sale` | ✅ Done (byte-stream + per-purchase watermark hardening pending) |
 | 3 | Swagger/OpenAPI handler (`/v1/docs`, `/api/v1/openapi.json`) | ✅ Done |
-| 4 | Notifications templates + consumer (overdue notices, hold-ready, fine assessed, fee due) | ⏳ Planned |
-| 5 | Membership-fee automation + dunning | ⏳ Planned |
+| 4 | Notifications templates + consumer (overdue notices, hold-ready, fine assessed, fee due) | ✅ Done |
+| 5 | Membership-fee automation + dunning | ✅ Done |
 
 ### Phase 3 — Advanced OPAC / MARC
 

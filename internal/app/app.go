@@ -17,6 +17,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 
+	sharedcache "github.com/Bengo-Hub/cache"
 	authclient "github.com/Bengo-Hub/shared-auth-client"
 	eventslib "github.com/Bengo-Hub/shared-events"
 
@@ -56,6 +57,7 @@ type App struct {
 	patronCategoryScheduler *membership.PatronCategoryScheduler
 	serialIssueScheduler    *handlers.SerialIssueScheduler
 	paymentConsumer       *consumers.PaymentConsumer
+	authConsumer          *consumers.AuthEventsConsumer
 }
 
 // New constructs and wires the application.
@@ -134,6 +136,9 @@ func New(ctx context.Context) (*App, error) {
 		log.Info("outbox background publisher started")
 	}
 
+	// Cache-aside (Redis); nil-safe — every caller falls back to a live fetch when unset.
+	cacheAside := sharedcache.New(redisClient, log)
+
 	// RBAC (seed global roles once).
 	rbacService := rbac.NewService(ormClient, log)
 	if err := rbacService.SeedGlobalRoles(ctx); err != nil {
@@ -189,14 +194,14 @@ func New(ctx context.Context) (*App, error) {
 		Log:            log,
 		Health:         healthHandler,
 		Auth:           handlers.NewAuthHandler(rbacService, log),
-		Catalog:        handlers.NewCatalogHandler(ormClient, secretStore, cfg.Media.Root, log),
+		Catalog:        handlers.NewCatalogHandler(ormClient, secretStore, cfg.Media.Root, cacheAside, log),
 		Branch:         handlers.NewBranchHandler(ormClient, log),
 		Member:         handlers.NewMemberHandler(ormClient, marketflowClient, log),
 		Circulation:    handlers.NewCirculationHandler(ormClient, circulationSvc, log),
 		Hold:           handlers.NewHoldHandler(ormClient, log),
 		Fine:           handlers.NewFineHandler(ormClient, treasuryClient, log),
 		Ebook:          handlers.NewEbookHandler(ormClient, treasuryClient, cfg.Media.EbookRoot, log),
-		Reports:        handlers.NewReportsHandler(ormClient, log),
+		Reports:        handlers.NewReportsHandler(ormClient, cacheAside, log),
 		RBACHandler:    handlers.NewRBACHandler(rbacService, log),
 		Membership:     handlers.NewMembershipHandler(ormClient, membershipSvc, treasuryClient, log),
 		Sequence:       handlers.NewSequenceHandler(ormClient, log),
@@ -253,6 +258,7 @@ func New(ctx context.Context) (*App, error) {
 		patronCategoryScheduler: membership.NewPatronCategoryScheduler(ormClient, log),
 		serialIssueScheduler:    handlers.NewSerialIssueScheduler(ormClient, log),
 		paymentConsumer:         consumers.NewPaymentConsumer(ormClient, log),
+		authConsumer:            consumers.NewAuthEventsConsumer(log, rbacService, ormClient),
 	}, nil
 }
 
@@ -281,6 +287,13 @@ func (a *App) Run(ctx context.Context) error {
 			} else {
 				a.log.Info("treasury payment reconcile consumer started")
 			}
+		}
+	}
+
+	// auth-service user/PIN event consumer (roles + terminal PIN provisioning).
+	if a.authConsumer != nil {
+		if err := a.authConsumer.Start(ctx, a.events); err != nil {
+			a.log.Warn("auth events consumer not started", zap.Error(err))
 		}
 	}
 

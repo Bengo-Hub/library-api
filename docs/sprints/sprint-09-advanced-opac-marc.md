@@ -14,13 +14,13 @@ Phase-3 catalog depth. Builds on the existing `BibRecord` (with `marc`/`dublin_c
 ## Task Checklist
 
 ### Faceted full-text OPAC
-- [ ] Add a Postgres `tsvector` column (title/subtitle/authors/subjects/summary) with a GIN index + `pg_trgm` for fuzzy/typo-tolerant matching (Atlas migration).
+- [ ] Add a Postgres `tsvector` column (title/subtitle/authors/subjects/summary) with a GIN index + `pg_trgm` for fuzzy/typo-tolerant matching (Atlas migration). *(2026-07-31 audit: reconfirmed still open — OPAC search remains ent-based ILIKE/facets, no tsvector/pg_trgm migration exists.)*
 - [ ] `GET /catalog/search` upgraded: ranked full-text + facets (author, subject, collection, format, language, availability, publication year).
 - [ ] `GET /catalog/facets` — facet counts for the current query.
 - [ ] Availability facet computed from live copy status per branch.
 
 ### Authority control
-- [ ] `GET/POST/PUT /catalog/authors`, `/catalog/publishers`, `/catalog/subjects` (CRUD + merge/dedupe).
+- [ ] `GET/POST/PUT /catalog/authors`, `/catalog/publishers`, `/catalog/subjects` (CRUD + merge/dedupe). *(2026-07-31 audit: backend still not built — reconfirmed open. The plan is to close this out via the UI side instead of building the backend: `library-ui`'s dead calls to these never-implemented endpoints (`lib/api/catalog.ts`) are slated for removal, which will resolve the UI half of this item, but the sprint item/backend CRUD itself remains open until then.)*
 - [ ] Subject hierarchy browse (parent/child) under LCSH/DDC/LOCAL schemes.
 - [ ] Link bibs to authority records (replace/augment denormalized `authors` JSON).
 - [ ] `POST /catalog/bibs/{id}/cover` — cover image upload to the media PVC.

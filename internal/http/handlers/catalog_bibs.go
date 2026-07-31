@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	sharedcache "github.com/Bengo-Hub/cache"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -24,13 +25,14 @@ type CatalogHandler struct {
 	db        *ent.Client
 	secrets   *secrets.Store // platform secret store; supplies the optional ISBNdb key for lookups
 	mediaRoot string         // on-disk media root (cover uploads); "" disables uploads
+	cache     *sharedcache.Aside // may be nil (Redis unconfigured) — callers fall back to a live fetch
 	log       *zap.Logger
 }
 
 // NewCatalogHandler builds the catalog handler. secretStore may be nil (ISBNdb enrichment off);
-// mediaRoot may be "" (cover upload disabled).
-func NewCatalogHandler(db *ent.Client, secretStore *secrets.Store, mediaRoot string, log *zap.Logger) *CatalogHandler {
-	return &CatalogHandler{db: db, secrets: secretStore, mediaRoot: mediaRoot, log: log}
+// mediaRoot may be "" (cover upload disabled); cache may be nil (Redis unconfigured).
+func NewCatalogHandler(db *ent.Client, secretStore *secrets.Store, mediaRoot string, cache *sharedcache.Aside, log *zap.Logger) *CatalogHandler {
+	return &CatalogHandler{db: db, secrets: secretStore, mediaRoot: mediaRoot, cache: cache, log: log}
 }
 
 // bibRequest is the create/update payload for a bibliographic record.
@@ -44,7 +46,6 @@ type bibRequest struct {
 	Format        string   `json:"format"`
 	Language      string   `json:"language"`
 	DDC           string   `json:"ddc_classification"`
-	CallNumber    string   `json:"lc_call_number"`
 	PublishYear   int      `json:"publication_year"`
 	PageCount     int      `json:"page_count"`
 	Summary           string   `json:"summary"`
@@ -294,17 +295,60 @@ func (h *CatalogHandler) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	onlyAvailable := qp.Get("available") == "true"
+	totalByBib, availByBib := h.copyCountsByBib(r.Context(), tenantID, rows)
 	out := make([]opacRow, 0, len(rows))
 	for _, b := range rows {
-		totalCopies, _ := h.db.BookCopy.Query().Where(bookcopy.TenantID(tenantID), bookcopy.BibRecordID(b.ID)).Count(r.Context())
-		avail, _ := h.db.BookCopy.Query().Where(bookcopy.TenantID(tenantID), bookcopy.BibRecordID(b.ID), bookcopy.StatusEQ(bookcopy.StatusAVAILABLE)).Count(r.Context())
+		avail := availByBib[b.ID]
 		if onlyAvailable && avail == 0 {
 			continue
 		}
-		out = append(out, opacRow{BibRecord: b, TotalCopies: totalCopies, AvailableCopies: avail})
+		out = append(out, opacRow{BibRecord: b, TotalCopies: totalByBib[b.ID], AvailableCopies: avail})
 	}
 	respondJSON(w, http.StatusOK, listEnvelope{Data: out, Total: total})
 }
+
+// copyCountsByBib batch-resolves total and available copy counts for a page of bib rows via two
+// grouped-count queries (instead of two Count() queries per row, which previously scaled 2x with
+// page size — see reference_library_pin_sso_gap for the full N+1 writeup).
+func (h *CatalogHandler) copyCountsByBib(ctx context.Context, tenantID uuid.UUID, rows []*ent.BibRecord) (total, available map[uuid.UUID]int) {
+	total, available = map[uuid.UUID]int{}, map[uuid.UUID]int{}
+	if len(rows) == 0 {
+		return total, available
+	}
+	bibIDs := make([]uuid.UUID, 0, len(rows))
+	for _, b := range rows {
+		bibIDs = append(bibIDs, b.ID)
+	}
+
+	type countRow struct {
+		BibRecordID uuid.UUID `json:"bib_record_id"`
+		Count       int       `json:"count"`
+	}
+	var totalCounts []countRow
+	if err := h.db.BookCopy.Query().
+		Where(bookcopy.TenantID(tenantID), bookcopy.BibRecordIDIn(bibIDs...)).
+		GroupBy(bookcopy.FieldBibRecordID).
+		Aggregate(ent.Count()).
+		Scan(ctx, &totalCounts); err == nil {
+		for _, c := range totalCounts {
+			total[c.BibRecordID] = c.Count
+		}
+	}
+	var availCounts []countRow
+	if err := h.db.BookCopy.Query().
+		Where(bookcopy.TenantID(tenantID), bookcopy.BibRecordIDIn(bibIDs...), bookcopy.StatusEQ(bookcopy.StatusAVAILABLE)).
+		GroupBy(bookcopy.FieldBibRecordID).
+		Aggregate(ent.Count()).
+		Scan(ctx, &availCounts); err == nil {
+		for _, c := range availCounts {
+			available[c.BibRecordID] = c.Count
+		}
+	}
+	return total, available
+}
+
+// facetsCacheKey scopes the cached facet payload per tenant.
+func facetsCacheKey(tenantID uuid.UUID) string { return "library:catalog:facets:" + tenantID.String() }
 
 // Facets godoc
 // @Summary Facet values for the OPAC filter UI (formats + collections + subjects + languages)
@@ -313,20 +357,42 @@ func (h *CatalogHandler) Search(w http.ResponseWriter, r *http.Request) {
 func (h *CatalogHandler) Facets(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := TenantUUID(r)
 	ctx := r.Context()
-	subjects, _ := h.db.Subject.Query().Where(subject.TenantID(tenantID)).All(ctx)
-	collections, _ := h.db.Collection.Query().
-		Where(collection.Or(collection.TenantID(tenantID), collection.TenantID(refdata.GlobalTenantID))).
-		Order(ent.Asc(collection.FieldName)).All(ctx)
-	branches, _ := h.db.Branch.Query().Where(branch.TenantID(tenantID)).All(ctx)
-	languages, _ := h.db.BibRecord.Query().Where(bibrecord.TenantID(tenantID)).
-		GroupBy(bibrecord.FieldLanguage).Strings(ctx)
-	respondJSON(w, http.StatusOK, map[string]any{
-		"formats":     []string{"PHYSICAL", "EBOOK", "AUDIOBOOK", "PERIODICAL"},
-		"subjects":    subjects,
-		"collections": collections,
-		"branches":    branches,
-		"languages":   languages,
-	})
+
+	fetch := func(ctx context.Context) (map[string]any, error) {
+		subjects, _ := h.db.Subject.Query().Where(subject.TenantID(tenantID)).All(ctx)
+		collections, _ := h.db.Collection.Query().
+			Where(collection.Or(collection.TenantID(tenantID), collection.TenantID(refdata.GlobalTenantID))).
+			Order(ent.Asc(collection.FieldName)).All(ctx)
+		branches, _ := h.db.Branch.Query().Where(branch.TenantID(tenantID)).All(ctx)
+		languages, _ := h.db.BibRecord.Query().Where(bibrecord.TenantID(tenantID)).
+			GroupBy(bibrecord.FieldLanguage).Strings(ctx)
+		return map[string]any{
+			"formats":     []string{"PHYSICAL", "EBOOK", "AUDIOBOOK", "PERIODICAL"},
+			"subjects":    subjects,
+			"collections": collections,
+			"branches":    branches,
+			"languages":   languages,
+		}, nil
+	}
+
+	var (
+		out map[string]any
+		err error
+	)
+	// Reference-ish data (subjects/collections/branches/languages): cache-aside instead of 4
+	// live queries on every catalog page load. Collection changes invalidate below; a newly
+	// added branch/subject can take up to the TTL to appear in facets (best-effort — both are
+	// admin-configured infrequently, unlike collections which cataloging staff edit routinely).
+	if h.cache != nil {
+		out, err = sharedcache.GetOrSet(ctx, h.cache, facetsCacheKey(tenantID), sharedcache.TTLReference, fetch)
+	} else {
+		out, err = fetch(ctx)
+	}
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "facets_failed")
+		return
+	}
+	respondJSON(w, http.StatusOK, out)
 }
 
 // ISBNLookup is implemented in isbn_lookup.go (local DB -> Google Books -> Open Library ->
@@ -356,9 +422,6 @@ func applyBibFields(c *ent.BibRecordCreate, req bibRequest) {
 	}
 	if req.DDC != "" {
 		c.SetDdcClassification(req.DDC)
-	}
-	if req.CallNumber != "" {
-		c.SetLcCallNumber(req.CallNumber)
 	}
 	if req.PublishYear > 0 {
 		c.SetPublicationYear(req.PublishYear)
@@ -421,9 +484,6 @@ func applyBibUpdate(u *ent.BibRecordUpdateOne, req bibRequest) {
 	}
 	if req.DDC != "" {
 		u.SetDdcClassification(req.DDC)
-	}
-	if req.CallNumber != "" {
-		u.SetLcCallNumber(req.CallNumber)
 	}
 	if req.PublishYear > 0 {
 		u.SetPublicationYear(req.PublishYear)

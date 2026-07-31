@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	sharedcache "github.com/Bengo-Hub/cache"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/bengobox/library-service/internal/ent"
@@ -48,17 +49,35 @@ func (h *CatalogHandler) ISBNLookup(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := TenantUUID(r)
 	isbn := cleanISBN(chi.URLParam(r, "isbn"))
 
-	// 1. Local hit first (tenant-scoped) — same flat shape so the UI prefill is identical.
+	// 1. Local hit first (tenant-scoped) — same flat shape so the UI prefill is identical. Never
+	// cached: it's one indexed lookup, and a just-cataloged title must be visible immediately.
 	if local, err := h.db.BibRecord.Query().Where(bibrecord.TenantID(tenantID),
 		bibrecord.Or(bibrecord.Isbn13(isbn), bibrecord.Isbn10(isbn))).First(r.Context()); err == nil {
 		respondJSON(w, http.StatusOK, localBibToMetadata(local, isbn))
 		return
 	}
 
-	// 2..4. External free/keyless providers. They are run CONCURRENTLY under one short
-	// overall budget so total latency ≈ the slowest single provider (not the sum), and the
-	// cataloging UI is never blocked: on a miss/timeout we still return 200 fast with the
-	// echoed ISBN so the librarian can type details manually. Never a 5xx for a miss.
+	// External-provider result cache: two staff cataloging the same title within the TTL window
+	// (a common case — new stock arrives in batches of the same title) shouldn't each re-fan-out
+	// to Google Books/Open Library/LoC for an identical ISBN.
+	if h.cache != nil {
+		if cached, err := sharedcache.GetOrSet(r.Context(), h.cache, isbnLookupCacheKey(isbn), sharedcache.TTLOperational,
+			func(ctx context.Context) (isbnMetadata, error) { return h.fetchExternalIsbnMetadata(ctx, isbn), nil }); err == nil {
+			respondJSON(w, http.StatusOK, cached)
+			return
+		}
+	}
+	respondJSON(w, http.StatusOK, h.fetchExternalIsbnMetadata(r.Context(), isbn))
+}
+
+func isbnLookupCacheKey(isbn string) string { return "library:catalog:isbn:" + isbn }
+
+// fetchExternalIsbnMetadata cascades the external free/keyless providers, run CONCURRENTLY under
+// one short overall budget so total latency ≈ the slowest single provider (not the sum). The
+// cataloging UI is never blocked: on a miss/timeout this still returns fast with the echoed ISBN
+// so the librarian can type details manually. Never errors on a miss — a zero-value/empty-source
+// result is a valid (cacheable) outcome.
+func (h *CatalogHandler) fetchExternalIsbnMetadata(ctx context.Context, isbn string) isbnMetadata {
 	out := isbnMetadata{ISBN: isbn}
 
 	type result struct {
@@ -68,7 +87,7 @@ func (h *CatalogHandler) ISBNLookup(w http.ResponseWriter, r *http.Request) {
 	}
 	// Overall budget across all providers. Each provider call additionally self-caps (~3s)
 	// in httpGetJSON/fetchSRU; this ctx guarantees the handler returns even if a host hangs.
-	gctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+	gctx, cancel := context.WithTimeout(ctx, 4*time.Second)
 	defer cancel()
 
 	providers := []struct {
@@ -83,8 +102,8 @@ func (h *CatalogHandler) ISBNLookup(w http.ResponseWriter, r *http.Request) {
 	// ISBNdb (priority 0 = richest: covers + synopsis) only when a platform API key is
 	// configured. The key is stored encrypted in ServiceConfig (platform settings), never env.
 	if h.secrets != nil {
-		if apiKey, ok := h.secrets.GetSecret(r.Context(), secrets.KeyISBNdbAPIKey); ok {
-			baseURL, hasBase := h.secrets.GetConfig(r.Context(), secrets.KeyISBNdbBaseURL)
+		if apiKey, ok := h.secrets.GetSecret(ctx, secrets.KeyISBNdbAPIKey); ok {
+			baseURL, hasBase := h.secrets.GetConfig(ctx, secrets.KeyISBNdbBaseURL)
 			if !hasBase {
 				baseURL = secrets.ISBNdbDefaultBaseURL
 			}
@@ -136,7 +155,7 @@ merge:
 	} else {
 		out.Source = strings.Join(sources, "+")
 	}
-	respondJSON(w, http.StatusOK, out)
+	return out
 }
 
 // cleanISBN strips everything that is not a digit or X (case-insensitive).

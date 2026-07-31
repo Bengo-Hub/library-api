@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	sharedcache "github.com/Bengo-Hub/cache"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
@@ -22,13 +23,14 @@ import (
 
 // ReportsHandler serves dashboard/summary endpoints.
 type ReportsHandler struct {
-	db  *ent.Client
-	log *zap.Logger
+	db    *ent.Client
+	cache *sharedcache.Aside // may be nil (Redis unconfigured) — Summary then always computes live
+	log   *zap.Logger
 }
 
-// NewReportsHandler builds the reports handler.
-func NewReportsHandler(db *ent.Client, log *zap.Logger) *ReportsHandler {
-	return &ReportsHandler{db: db, log: log}
+// NewReportsHandler builds the reports handler. cache may be nil (Redis unconfigured).
+func NewReportsHandler(db *ent.Client, cache *sharedcache.Aside, log *zap.Logger) *ReportsHandler {
+	return &ReportsHandler{db: db, cache: cache, log: log}
 }
 
 // Summary godoc
@@ -38,6 +40,31 @@ func NewReportsHandler(db *ent.Client, log *zap.Logger) *ReportsHandler {
 func (h *ReportsHandler) Summary(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := TenantUUID(r)
 	ctx := r.Context()
+
+	fetch := func(ctx context.Context) (map[string]any, error) {
+		return h.buildSummary(ctx, tenantID), nil
+	}
+	var (
+		out map[string]any
+		err error
+	)
+	if h.cache != nil {
+		// Dashboard summary tolerates a short staleness window in exchange for not issuing ~13
+		// sequential COUNT queries on every dashboard load (see reference_library_pin_sso_gap for
+		// why library-api previously had no cache-aside adoption at all).
+		out, err = sharedcache.GetOrSet(ctx, h.cache, "library:reports:summary:"+tenantID.String(), sharedcache.TTLOperational, fetch)
+	} else {
+		out, err = fetch(ctx)
+	}
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "summary_failed")
+		return
+	}
+	respondJSON(w, http.StatusOK, out)
+}
+
+// buildSummary computes the dashboard summary counts live (cache miss / cache disabled path).
+func (h *ReportsHandler) buildSummary(ctx context.Context, tenantID uuid.UUID) map[string]any {
 	now := time.Now()
 	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
@@ -60,7 +87,7 @@ func (h *ReportsHandler) Summary(w http.ResponseWriter, r *http.Request) {
 		outstanding = outstanding.Add(f.Amount.Sub(f.AmountPaid))
 	}
 
-	respondJSON(w, http.StatusOK, map[string]any{
+	return map[string]any{
 		"active_loans":      activeLoans,
 		"overdue_loans":     overdue,
 		"holds_ready":       holdsReady,
@@ -75,7 +102,7 @@ func (h *ReportsHandler) Summary(w http.ResponseWriter, r *http.Request) {
 		"returns_today":     returnsToday,
 		"circulation_trend": h.circulationTrend(ctx, tenantID, 14),
 		"popular_titles":    h.popularTitles(ctx, tenantID, 30, 5),
-	})
+	}
 }
 
 // circulationTrend returns daily checkout/return counts for the last n days (oldest first).

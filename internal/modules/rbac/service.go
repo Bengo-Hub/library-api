@@ -67,6 +67,9 @@ func staffPermissions() []string {
 		"library.stocktake.view", "library.stocktake.add", "library.stocktake.scan", "library.stocktake.finalize", "library.stocktake.manage",
 		"library.membership_fees.view", "library.membership_fees.add", "library.membership_fees.pay",
 		"library.reports.view",
+		// Circulation-desk staff must be able to view their own Team page and set their own PIN
+		// without needing a full library_admin (tenant-admin) grant.
+		"library.team.view", "library.team.manage",
 	)
 	return out
 }
@@ -196,6 +199,74 @@ func (s *Service) resolveSSOBranchID(ctx context.Context, tenantID uuid.UUID, cl
 		}
 	}
 	return ""
+}
+
+// SyncUserFromEvent upserts the local LibraryUser from an auth.user.{created,updated,pin_set}
+// NATS event, mapping global roles and reconciling the SSO-linked branch. Mirrors
+// EnsureUserFromToken's upsert/merge logic but takes already-unpacked event fields instead of
+// JWT claims, since the auth-events consumer has no JWT to read (see reference_library_pin_sso_gap
+// for why library-api previously had no consumer for these events at all).
+//
+// globalRoles empty means the event carried no role info (e.g. a profile-only update) — roles
+// are left untouched rather than downgraded. outletID follows auth-api's pointer convention:
+// nil = no change, non-nil-empty = clear, non-nil-non-empty = set.
+func (s *Service) SyncUserFromEvent(ctx context.Context, tenantID uuid.UUID, userID, email, displayName string, globalRoles []string, outletID *string) error {
+	var roles []string
+	if len(globalRoles) > 0 {
+		roles = MapGlobalRoles(globalRoles)
+	}
+
+	var branchID string
+	if outletID != nil && *outletID != "" {
+		if oid, err := uuid.Parse(*outletID); err == nil {
+			if b, berr := s.db.Branch.Query().Where(branch.TenantID(tenantID), branch.OutletID(oid)).First(ctx); berr == nil {
+				branchID = b.ID.String()
+			}
+		}
+	}
+
+	existing, err := s.db.LibraryUser.Query().
+		Where(libraryuser.TenantID(tenantID), libraryuser.UserID(userID)).
+		Only(ctx)
+	if ent.IsNotFound(err) {
+		c := s.db.LibraryUser.Create().SetTenantID(tenantID).SetUserID(userID)
+		if email != "" {
+			c.SetEmail(email)
+		}
+		if displayName != "" {
+			c.SetDisplayName(displayName)
+		}
+		if len(roles) > 0 {
+			c.SetRoles(roles)
+		}
+		if branchID != "" {
+			c.SetBranchIds([]string{branchID})
+		}
+		_, cerr := c.Save(ctx)
+		return cerr
+	} else if err != nil {
+		return err
+	}
+
+	u := s.db.LibraryUser.UpdateOne(existing)
+	if email != "" {
+		u.SetEmail(email)
+	}
+	if displayName != "" {
+		u.SetDisplayName(displayName)
+	}
+	if len(roles) > 0 {
+		u.SetRoles(mergeUnique(existing.Roles, roles))
+	}
+	if outletID != nil {
+		if *outletID == "" {
+			u.SetBranchIds([]string{})
+		} else if branchID != "" {
+			u.SetBranchIds(mergeUnique(existing.BranchIds, []string{branchID}))
+		}
+	}
+	_, err = u.Save(ctx)
+	return err
 }
 
 // HasAnyPermission resolves the user's local role permissions and reports whether any of

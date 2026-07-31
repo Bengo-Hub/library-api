@@ -19,7 +19,7 @@ Phase-4 operational maturity + the deferred items from earlier sprints (notifica
 - [ ] Security-gate integration: emit a gate-alert event when an un-checked-out copy passes (`library.security.alert`).
 
 ### Offline staff desk
-- [ ] Offline circulation queue: idempotent checkout/return with a `client_reference`/Idempotency-Key end-to-end (mirror the POS offline pattern).
+- [x] Offline circulation queue: idempotent checkout/return with a `client_reference`/Idempotency-Key end-to-end (mirror the POS offline pattern). *(2026-07-31 audit: confirmed shipped — `Loan.client_reference` (migration `20260626175055_add_loan_client_reference.sql`), `Checkout` is get-or-create on it in `internal/modules/circulation/service.go` + `internal/http/handlers/circulation.go`; library-ui `lib/offline-queue.ts` replays on reconnect.)*
 - [ ] Conflict resolution + dead-letter for un-syncable transactions.
 
 ### Inter-branch logistics

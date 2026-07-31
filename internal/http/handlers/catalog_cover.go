@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/disintegration/imaging"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 
@@ -17,6 +18,11 @@ import (
 
 // maxCoverBytes caps an uploaded cover image (8 MB).
 const maxCoverBytes = 8 << 20
+
+// coverThumbWidth is the max width (px) of the generated grid/list thumbnail; height scales
+// proportionally. Catalog grid cards previously served the full-resolution original (up to 8 MB)
+// for every thumbnail, which is the main driver of slow catalog page loads.
+const coverThumbWidth = 320
 
 // UploadCover godoc
 // @Summary Upload a bib cover image (front or back) to the media store
@@ -90,8 +96,22 @@ func (h *CatalogHandler) UploadCover(w http.ResponseWriter, r *http.Request) {
 	}
 	dst.Close()
 
+	// Best-effort thumbnail for grid/list views; the full-resolution original stays available for
+	// the cover preview modal / detail page. A failure here (e.g. unsupported source format for
+	// re-encoding) is not fatal to the upload — callers fall back to the original if no thumb URL.
+	thumbFname := fmt.Sprintf("%s_%s_thumb%s", bib.ID.String(), side, ext)
+	if err := writeCoverThumbnail(filepath.Join(dir, fname), filepath.Join(dir, thumbFname)); err != nil {
+		h.log.Warn("cover thumbnail generation failed", zap.Error(err), zap.String("bib_id", bib.ID.String()))
+		thumbFname = ""
+	}
+
 	// Absolute URL so the UI <img> (on the UI host) can load it from the API/media host directly.
-	url := fmt.Sprintf("%s/media/covers/%s/%s", publicBaseURL(r), tenantID.String(), fname)
+	base := fmt.Sprintf("%s/media/covers/%s", publicBaseURL(r), tenantID.String())
+	url := base + "/" + fname
+	thumbURL := ""
+	if thumbFname != "" {
+		thumbURL = base + "/" + thumbFname
+	}
 
 	upd := h.db.BibRecord.UpdateOneID(bib.ID)
 	if side == "back" {
@@ -103,7 +123,19 @@ func (h *CatalogHandler) UploadCover(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err.Error(), "update_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, map[string]any{"cover_url": url, "side": side})
+	respondJSON(w, http.StatusOK, map[string]any{"cover_url": url, "cover_thumb_url": thumbURL, "side": side})
+}
+
+// writeCoverThumbnail decodes the just-saved original at srcPath and writes a proportionally
+// resized copy (coverThumbWidth px wide) to dstPath. Format is inferred from dstPath's extension;
+// webp sources fail here (imaging has no webp encoder) and the caller treats that as best-effort.
+func writeCoverThumbnail(srcPath, dstPath string) error {
+	src, err := imaging.Open(srcPath)
+	if err != nil {
+		return err
+	}
+	thumb := imaging.Resize(src, coverThumbWidth, 0, imaging.Lanczos)
+	return imaging.Save(thumb, dstPath)
 }
 
 // coverExt returns a safe image extension from the filename or content-type, "" if unsupported.

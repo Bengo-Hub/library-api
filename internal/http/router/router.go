@@ -79,7 +79,7 @@ func New(d Deps) http.Handler {
 		http.Redirect(w, req, "/v1/docs/", http.StatusMovedPermanently)
 	})
 	if d.MediaRoot != "" {
-		r.Handle("/media/*", http.StripPrefix("/media", http.FileServer(http.Dir(d.MediaRoot))))
+		r.Handle("/media/*", withMediaCacheControl(http.StripPrefix("/media", http.FileServer(http.Dir(d.MediaRoot)))))
 	}
 
 	// Public PIN/terminal auth (no SSO) — desk/kiosk quick login.
@@ -190,8 +190,10 @@ func New(d Deps) http.Handler {
 			c.With(act("collections", "delete")).Delete("/collections/{id}", d.Catalog.DeleteCollection)
 			// Copies & holdings
 			c.With(view("copies")).Get("/bibs/{id}/copies", d.Catalog.ListCopies)
+			c.With(view("copies")).Get("/copies", d.Catalog.ListAllCopies)
 			c.With(act("copies", "add")).Post("/copies", d.Catalog.CreateCopy)
 			c.With(act("copies", "change")).Put("/copies/{id}", d.Catalog.UpdateCopy)
+			c.With(act("copies", "delete")).Delete("/copies/{id}", d.Catalog.DeleteCopy)
 			c.With(view("copies")).Get("/copies/by-barcode/{barcode}", d.Catalog.GetCopyByBarcode)
 			c.With(view("copies")).Get("/copies/{id}/label.pdf", d.Catalog.CopyLabel)
 			// Transfers
@@ -367,4 +369,15 @@ func New(d Deps) http.Handler {
 	})
 
 	return r
+}
+
+// withMediaCacheControl adds a day-long Cache-Control header to static /media/* responses
+// (cover images + thumbnails). Covers are overwritten in place on re-upload under the same
+// filename, so a shorter TTL than "immutable" is used to bound staleness after a re-upload
+// without requiring the UI to cache-bust with a query param.
+func withMediaCacheControl(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		next.ServeHTTP(w, r)
+	})
 }

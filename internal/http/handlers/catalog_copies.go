@@ -5,11 +5,13 @@ import (
 	"strings"
 	"time"
 
+	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
 	"github.com/bengobox/library-service/internal/ent"
+	"github.com/bengobox/library-service/internal/ent/bibrecord"
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
 	"github.com/bengobox/library-service/internal/ent/branch"
 	"github.com/bengobox/library-service/internal/ent/loan"
@@ -38,6 +40,7 @@ type copyRequest struct {
 type copyResponse struct {
 	ID              string   `json:"id"`
 	BibRecordID     string   `json:"bib_record_id"`
+	BibTitle        string   `json:"bib_title,omitempty"`
 	Barcode         string   `json:"barcode"`
 	AccessionNo     string   `json:"accession_no,omitempty"`
 	CallNumber      string   `json:"call_number,omitempty"`
@@ -59,13 +62,16 @@ type copyResponse struct {
 // statusToWire lower-cases the stored UPPERCASE enum to the library-ui CopyStatus contract.
 func statusToWire(s bookcopy.Status) string { return strings.ToLower(string(s)) }
 
-// buildCopyResponses batch-resolves branch names + active-loan due dates for a set of copies.
+// buildCopyResponses batch-resolves branch names + bib titles + active-loan due dates for a set
+// of copies.
 func (h *CatalogHandler) buildCopyResponses(r *http.Request, tenantID uuid.UUID, rows []*ent.BookCopy) []copyResponse {
 	ctx := r.Context()
 	branchIDs := make([]uuid.UUID, 0, len(rows))
+	bibIDs := make([]uuid.UUID, 0, len(rows))
 	copyIDs := make([]uuid.UUID, 0, len(rows))
 	for _, c := range rows {
 		branchIDs = append(branchIDs, c.BranchID)
+		bibIDs = append(bibIDs, c.BibRecordID)
 		copyIDs = append(copyIDs, c.ID)
 	}
 	// Branch names.
@@ -75,6 +81,15 @@ func (h *CatalogHandler) buildCopyResponses(r *http.Request, tenantID uuid.UUID,
 			Where(branch.TenantID(tenantID), branch.IDIn(branchIDs...)).All(ctx)
 		for _, b := range brs {
 			names[b.ID] = b.Name
+		}
+	}
+	// Bib titles (used by the global holdings browser, which has no other title context).
+	titles := map[uuid.UUID]string{}
+	if len(bibIDs) > 0 {
+		bibs, _ := h.db.BibRecord.Query().
+			Where(bibrecord.TenantID(tenantID), bibrecord.IDIn(bibIDs...)).All(ctx)
+		for _, b := range bibs {
+			titles[b.ID] = b.Title
 		}
 	}
 	// Active-loan due dates keyed by copy.
@@ -92,14 +107,14 @@ func (h *CatalogHandler) buildCopyResponses(r *http.Request, tenantID uuid.UUID,
 	}
 	out := make([]copyResponse, 0, len(rows))
 	for _, c := range rows {
-		out = append(out, h.toCopyResponse(c, names[c.BranchID], dues[c.ID].id, dues[c.ID].due))
+		out = append(out, h.toCopyResponse(c, names[c.BranchID], titles[c.BibRecordID], dues[c.ID].id, dues[c.ID].due))
 	}
 	return out
 }
 
-func (h *CatalogHandler) toCopyResponse(c *ent.BookCopy, branchName, loanID string, due time.Time) copyResponse {
+func (h *CatalogHandler) toCopyResponse(c *ent.BookCopy, branchName, bibTitle, loanID string, due time.Time) copyResponse {
 	resp := copyResponse{
-		ID: c.ID.String(), BibRecordID: c.BibRecordID.String(), Barcode: c.Barcode,
+		ID: c.ID.String(), BibRecordID: c.BibRecordID.String(), BibTitle: bibTitle, Barcode: c.Barcode,
 		AccessionNo: c.AccessionNo, CallNumber: c.CallNumber, ShelfLocation: c.ShelfLocation,
 		Status: statusToWire(c.Status), Condition: c.Condition, IsReferenceOnly: c.IsReferenceOnly,
 		BranchID: c.BranchID.String(), BranchName: branchName, Notes: c.Notes,
@@ -127,7 +142,95 @@ func (h *CatalogHandler) singleCopyResponse(r *http.Request, tenantID uuid.UUID,
 	if len(resps) == 1 {
 		return resps[0]
 	}
-	return h.toCopyResponse(c, "", "", time.Time{})
+	return h.toCopyResponse(c, "", "", "", time.Time{})
+}
+
+// ListAllCopies returns copies across ALL titles (the "Copies & Holdings" global browser),
+// filterable by status/branch_id/q (barcode, accession number, or bib title). This route
+// previously didn't exist even though library-ui's copiesApi.list() has called it since
+// 2026-07-04 — opening /copies with no ?bib= filter 404'd (see reference_library_pin_sso_gap).
+// @Summary List copies across all titles, with status/branch/search filters
+// @Tags Catalog
+// @Router /{tenant}/library/catalog/copies [get]
+func (h *CatalogHandler) ListAllCopies(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := TenantUUID(r)
+	if !ok {
+		respondError(w, http.StatusUnauthorized, "missing tenant", "unauthorized")
+		return
+	}
+	qp := r.URL.Query()
+	q := h.db.BookCopy.Query().Where(bookcopy.TenantID(tenantID))
+	if s := strings.ToUpper(strings.TrimSpace(qp.Get("status"))); s != "" {
+		q = q.Where(bookcopy.StatusEQ(bookcopy.Status(s)))
+	}
+	if bid := qp.Get("branch_id"); bid != "" {
+		if id, err := uuid.Parse(bid); err == nil {
+			q = q.Where(bookcopy.BranchID(id))
+		}
+	}
+	if term := strings.TrimSpace(qp.Get("q")); term != "" {
+		bibIDs, _ := h.db.BibRecord.Query().
+			Where(bibrecord.TenantID(tenantID), bibrecord.TitleContainsFold(term)).
+			Select(bibrecord.FieldID).Strings(r.Context())
+		matchingBibIDs := make([]uuid.UUID, 0, len(bibIDs))
+		for _, s := range bibIDs {
+			if u, e := uuid.Parse(s); e == nil {
+				matchingBibIDs = append(matchingBibIDs, u)
+			}
+		}
+		q = q.Where(bookcopy.Or(
+			bookcopy.BarcodeContainsFold(term),
+			bookcopy.AccessionNoContainsFold(term),
+			bookcopy.BibRecordIDIn(matchingBibIDs...),
+		))
+	}
+
+	params := sharedpagination.Parse(r)
+	total, _ := q.Clone().Count(r.Context())
+	rows, err := q.Order(ent.Desc(bookcopy.FieldCreatedAt)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
+		return
+	}
+	out := h.buildCopyResponses(r, tenantID, rows)
+	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(out, total, params))
+}
+
+// DeleteCopy withdraws a copy from circulation (soft-delete: status -> WITHDRAWN). A copy
+// currently on loan cannot be withdrawn — return it first. Hard-deleting would orphan its loan
+// history's foreign key; WITHDRAWN is an existing, first-class status (see bookcopy.go schema)
+// that OPAC/availability counts and the copies list already understand.
+// @Summary Withdraw a copy from circulation
+// @Tags Catalog
+// @Router /{tenant}/library/catalog/copies/{id} [delete]
+func (h *CatalogHandler) DeleteCopy(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := TenantUUID(r)
+	if !ok {
+		respondError(w, http.StatusUnauthorized, "missing tenant", "unauthorized")
+		return
+	}
+	id, err := ParseUUIDParam(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "bad id", "invalid_request")
+		return
+	}
+	existing, err := h.db.BookCopy.Query().Where(bookcopy.IDEQ(id), bookcopy.TenantID(tenantID)).Only(r.Context())
+	if ent.IsNotFound(err) {
+		respondError(w, http.StatusNotFound, "not found", "not_found")
+		return
+	} else if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "get_failed")
+		return
+	}
+	if existing.Status == bookcopy.StatusON_LOAN {
+		respondError(w, http.StatusConflict, "this copy is on loan — it must be returned before it can be withdrawn", "on_loan")
+		return
+	}
+	if _, err := h.db.BookCopy.UpdateOneID(id).SetStatus(bookcopy.StatusWITHDRAWN).Save(r.Context()); err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "delete_failed")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"deleted": true})
 }
 
 // ListCopies returns all copies for a bib record.
