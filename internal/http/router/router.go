@@ -196,6 +196,7 @@ func New(d Deps) http.Handler {
 			c.With(act("copies", "delete")).Delete("/copies/{id}", d.Catalog.DeleteCopy)
 			c.With(view("copies")).Get("/copies/by-barcode/{barcode}", d.Catalog.GetCopyByBarcode)
 			c.With(view("copies")).Get("/copies/{id}/label.pdf", d.Catalog.CopyLabel)
+			c.With(view("copies")).Post("/copies/labels/print", d.Catalog.PrintCopyLabels)
 			// Transfers
 			c.With(view("transfers")).Get("/transfers", d.Catalog.ListTransfers)
 			c.With(act("transfers", "add")).Post("/transfers", d.Catalog.CreateTransfer)
