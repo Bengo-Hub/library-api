@@ -63,34 +63,56 @@ func (t LabelTemplate) laneCount() int {
 	}
 }
 
-// namedLabelTemplates are the built-in presets. "1row_62x29" is an exact alias of the
-// pre-existing hardcoded RenderPDF size (62mm×29mm) so old callers keep working unchanged. The
-// multi-row presets are new — engineering estimates fit within a ≤80mm thermal roll width (the
-// Xprinter XP-330B's confirmed media width), NOT vendor-confirmed exact stock. A library with
-// different real stock should use "custom" instead of assuming one of these matches exactly.
+// namedLabelTemplates are the built-in presets. "1row_29x62" is the real, bench-verified size of
+// this library's actual spine/holding label roll — confirmed 2026-08-02 by printing a live label
+// (a real BookCopy fetched through the deployed library-api, not synthetic data) directly to an
+// Xprinter XP-330B via the local print-agent: SIZE 29mm×62mm with DIRECTION 0 and no per-field
+// rotation was the only combination that both (a) kept one label's content fully inside one
+// physical die-cut cell (the previous 62×29 — width/height swapped — either bled across cells or,
+// once corrected for lane math, printed rotated 90°, matching this bug's original report of a
+// barcode spanning several physical labels) and (b) read horizontally rather than sideways. The
+// pre-existing hardcoded RenderPDF size before this fix used 62×29mm — i.e. width and height were
+// swapped relative to the real roll. The multi-row presets below only ever had their LabelWIn
+// (lane width) specified — that axis was already correct — so only their LabelHIn is corrected
+// here to match the same real per-label length (62mm); their lane widths (35/23/17mm) are still
+// engineering estimates, NOT vendor-confirmed exact stock. A library with different real stock
+// should use "custom" instead of assuming one of these matches exactly.
+//
+// One known open issue: this bench-verified combination prints upside-down relative to normal
+// reading direction (confirmed against the physical printout, not just theory) — attempts to
+// correct that via DIRECTION 1 or per-field rotation=180 in the same test session produced worse
+// misalignment (content spilling across cell boundaries) than the plain upside-down result, so
+// the fix was intentionally NOT applied here — see docs/barcode-labels.md's "Known orientation
+// follow-up" section. Content is right-side-up if the operator loads the roll turned 180°.
 func namedLabelTemplates() map[string]LabelTemplate {
 	return map[string]LabelTemplate{
-		"1row_62x29": {
-			Name: "1 row — 62x29mm (spine/holding label)", LabelWIn: 62.0 / 25.4, LabelHIn: 29.0 / 25.4,
+		"1row_29x62": {
+			Name: "1 row — 29x62mm (spine/holding label)", LabelWIn: 29.0 / 25.4, LabelHIn: 62.0 / 25.4,
 			DPI: 203, Lanes: 1, GapYIn: 2.0 / 25.4,
 		},
 		"2row_35x29": {
-			Name: "2 rows — 35x29mm each", LabelWIn: 35.0 / 25.4, LabelHIn: 29.0 / 25.4,
+			Name: "2 rows — 35mm wide each", LabelWIn: 35.0 / 25.4, LabelHIn: 62.0 / 25.4,
 			DPI: 203, Lanes: 2, GapXIn: 2.0 / 25.4, GapYIn: 2.0 / 25.4,
 		},
 		"3row_23x29": {
-			Name: "3 rows — 23x29mm each", LabelWIn: 23.0 / 25.4, LabelHIn: 29.0 / 25.4,
+			Name: "3 rows — 23mm wide each", LabelWIn: 23.0 / 25.4, LabelHIn: 62.0 / 25.4,
 			DPI: 203, Lanes: 3, GapXIn: 1.5 / 25.4, GapYIn: 2.0 / 25.4,
 		},
 		"4row_17x29": {
-			Name: "4 rows — 17x29mm each", LabelWIn: 17.0 / 25.4, LabelHIn: 29.0 / 25.4,
+			Name: "4 rows — 17mm wide each", LabelWIn: 17.0 / 25.4, LabelHIn: 62.0 / 25.4,
 			DPI: 203, Lanes: 4, GapXIn: 1.0 / 25.4, GapYIn: 2.0 / 25.4,
+		},
+		// Back-compat alias of the old (incorrect, width/height swapped) name, in case anything
+		// already saved "1row_62x29" as a tenant default before this fix.
+		"1row_62x29": {
+			Name: "1 row — 29x62mm (spine/holding label)", LabelWIn: 29.0 / 25.4, LabelHIn: 62.0 / 25.4,
+			DPI: 203, Lanes: 1, GapYIn: 2.0 / 25.4,
 		},
 	}
 }
 
 // LabelTemplateByName resolves a request-supplied template/preset name; unknown/empty falls back
-// to the pre-existing 62x29mm single-lane default so old callers with no opinion keep working.
+// to the bench-verified 29x62mm single-lane default so old callers with no opinion keep working.
 func LabelTemplateByName(name string) LabelTemplate {
 	key := strings.ToLower(strings.TrimSpace(name))
 	if t, ok := namedLabelTemplates()[key]; ok {
@@ -99,7 +121,7 @@ func LabelTemplateByName(name string) LabelTemplate {
 		}
 		return t
 	}
-	return namedLabelTemplates()["1row_62x29"]
+	return namedLabelTemplates()["1row_29x62"]
 }
 
 // CustomLabelTemplate builds a template from caller-supplied physical dimensions. lanes clamps to 1-4.
@@ -111,10 +133,10 @@ func CustomLabelTemplate(wIn, hIn float64, lanes int, gapXIn, gapYIn float64, ro
 		lanes = 4
 	}
 	if wIn <= 0 {
-		wIn = 62.0 / 25.4
+		wIn = 29.0 / 25.4
 	}
 	if hIn <= 0 {
-		hIn = 29.0 / 25.4
+		hIn = 62.0 / 25.4
 	}
 	return LabelTemplate{
 		Name:     "Custom",

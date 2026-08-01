@@ -72,18 +72,27 @@ necessary.
 
   | Preset | Rows (lanes) | One label's size | Notes |
   |---|---|---|---|
-  | `1row_62x29` (default) | 1 | 62×29mm | Exact alias of the pre-existing hardcoded spine-label size — old callers with no opinion keep working unchanged. |
-  | `2row_35x29` | 2 | 35×29mm each | A wider roll die-cut into 2 parallel lanes. |
-  | `3row_23x29` | 3 | 23×29mm each | 3 parallel lanes. |
-  | `4row_17x29` | 4 | 17×29mm each | 4 parallel lanes. |
+  | `1row_29x62` (default) | 1 | 29×62mm | **Bench-verified** 2026-08-02 by printing real BookCopy data (fetched through the live deployed library-api, not synthetic values) directly to an Xprinter XP-330B via the local print-agent. `1row_62x29` (the old, width/height-swapped name) is kept as a back-compat alias resolving to the same corrected values. |
+  | `2row_35x29` | 2 | 35mm wide × 62mm each | A wider roll die-cut into 2 parallel lanes; lane width is an engineering estimate, the 62mm length matches the bench-verified single-lane roll. |
+  | `3row_23x29` | 3 | 23mm wide × 62mm each | 3 parallel lanes. |
+  | `4row_17x29` | 4 | 17mm wide × 62mm each | 4 parallel lanes. |
   | `custom` | 1-4 (`custom_lanes`) | `custom_label_w_in`/`custom_label_h_in` | Explicit W/H/lanes/gaps/rotate for a real roll that doesn't match any preset above. |
 
-  **"Rows" = lanes across the roll's width**, not the Avery sheet's grid rows below. The
-  multi-row presets are **engineering estimates** fit within a ≤80mm thermal roll width (the
-  Xprinter XP-330B's confirmed media width) — **not vendor-confirmed exact stock**. Measure your
-  real label roll and use `template: "custom"` if it doesn't match a preset exactly; a mismatched
-  `GAP`/`SIZE` height is what causes one barcode's content to bleed across several physical
-  labels.
+  **"Rows" = lanes across the roll's width**, not the Avery sheet's grid rows below. Only
+  `1row_29x62` is bench-confirmed; the multi-row presets' lane widths remain **engineering
+  estimates** fit within a ≤80mm thermal roll width (the Xprinter XP-330B's confirmed media
+  width) — **not vendor-confirmed exact stock**. Measure your real label roll and use `template:
+  "custom"` if it doesn't match a preset exactly; a mismatched `GAP`/`SIZE` height is what causes
+  one barcode's content to bleed across several physical labels.
+
+  **What "bench-verified" corrected**: the pre-existing hardcoded spine-label size (before this
+  fix) was 62mm wide × 29mm tall — i.e. **width and height were swapped** relative to the real
+  roll, which is a single narrow (~29mm) lane feeding one label at a time down its ~62mm length.
+  Printing `SIZE 62mm,29mm` onto that roll is what produced the originally-reported bug: content
+  either bled across several physical labels or came out rotated 90°, depending on exactly how
+  the mismatch resolved on a given print. `SIZE 29mm,62mm` (this label's real proportions) with
+  `DIRECTION 0` and no per-field rotation is the combination that keeps one label's content fully
+  inside one physical die-cut cell and reading horizontally.
 
 - **Bulk sheet** (`sheet` field, only used when `format=avery_a4`, the default) — reuses the
   same two Avery grid presets as inventory-api:
@@ -109,6 +118,28 @@ the page, when `Rotate` is set; `RenderThermalTSPL` emits a `90` rotation parame
 `TEXT`/`BARCODE` command instead of `0`. Neither ever swaps `SIZE`/page dims based on guesswork —
 `Rotate` is an explicit fact about how the roll is mounted, set via the `rotate` request param.
 
+**Known follow-up (not yet fixed): content prints upside-down.** On the bench-verified
+`1row_29x62` setup (`Rotate=false`, `DIRECTION 0`), content is fully contained in one label cell
+and reads horizontally, but upside-down relative to normal reading direction. Two fixes were
+attempted in the same live-hardware session and both made things WORSE, not better:
+- `DIRECTION 1` (global print-direction flip): content came out right-side-up, but the print
+  registration broke — content spilled across physical label-cell boundaries instead of staying
+  contained in one cell.
+- Per-field `rotation=180` on `TEXT`/`BARCODE` at the same (x,y) as the working layout: this
+  does NOT re-mirror position the way a true 180° content rotation needs (TSPL anchors a
+  rotated field differently than a 0°-rotation field), so content became badly mispositioned.
+  A mathematically mirrored-position attempt (recomputing x,y from the canvas bounds) also
+  didn't reliably reproduce the working layout.
+
+Given both attempts regressed alignment, this module intentionally keeps the plain (working,
+upside-down) `Rotate=false`/`DIRECTION 0` combination rather than risk breaking containment for
+a cosmetic fix. If picked up again: the more promising path is probably a per-print
+mechanical fix (load the roll turned 180°) rather than another software rotation attempt,
+or bench-testing `DIRECTION 1` again after a fresh gap-sensor auto-calibration cycle (the
+registration break may have been a one-time calibration artifact from switching `DIRECTION`
+mid-session rather than a deterministic property of `DIRECTION 1` itself — not conclusively
+ruled out).
+
 ## TSPL support (Xprinter/TSC-compatible printers)
 
 `RenderThermalTSPL` (`tspl.go`) emits real TSC/TSPL2 commands (`SIZE`/`GAP`/`CLS`/`TEXT`/
@@ -120,6 +151,30 @@ no GS1-128, no price, no lot/serial (this module never needed them — see
 [Symbology](#symbology)). Multi-row templates tile `lanes` consecutive labels side-by-side per
 feed-row, then `CLS`/`PRINT` advances to the next row, identical to `RenderSheet`'s Avery-grid
 tiling applied to a continuous roll instead of a fixed sheet.
+
+**Layout fitting** (fixed 2026-08-02 after the same live-hardware session surfaced these):
+- **Font size is sized off the label's SMALLER dimension** (`min(w,h)`), not height alone. The
+  original formula scaled title/detail text multipliers purely from label height (`h/10/24`),
+  which was fine for wide-but-short presets but badly wrong for a tall-but-narrow label like the
+  real 29×62mm roll: plenty of height to spare, almost no width, so a height-only formula
+  inflated text well past what the width could hold — first overflowing the printable area
+  entirely, and even after that overflow was independently clamped (see below), still dominating
+  the label and leaving no visual room to balance against the barcode. `writeTSPLLabel` now: (a)
+  targets a multiplier off `min(w,h)`, (b) switched from TSPL's larger built-in font "3" (16×24
+  dots/char at multiplier 1) to the smallest built-in font "1" (8×12 dots/char), and (c) still
+  clamps the multiplier down further until a ~12-character string would fit the label's actual
+  width, truncating text to whatever fits at the chosen multiplier.
+- **Barcode height is capped relative to width**, not just "roughly half the remaining vertical
+  space" — on a narrow label the latter produced bars taller than the barcode's own natural
+  width (a dense vertical column instead of the normal short-and-wide look a Code128 symbol
+  should have).
+- **Both text and the barcode are horizontally centered**, estimating each element's printed
+  width (`estimateCode128WidthDots`: `(len+2)*11+13` modules × the narrow-bar dot width — an
+  intentional over-estimate, since Code128's Set-C digit-pairing can make real numeric-heavy
+  barcodes narrower than this) rather than left-aligning at a fixed margin.
+- **More top clearance** (`h/10` instead of `h/20`) before the first text line — on this
+  printer/roll, low-`y` content lands closest to the physical edge the operator tears along, and
+  a line flush against the old smaller margin was getting clipped by the tear.
 
 ## Direct USB printing via the local print-agent
 

@@ -5,7 +5,7 @@ import "testing"
 func TestRenderPDF_PageMatchesTemplate(t *testing.T) {
 	lbl := CopyLabel{Barcode: "B00012345", Title: "Archeology", CallNumber: "930.1 MCI"}
 
-	tmpl := LabelTemplateByName("1row_62x29")
+	tmpl := LabelTemplateByName("1row_29x62")
 	if _, err := RenderPDF(lbl, tmpl); err != nil {
 		t.Fatalf("RenderPDF (Rotate=false) failed: %v", err)
 	}

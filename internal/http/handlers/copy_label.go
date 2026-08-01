@@ -63,14 +63,14 @@ func (h *CatalogHandler) CopyLabel(w http.ResponseWriter, r *http.Request) {
 // resolveTemplate resolves the LabelTemplate for a single-label print from query params:
 // ?template=<preset|custom>&rotate=true&custom_label_w_in=&custom_label_h_in=&custom_lanes=&
 // custom_gap_x_in=&custom_gap_y_in=. Empty/unknown template falls back to the pre-existing
-// 62x29mm single-lane default inside LabelTemplateByName.
+// 29x62mm single-lane default inside LabelTemplateByName.
 func resolveTemplate(r *http.Request) barcode.LabelTemplate {
 	q := r.URL.Query()
 	rotate := strings.EqualFold(strings.TrimSpace(q.Get("rotate")), "true")
 	if strings.EqualFold(strings.TrimSpace(q.Get("template")), "custom") {
 		return barcode.CustomLabelTemplate(
-			parseFloatOr(q.Get("custom_label_w_in"), 62.0/25.4),
-			parseFloatOr(q.Get("custom_label_h_in"), 29.0/25.4),
+			parseFloatOr(q.Get("custom_label_w_in"), 29.0/25.4),
+			parseFloatOr(q.Get("custom_label_h_in"), 62.0/25.4),
 			int(parseFloatOr(q.Get("custom_lanes"), 1)),
 			parseFloatOr(q.Get("custom_gap_x_in"), 0),
 			parseFloatOr(q.Get("custom_gap_y_in"), 0),

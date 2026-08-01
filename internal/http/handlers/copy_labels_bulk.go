@@ -35,7 +35,7 @@ type printCopyLabelsRequest struct {
 	// that mis-use is no longer necessary.
 	Format string `json:"format,omitempty"`
 	// Template selects the physical label-roll template when Format == thermal_tspl: a named
-	// preset (see barcode.LabelTemplateByName — "1row_62x29" (default) | "2row_35x29" |
+	// preset (see barcode.LabelTemplateByName — "1row_29x62" (default) | "2row_35x29" |
 	// "3row_23x29" | "4row_17x29") or "custom" (paired with the custom_* fields below).
 	Template     string  `json:"template,omitempty"`
 	CustomLabelW float64 `json:"custom_label_w_in,omitempty"`

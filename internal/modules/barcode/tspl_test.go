@@ -15,7 +15,7 @@ func sampleCopyLabels(n int) []CopyLabel {
 }
 
 func TestRenderThermalTSPL_RotationParam(t *testing.T) {
-	tmpl := LabelTemplateByName("1row_62x29")
+	tmpl := LabelTemplateByName("1row_29x62")
 
 	tmpl.Rotate = false
 	out := string(RenderThermalTSPL(sampleCopyLabels(1), tmpl))
