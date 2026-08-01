@@ -27,7 +27,23 @@ type printCopyLabelsRequest struct {
 	BibID    string   `json:"bib_id,omitempty"`    // all copies of one title
 	BranchID string   `json:"branch_id,omitempty"` // filters alone or combined with copy_ids/bib_id
 	Status   string   `json:"status,omitempty"`    // e.g. "available" — filters alone or combined
-	Sheet    string   `json:"sheet,omitempty"`     // "l7160" (default) | "5160"
+	Sheet    string   `json:"sheet,omitempty"`     // "l7160" (default) | "5160" — only used when format=avery_a4
+	// Format: "avery_a4" (default, a full A4/Letter sheet for a cut-sheet office printer) |
+	// "thermal_tspl" (raw TSPL text for a thermal roll printer, e.g. Xprinter XP-330B). Printing
+	// avery_a4 output on a thermal roll printer (guessing a Windows paper preset) is exactly what
+	// produced this endpoint's originally-reported rotated-label bug — thermal_tspl exists so
+	// that mis-use is no longer necessary.
+	Format string `json:"format,omitempty"`
+	// Template selects the physical label-roll template when Format == thermal_tspl: a named
+	// preset (see barcode.LabelTemplateByName — "1row_62x29" (default) | "2row_35x29" |
+	// "3row_23x29" | "4row_17x29") or "custom" (paired with the custom_* fields below).
+	Template     string  `json:"template,omitempty"`
+	CustomLabelW float64 `json:"custom_label_w_in,omitempty"`
+	CustomLabelH float64 `json:"custom_label_h_in,omitempty"`
+	CustomLanes  int     `json:"custom_lanes,omitempty"`
+	CustomGapX   float64 `json:"custom_gap_x_in,omitempty"`
+	CustomGapY   float64 `json:"custom_gap_y_in,omitempty"`
+	Rotate       bool    `json:"rotate,omitempty"`
 }
 
 // PrintCopyLabels renders a printable Avery-sheet PDF of holding labels for a set of copies
@@ -123,6 +139,21 @@ func (h *CatalogHandler) PrintCopyLabels(w http.ResponseWriter, r *http.Request)
 			Title:      titles[c.BibRecordID],
 			CallNumber: c.CallNumber,
 		})
+	}
+
+	if strings.EqualFold(strings.TrimSpace(req.Format), "thermal_tspl") {
+		tmpl := barcode.LabelTemplateByName(req.Template)
+		if strings.EqualFold(strings.TrimSpace(req.Template), "custom") {
+			tmpl = barcode.CustomLabelTemplate(req.CustomLabelW, req.CustomLabelH, req.CustomLanes, req.CustomGapX, req.CustomGapY, req.Rotate)
+		} else {
+			tmpl.Rotate = req.Rotate
+		}
+		out := barcode.RenderThermalTSPL(labels, tmpl)
+		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+		w.Header().Set("Content-Disposition", "inline; filename=\"copy-labels.tspl\"")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(out)
+		return
 	}
 
 	tenantName := ""
