@@ -141,12 +141,32 @@ func (h *CatalogHandler) PrintCopyLabels(w http.ResponseWriter, r *http.Request)
 		})
 	}
 
-	if strings.EqualFold(strings.TrimSpace(req.Format), "thermal_tspl") {
+	format := strings.ToLower(strings.TrimSpace(req.Format))
+
+	// format=thermal_preview renders a PDF matching EXACTLY what thermal_tspl would print (same
+	// template, same per-label pages, same rotation) — NOT the Avery grid below, which is a
+	// different physical format (cut-sheet office paper laid out in columns). Silently
+	// substituting that grid as a "preview" for a thermal-roll job was misleading the operator
+	// into printing labels in columns on a single-lane roll; this lets the UI always preview the
+	// actual thermal layout before sending anything to the printer.
+	if format == "thermal_tspl" || format == "thermal_preview" {
 		tmpl := barcode.LabelTemplateByName(req.Template)
 		if strings.EqualFold(strings.TrimSpace(req.Template), "custom") {
 			tmpl = barcode.CustomLabelTemplate(req.CustomLabelW, req.CustomLabelH, req.CustomLanes, req.CustomGapX, req.CustomGapY, req.Rotate)
 		} else {
 			tmpl.Rotate = req.Rotate
+		}
+		if format == "thermal_preview" {
+			pdf, perr := barcode.RenderThermalPreviewPDF(labels, tmpl)
+			if perr != nil {
+				respondError(w, http.StatusInternalServerError, perr.Error(), "label_failed")
+				return
+			}
+			w.Header().Set("Content-Type", "application/pdf")
+			w.Header().Set("Content-Disposition", "inline; filename=\"copy-labels-preview.pdf\"")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write(pdf)
+			return
 		}
 		out := barcode.RenderThermalTSPL(labels, tmpl)
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
