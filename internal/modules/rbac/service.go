@@ -242,8 +242,17 @@ func (s *Service) SyncUserFromEvent(ctx context.Context, tenantID uuid.UUID, use
 		if branchID != "" {
 			c.SetBranchIds([]string{branchID})
 		}
-		_, cerr := c.Save(ctx)
-		return cerr
+		// auth.user.created and auth.user.pin_set are independent NATS
+		// subjects/durable consumers that can be processed concurrently (e.g.
+		// back-to-back events for a tenant's owner/admin during registration),
+		// both racing to create the same LibraryUser row on the (tenant_id,
+		// user_id) unique index. Upsert so the loser of the race no-ops
+		// instead of failing the whole handler on the constraint violation —
+		// callers (handlePinSet) re-query afterward for the authoritative row.
+		return c.
+			OnConflictColumns(libraryuser.FieldTenantID, libraryuser.FieldUserID).
+			DoNothing().
+			Exec(ctx)
 	} else if err != nil {
 		return err
 	}
