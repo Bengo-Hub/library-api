@@ -29,7 +29,7 @@ type Config struct {
 // mutations + NATS data sync by tenant entitlement. APIKey reuses the shared
 // INTERNAL_SERVICE_KEY (same value every library S2S client uses).
 type SubscriptionsConfig struct {
-	ServiceURL     string        `envconfig:"SUBSCRIPTIONS_SERVICE_URL" default:"https://pricingapi.codevertexafrica.com"`
+	ServiceURL     string        `envconfig:"SUBSCRIPTION_BASE_URL" default:"https://pricingapi.codevertexafrica.com"`
 	RequestTimeout time.Duration `envconfig:"SUBSCRIPTIONS_REQUEST_TIMEOUT" default:"10s"`
 	APIKey         string        `envconfig:"INTERNAL_SERVICE_KEY" default:""`
 }
