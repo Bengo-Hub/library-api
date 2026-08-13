@@ -15,6 +15,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
 	"github.com/bengobox/library-service/internal/ent/branch"
 	"github.com/bengobox/library-service/internal/ent/collection"
+	"github.com/bengobox/library-service/internal/ent/hold"
 	"github.com/bengobox/library-service/internal/ent/subject"
 	"github.com/bengobox/library-service/internal/events"
 	"github.com/bengobox/library-service/internal/modules/refdata"
@@ -169,11 +170,11 @@ func (h *CatalogHandler) GetBib(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err.Error(), "get_failed")
 		return
 	}
-	// Enrich with live copy counts the same way Search's opacRow does — GetBib previously
-	// returned the bare row with no total_copies/available_copies, so the title-detail page's
-	// AvailabilityBadge always rendered "No copies" regardless of real holdings.
-	total, available := h.copyCountsByBib(r.Context(), tenantID, []*ent.BibRecord{row})
-	respondJSON(w, http.StatusOK, opacRow{BibRecord: row, TotalCopies: total[row.ID], AvailableCopies: available[row.ID]})
+	// Enrich with live copy/hold counts the same way Search's opacRow does — GetBib previously
+	// returned the bare row with no total_copies/available_copies/on_hold, so the title-detail
+	// page's AvailabilityBadge always rendered "No copies" regardless of real holdings.
+	total, available, onHold := h.copyCountsByBib(r.Context(), tenantID, []*ent.BibRecord{row})
+	respondJSON(w, http.StatusOK, opacRow{BibRecord: row, TotalCopies: total[row.ID], AvailableCopies: available[row.ID], OnHold: onHold[row.ID]})
 }
 
 // UpdateBib updates a bib record.
@@ -235,6 +236,7 @@ type opacRow struct {
 	*ent.BibRecord
 	TotalCopies     int `json:"total_copies"`
 	AvailableCopies int `json:"available_copies"`
+	OnHold          int `json:"on_hold"`
 }
 
 // Search godoc
@@ -300,25 +302,27 @@ func (h *CatalogHandler) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	onlyAvailable := qp.Get("available") == "true"
-	totalByBib, availByBib := h.copyCountsByBib(r.Context(), tenantID, rows)
+	totalByBib, availByBib, onHoldByBib := h.copyCountsByBib(r.Context(), tenantID, rows)
 	out := make([]opacRow, 0, len(rows))
 	for _, b := range rows {
 		avail := availByBib[b.ID]
 		if onlyAvailable && avail == 0 {
 			continue
 		}
-		out = append(out, opacRow{BibRecord: b, TotalCopies: totalByBib[b.ID], AvailableCopies: avail})
+		out = append(out, opacRow{BibRecord: b, TotalCopies: totalByBib[b.ID], AvailableCopies: avail, OnHold: onHoldByBib[b.ID]})
 	}
 	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(out, total, params))
 }
 
-// copyCountsByBib batch-resolves total and available copy counts for a page of bib rows via two
-// grouped-count queries (instead of two Count() queries per row, which previously scaled 2x with
-// page size — see reference_library_pin_sso_gap for the full N+1 writeup).
-func (h *CatalogHandler) copyCountsByBib(ctx context.Context, tenantID uuid.UUID, rows []*ent.BibRecord) (total, available map[uuid.UUID]int) {
-	total, available = map[uuid.UUID]int{}, map[uuid.UUID]int{}
+// copyCountsByBib batch-resolves total copies, available copies, and active (WAITING/READY)
+// hold counts for a page of bib rows via grouped-count queries (instead of a Count() call per
+// row per metric, which previously scaled with page size — see reference_library_pin_sso_gap
+// for the full N+1 writeup). on_hold counts active Hold records, not a BookCopy status — a hold
+// is a member queued waiting for ANY copy of the bib to free up, not a property of one copy.
+func (h *CatalogHandler) copyCountsByBib(ctx context.Context, tenantID uuid.UUID, rows []*ent.BibRecord) (total, available, onHold map[uuid.UUID]int) {
+	total, available, onHold = map[uuid.UUID]int{}, map[uuid.UUID]int{}, map[uuid.UUID]int{}
 	if len(rows) == 0 {
-		return total, available
+		return total, available, onHold
 	}
 	bibIDs := make([]uuid.UUID, 0, len(rows))
 	for _, b := range rows {
@@ -349,7 +353,17 @@ func (h *CatalogHandler) copyCountsByBib(ctx context.Context, tenantID uuid.UUID
 			available[c.BibRecordID] = c.Count
 		}
 	}
-	return total, available
+	var holdCounts []countRow
+	if err := h.db.Hold.Query().
+		Where(hold.TenantID(tenantID), hold.BibRecordIDIn(bibIDs...), hold.StatusIn(hold.StatusWAITING, hold.StatusREADY)).
+		GroupBy(hold.FieldBibRecordID).
+		Aggregate(ent.Count()).
+		Scan(ctx, &holdCounts); err == nil {
+		for _, c := range holdCounts {
+			onHold[c.BibRecordID] = c.Count
+		}
+	}
+	return total, available, onHold
 }
 
 // facetsCacheKey scopes the cached facet payload per tenant.

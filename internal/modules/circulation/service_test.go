@@ -34,7 +34,7 @@ func TestCheckoutReturnFlow(t *testing.T) {
 	client := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, sqlDB)))
 	defer client.Close()
 	ctx := context.Background()
-	svc := NewService(client, zap.NewNop())
+	svc := NewService(client, nil, zap.NewNop())
 
 	tenantID := uuid.New()
 	// Fixtures.
