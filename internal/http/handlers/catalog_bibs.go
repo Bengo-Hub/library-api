@@ -169,7 +169,11 @@ func (h *CatalogHandler) GetBib(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err.Error(), "get_failed")
 		return
 	}
-	respondJSON(w, http.StatusOK, row)
+	// Enrich with live copy counts the same way Search's opacRow does — GetBib previously
+	// returned the bare row with no total_copies/available_copies, so the title-detail page's
+	// AvailabilityBadge always rendered "No copies" regardless of real holdings.
+	total, available := h.copyCountsByBib(r.Context(), tenantID, []*ent.BibRecord{row})
+	respondJSON(w, http.StatusOK, opacRow{BibRecord: row, TotalCopies: total[row.ID], AvailableCopies: available[row.ID]})
 }
 
 // UpdateBib updates a bib record.
