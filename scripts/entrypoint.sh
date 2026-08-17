@@ -13,15 +13,18 @@ echo "=========================================="
 echo "Waiting for database and running migrations..."
 MAX_RETRIES=60
 RETRY_COUNT=0
+MIGRATE_OUT="/tmp/library-migrate.out"
 
-until POSTGRES_URL="$MIGRATE_URL" /usr/local/bin/library-migrate > /dev/null 2>&1 || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
+until POSTGRES_URL="$MIGRATE_URL" /usr/local/bin/library-migrate > "$MIGRATE_OUT" 2>&1 || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
   RETRY_COUNT=$((RETRY_COUNT+1))
-  echo "Database not ready yet... (attempt $RETRY_COUNT/$MAX_RETRIES)"
+  echo "Migration attempt $RETRY_COUNT/$MAX_RETRIES failed:"
+  tail -c 2000 "$MIGRATE_OUT"
   sleep 5
 done
 
 if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-  echo "Database connection timeout after $MAX_RETRIES attempts"
+  echo "Migrations did not succeed after $MAX_RETRIES attempts. Last error:"
+  tail -c 2000 "$MIGRATE_OUT"
   exit 1
 fi
 
