@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/bengobox/library-service/internal/ent/stockcount"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
 
 // StockCountCreate is the builder for creating a StockCount entity.
@@ -140,6 +141,48 @@ func (_c *StockCountCreate) SetNillableMissingCount(v *int) *StockCountCreate {
 	return _c
 }
 
+// SetExpectedValue sets the "expected_value" field.
+func (_c *StockCountCreate) SetExpectedValue(v decimal.Decimal) *StockCountCreate {
+	_c.mutation.SetExpectedValue(v)
+	return _c
+}
+
+// SetNillableExpectedValue sets the "expected_value" field if the given value is not nil.
+func (_c *StockCountCreate) SetNillableExpectedValue(v *decimal.Decimal) *StockCountCreate {
+	if v != nil {
+		_c.SetExpectedValue(*v)
+	}
+	return _c
+}
+
+// SetScannedValue sets the "scanned_value" field.
+func (_c *StockCountCreate) SetScannedValue(v decimal.Decimal) *StockCountCreate {
+	_c.mutation.SetScannedValue(v)
+	return _c
+}
+
+// SetNillableScannedValue sets the "scanned_value" field if the given value is not nil.
+func (_c *StockCountCreate) SetNillableScannedValue(v *decimal.Decimal) *StockCountCreate {
+	if v != nil {
+		_c.SetScannedValue(*v)
+	}
+	return _c
+}
+
+// SetMissingValue sets the "missing_value" field.
+func (_c *StockCountCreate) SetMissingValue(v decimal.Decimal) *StockCountCreate {
+	_c.mutation.SetMissingValue(v)
+	return _c
+}
+
+// SetNillableMissingValue sets the "missing_value" field if the given value is not nil.
+func (_c *StockCountCreate) SetNillableMissingValue(v *decimal.Decimal) *StockCountCreate {
+	if v != nil {
+		_c.SetMissingValue(*v)
+	}
+	return _c
+}
+
 // SetCountedBy sets the "counted_by" field.
 func (_c *StockCountCreate) SetCountedBy(v string) *StockCountCreate {
 	_c.mutation.SetCountedBy(v)
@@ -241,6 +284,18 @@ func (_c *StockCountCreate) defaults() {
 		v := stockcount.DefaultMissingCount
 		_c.mutation.SetMissingCount(v)
 	}
+	if _, ok := _c.mutation.ExpectedValue(); !ok {
+		v := stockcount.DefaultExpectedValue
+		_c.mutation.SetExpectedValue(v)
+	}
+	if _, ok := _c.mutation.ScannedValue(); !ok {
+		v := stockcount.DefaultScannedValue
+		_c.mutation.SetScannedValue(v)
+	}
+	if _, ok := _c.mutation.MissingValue(); !ok {
+		v := stockcount.DefaultMissingValue
+		_c.mutation.SetMissingValue(v)
+	}
 	if _, ok := _c.mutation.ID(); !ok {
 		v := stockcount.DefaultID()
 		_c.mutation.SetID(v)
@@ -277,6 +332,15 @@ func (_c *StockCountCreate) check() error {
 	}
 	if _, ok := _c.mutation.MissingCount(); !ok {
 		return &ValidationError{Name: "missing_count", err: errors.New(`ent: missing required field "StockCount.missing_count"`)}
+	}
+	if _, ok := _c.mutation.ExpectedValue(); !ok {
+		return &ValidationError{Name: "expected_value", err: errors.New(`ent: missing required field "StockCount.expected_value"`)}
+	}
+	if _, ok := _c.mutation.ScannedValue(); !ok {
+		return &ValidationError{Name: "scanned_value", err: errors.New(`ent: missing required field "StockCount.scanned_value"`)}
+	}
+	if _, ok := _c.mutation.MissingValue(); !ok {
+		return &ValidationError{Name: "missing_value", err: errors.New(`ent: missing required field "StockCount.missing_value"`)}
 	}
 	return nil
 }
@@ -353,6 +417,18 @@ func (_c *StockCountCreate) createSpec() (*StockCount, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.MissingCount(); ok {
 		_spec.SetField(stockcount.FieldMissingCount, field.TypeInt, value)
 		_node.MissingCount = value
+	}
+	if value, ok := _c.mutation.ExpectedValue(); ok {
+		_spec.SetField(stockcount.FieldExpectedValue, field.TypeOther, value)
+		_node.ExpectedValue = value
+	}
+	if value, ok := _c.mutation.ScannedValue(); ok {
+		_spec.SetField(stockcount.FieldScannedValue, field.TypeOther, value)
+		_node.ScannedValue = value
+	}
+	if value, ok := _c.mutation.MissingValue(); ok {
+		_spec.SetField(stockcount.FieldMissingValue, field.TypeOther, value)
+		_node.MissingValue = value
 	}
 	if value, ok := _c.mutation.CountedBy(); ok {
 		_spec.SetField(stockcount.FieldCountedBy, field.TypeString, value)
@@ -549,6 +625,42 @@ func (u *StockCountUpsert) UpdateMissingCount() *StockCountUpsert {
 // AddMissingCount adds v to the "missing_count" field.
 func (u *StockCountUpsert) AddMissingCount(v int) *StockCountUpsert {
 	u.Add(stockcount.FieldMissingCount, v)
+	return u
+}
+
+// SetExpectedValue sets the "expected_value" field.
+func (u *StockCountUpsert) SetExpectedValue(v decimal.Decimal) *StockCountUpsert {
+	u.Set(stockcount.FieldExpectedValue, v)
+	return u
+}
+
+// UpdateExpectedValue sets the "expected_value" field to the value that was provided on create.
+func (u *StockCountUpsert) UpdateExpectedValue() *StockCountUpsert {
+	u.SetExcluded(stockcount.FieldExpectedValue)
+	return u
+}
+
+// SetScannedValue sets the "scanned_value" field.
+func (u *StockCountUpsert) SetScannedValue(v decimal.Decimal) *StockCountUpsert {
+	u.Set(stockcount.FieldScannedValue, v)
+	return u
+}
+
+// UpdateScannedValue sets the "scanned_value" field to the value that was provided on create.
+func (u *StockCountUpsert) UpdateScannedValue() *StockCountUpsert {
+	u.SetExcluded(stockcount.FieldScannedValue)
+	return u
+}
+
+// SetMissingValue sets the "missing_value" field.
+func (u *StockCountUpsert) SetMissingValue(v decimal.Decimal) *StockCountUpsert {
+	u.Set(stockcount.FieldMissingValue, v)
+	return u
+}
+
+// UpdateMissingValue sets the "missing_value" field to the value that was provided on create.
+func (u *StockCountUpsert) UpdateMissingValue() *StockCountUpsert {
+	u.SetExcluded(stockcount.FieldMissingValue)
 	return u
 }
 
@@ -797,6 +909,48 @@ func (u *StockCountUpsertOne) AddMissingCount(v int) *StockCountUpsertOne {
 func (u *StockCountUpsertOne) UpdateMissingCount() *StockCountUpsertOne {
 	return u.Update(func(s *StockCountUpsert) {
 		s.UpdateMissingCount()
+	})
+}
+
+// SetExpectedValue sets the "expected_value" field.
+func (u *StockCountUpsertOne) SetExpectedValue(v decimal.Decimal) *StockCountUpsertOne {
+	return u.Update(func(s *StockCountUpsert) {
+		s.SetExpectedValue(v)
+	})
+}
+
+// UpdateExpectedValue sets the "expected_value" field to the value that was provided on create.
+func (u *StockCountUpsertOne) UpdateExpectedValue() *StockCountUpsertOne {
+	return u.Update(func(s *StockCountUpsert) {
+		s.UpdateExpectedValue()
+	})
+}
+
+// SetScannedValue sets the "scanned_value" field.
+func (u *StockCountUpsertOne) SetScannedValue(v decimal.Decimal) *StockCountUpsertOne {
+	return u.Update(func(s *StockCountUpsert) {
+		s.SetScannedValue(v)
+	})
+}
+
+// UpdateScannedValue sets the "scanned_value" field to the value that was provided on create.
+func (u *StockCountUpsertOne) UpdateScannedValue() *StockCountUpsertOne {
+	return u.Update(func(s *StockCountUpsert) {
+		s.UpdateScannedValue()
+	})
+}
+
+// SetMissingValue sets the "missing_value" field.
+func (u *StockCountUpsertOne) SetMissingValue(v decimal.Decimal) *StockCountUpsertOne {
+	return u.Update(func(s *StockCountUpsert) {
+		s.SetMissingValue(v)
+	})
+}
+
+// UpdateMissingValue sets the "missing_value" field to the value that was provided on create.
+func (u *StockCountUpsertOne) UpdateMissingValue() *StockCountUpsertOne {
+	return u.Update(func(s *StockCountUpsert) {
+		s.UpdateMissingValue()
 	})
 }
 
@@ -1218,6 +1372,48 @@ func (u *StockCountUpsertBulk) AddMissingCount(v int) *StockCountUpsertBulk {
 func (u *StockCountUpsertBulk) UpdateMissingCount() *StockCountUpsertBulk {
 	return u.Update(func(s *StockCountUpsert) {
 		s.UpdateMissingCount()
+	})
+}
+
+// SetExpectedValue sets the "expected_value" field.
+func (u *StockCountUpsertBulk) SetExpectedValue(v decimal.Decimal) *StockCountUpsertBulk {
+	return u.Update(func(s *StockCountUpsert) {
+		s.SetExpectedValue(v)
+	})
+}
+
+// UpdateExpectedValue sets the "expected_value" field to the value that was provided on create.
+func (u *StockCountUpsertBulk) UpdateExpectedValue() *StockCountUpsertBulk {
+	return u.Update(func(s *StockCountUpsert) {
+		s.UpdateExpectedValue()
+	})
+}
+
+// SetScannedValue sets the "scanned_value" field.
+func (u *StockCountUpsertBulk) SetScannedValue(v decimal.Decimal) *StockCountUpsertBulk {
+	return u.Update(func(s *StockCountUpsert) {
+		s.SetScannedValue(v)
+	})
+}
+
+// UpdateScannedValue sets the "scanned_value" field to the value that was provided on create.
+func (u *StockCountUpsertBulk) UpdateScannedValue() *StockCountUpsertBulk {
+	return u.Update(func(s *StockCountUpsert) {
+		s.UpdateScannedValue()
+	})
+}
+
+// SetMissingValue sets the "missing_value" field.
+func (u *StockCountUpsertBulk) SetMissingValue(v decimal.Decimal) *StockCountUpsertBulk {
+	return u.Update(func(s *StockCountUpsert) {
+		s.SetMissingValue(v)
+	})
+}
+
+// UpdateMissingValue sets the "missing_value" field to the value that was provided on create.
+func (u *StockCountUpsertBulk) UpdateMissingValue() *StockCountUpsertBulk {
+	return u.Update(func(s *StockCountUpsert) {
+		s.UpdateMissingValue()
 	})
 }
 

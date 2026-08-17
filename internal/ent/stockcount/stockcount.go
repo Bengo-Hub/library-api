@@ -8,6 +8,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
 
 const (
@@ -35,6 +36,12 @@ const (
 	FieldScannedCount = "scanned_count"
 	// FieldMissingCount holds the string denoting the missing_count field in the database.
 	FieldMissingCount = "missing_count"
+	// FieldExpectedValue holds the string denoting the expected_value field in the database.
+	FieldExpectedValue = "expected_value"
+	// FieldScannedValue holds the string denoting the scanned_value field in the database.
+	FieldScannedValue = "scanned_value"
+	// FieldMissingValue holds the string denoting the missing_value field in the database.
+	FieldMissingValue = "missing_value"
 	// FieldCountedBy holds the string denoting the counted_by field in the database.
 	FieldCountedBy = "counted_by"
 	// FieldCompletedAt holds the string denoting the completed_at field in the database.
@@ -56,6 +63,9 @@ var Columns = []string{
 	FieldExpectedCount,
 	FieldScannedCount,
 	FieldMissingCount,
+	FieldExpectedValue,
+	FieldScannedValue,
+	FieldMissingValue,
 	FieldCountedBy,
 	FieldCompletedAt,
 }
@@ -83,6 +93,12 @@ var (
 	DefaultScannedCount int
 	// DefaultMissingCount holds the default value on creation for the "missing_count" field.
 	DefaultMissingCount int
+	// DefaultExpectedValue holds the default value on creation for the "expected_value" field.
+	DefaultExpectedValue decimal.Decimal
+	// DefaultScannedValue holds the default value on creation for the "scanned_value" field.
+	DefaultScannedValue decimal.Decimal
+	// DefaultMissingValue holds the default value on creation for the "missing_value" field.
+	DefaultMissingValue decimal.Decimal
 	// DefaultID holds the default value on creation for the "id" field.
 	DefaultID func() uuid.UUID
 )
@@ -165,6 +181,21 @@ func ByScannedCount(opts ...sql.OrderTermOption) OrderOption {
 // ByMissingCount orders the results by the missing_count field.
 func ByMissingCount(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMissingCount, opts...).ToFunc()
+}
+
+// ByExpectedValue orders the results by the expected_value field.
+func ByExpectedValue(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldExpectedValue, opts...).ToFunc()
+}
+
+// ByScannedValue orders the results by the scanned_value field.
+func ByScannedValue(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldScannedValue, opts...).ToFunc()
+}
+
+// ByMissingValue orders the results by the missing_value field.
+func ByMissingValue(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldMissingValue, opts...).ToFunc()
 }
 
 // ByCountedBy orders the results by the counted_by field.

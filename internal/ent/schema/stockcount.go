@@ -27,6 +27,11 @@ func (StockCount) Fields() []ent.Field {
 		field.Int("expected_count").Default(0),
 		field.Int("scanned_count").Default(0),
 		field.Int("missing_count").Default(0),
+		// Valuation trail (sum of BookCopy.acquisition_cost): expected at start, running total as
+		// copies are scanned, and what's left unaccounted for once missing copies are flagged LOST.
+		moneyField("expected_value"),
+		moneyField("scanned_value"),
+		moneyField("missing_value"),
 		field.String("counted_by").Optional(),
 		field.Time("completed_at").Optional().Nillable(),
 	}

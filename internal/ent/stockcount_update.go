@@ -15,6 +15,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/predicate"
 	"github.com/bengobox/library-service/internal/ent/stockcount"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
 
 // StockCountUpdate is the builder for updating StockCount entities.
@@ -179,6 +180,48 @@ func (_u *StockCountUpdate) AddMissingCount(v int) *StockCountUpdate {
 	return _u
 }
 
+// SetExpectedValue sets the "expected_value" field.
+func (_u *StockCountUpdate) SetExpectedValue(v decimal.Decimal) *StockCountUpdate {
+	_u.mutation.SetExpectedValue(v)
+	return _u
+}
+
+// SetNillableExpectedValue sets the "expected_value" field if the given value is not nil.
+func (_u *StockCountUpdate) SetNillableExpectedValue(v *decimal.Decimal) *StockCountUpdate {
+	if v != nil {
+		_u.SetExpectedValue(*v)
+	}
+	return _u
+}
+
+// SetScannedValue sets the "scanned_value" field.
+func (_u *StockCountUpdate) SetScannedValue(v decimal.Decimal) *StockCountUpdate {
+	_u.mutation.SetScannedValue(v)
+	return _u
+}
+
+// SetNillableScannedValue sets the "scanned_value" field if the given value is not nil.
+func (_u *StockCountUpdate) SetNillableScannedValue(v *decimal.Decimal) *StockCountUpdate {
+	if v != nil {
+		_u.SetScannedValue(*v)
+	}
+	return _u
+}
+
+// SetMissingValue sets the "missing_value" field.
+func (_u *StockCountUpdate) SetMissingValue(v decimal.Decimal) *StockCountUpdate {
+	_u.mutation.SetMissingValue(v)
+	return _u
+}
+
+// SetNillableMissingValue sets the "missing_value" field if the given value is not nil.
+func (_u *StockCountUpdate) SetNillableMissingValue(v *decimal.Decimal) *StockCountUpdate {
+	if v != nil {
+		_u.SetMissingValue(*v)
+	}
+	return _u
+}
+
 // SetCountedBy sets the "counted_by" field.
 func (_u *StockCountUpdate) SetCountedBy(v string) *StockCountUpdate {
 	_u.mutation.SetCountedBy(v)
@@ -328,6 +371,15 @@ func (_u *StockCountUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if value, ok := _u.mutation.AddedMissingCount(); ok {
 		_spec.AddField(stockcount.FieldMissingCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.ExpectedValue(); ok {
+		_spec.SetField(stockcount.FieldExpectedValue, field.TypeOther, value)
+	}
+	if value, ok := _u.mutation.ScannedValue(); ok {
+		_spec.SetField(stockcount.FieldScannedValue, field.TypeOther, value)
+	}
+	if value, ok := _u.mutation.MissingValue(); ok {
+		_spec.SetField(stockcount.FieldMissingValue, field.TypeOther, value)
 	}
 	if value, ok := _u.mutation.CountedBy(); ok {
 		_spec.SetField(stockcount.FieldCountedBy, field.TypeString, value)
@@ -510,6 +562,48 @@ func (_u *StockCountUpdateOne) AddMissingCount(v int) *StockCountUpdateOne {
 	return _u
 }
 
+// SetExpectedValue sets the "expected_value" field.
+func (_u *StockCountUpdateOne) SetExpectedValue(v decimal.Decimal) *StockCountUpdateOne {
+	_u.mutation.SetExpectedValue(v)
+	return _u
+}
+
+// SetNillableExpectedValue sets the "expected_value" field if the given value is not nil.
+func (_u *StockCountUpdateOne) SetNillableExpectedValue(v *decimal.Decimal) *StockCountUpdateOne {
+	if v != nil {
+		_u.SetExpectedValue(*v)
+	}
+	return _u
+}
+
+// SetScannedValue sets the "scanned_value" field.
+func (_u *StockCountUpdateOne) SetScannedValue(v decimal.Decimal) *StockCountUpdateOne {
+	_u.mutation.SetScannedValue(v)
+	return _u
+}
+
+// SetNillableScannedValue sets the "scanned_value" field if the given value is not nil.
+func (_u *StockCountUpdateOne) SetNillableScannedValue(v *decimal.Decimal) *StockCountUpdateOne {
+	if v != nil {
+		_u.SetScannedValue(*v)
+	}
+	return _u
+}
+
+// SetMissingValue sets the "missing_value" field.
+func (_u *StockCountUpdateOne) SetMissingValue(v decimal.Decimal) *StockCountUpdateOne {
+	_u.mutation.SetMissingValue(v)
+	return _u
+}
+
+// SetNillableMissingValue sets the "missing_value" field if the given value is not nil.
+func (_u *StockCountUpdateOne) SetNillableMissingValue(v *decimal.Decimal) *StockCountUpdateOne {
+	if v != nil {
+		_u.SetMissingValue(*v)
+	}
+	return _u
+}
+
 // SetCountedBy sets the "counted_by" field.
 func (_u *StockCountUpdateOne) SetCountedBy(v string) *StockCountUpdateOne {
 	_u.mutation.SetCountedBy(v)
@@ -689,6 +783,15 @@ func (_u *StockCountUpdateOne) sqlSave(ctx context.Context) (_node *StockCount, 
 	}
 	if value, ok := _u.mutation.AddedMissingCount(); ok {
 		_spec.AddField(stockcount.FieldMissingCount, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.ExpectedValue(); ok {
+		_spec.SetField(stockcount.FieldExpectedValue, field.TypeOther, value)
+	}
+	if value, ok := _u.mutation.ScannedValue(); ok {
+		_spec.SetField(stockcount.FieldScannedValue, field.TypeOther, value)
+	}
+	if value, ok := _u.mutation.MissingValue(); ok {
+		_spec.SetField(stockcount.FieldMissingValue, field.TypeOther, value)
 	}
 	if value, ok := _u.mutation.CountedBy(); ok {
 		_spec.SetField(stockcount.FieldCountedBy, field.TypeString, value)

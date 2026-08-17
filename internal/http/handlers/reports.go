@@ -78,6 +78,15 @@ func (h *ReportsHandler) buildSummary(ctx context.Context, tenantID uuid.UUID) m
 	bibs, _ := h.db.BibRecord.Query().Where(bibrecord.TenantID(tenantID)).Count(ctx)
 	copies, _ := h.db.BookCopy.Query().Where(bookcopy.TenantID(tenantID)).Count(ctx)
 	available, _ := h.db.BookCopy.Query().Where(bookcopy.TenantID(tenantID), bookcopy.StatusEQ(bookcopy.StatusAVAILABLE)).Count(ctx)
+
+	// Total collection value = sum(acquisition_cost) across all copies, for audit/insurance use.
+	collectionValue := decimal.Zero
+	allCopies, _ := h.db.BookCopy.Query().Where(bookcopy.TenantID(tenantID)).All(ctx)
+	for _, c := range allCopies {
+		if c.AcquisitionCost != nil {
+			collectionValue = collectionValue.Add(*c.AcquisitionCost)
+		}
+	}
 	checkoutsToday, _ := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.CheckoutAtGTE(startOfDay)).Count(ctx)
 	returnsToday, _ := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.ReturnedAtGTE(startOfDay)).Count(ctx)
 
@@ -98,6 +107,7 @@ func (h *ReportsHandler) buildSummary(ctx context.Context, tenantID uuid.UUID) m
 		"total_titles":      bibs,
 		"total_copies":      copies,
 		"available_copies":  available,
+		"collection_value":  collectionValue.InexactFloat64(),
 		"outstanding_fines": outstanding.InexactFloat64(),
 		"checkouts_today":   checkoutsToday,
 		"returns_today":     returnsToday,

@@ -8,6 +8,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/bengobox/library-service/internal/ent/predicate"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
 
 // ID filters vertices based on their ID field.
@@ -93,6 +94,21 @@ func ScannedCount(v int) predicate.StockCount {
 // MissingCount applies equality check predicate on the "missing_count" field. It's identical to MissingCountEQ.
 func MissingCount(v int) predicate.StockCount {
 	return predicate.StockCount(sql.FieldEQ(FieldMissingCount, v))
+}
+
+// ExpectedValue applies equality check predicate on the "expected_value" field. It's identical to ExpectedValueEQ.
+func ExpectedValue(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldEQ(FieldExpectedValue, v))
+}
+
+// ScannedValue applies equality check predicate on the "scanned_value" field. It's identical to ScannedValueEQ.
+func ScannedValue(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldEQ(FieldScannedValue, v))
+}
+
+// MissingValue applies equality check predicate on the "missing_value" field. It's identical to MissingValueEQ.
+func MissingValue(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldEQ(FieldMissingValue, v))
 }
 
 // CountedBy applies equality check predicate on the "counted_by" field. It's identical to CountedByEQ.
@@ -488,6 +504,126 @@ func MissingCountLT(v int) predicate.StockCount {
 // MissingCountLTE applies the LTE predicate on the "missing_count" field.
 func MissingCountLTE(v int) predicate.StockCount {
 	return predicate.StockCount(sql.FieldLTE(FieldMissingCount, v))
+}
+
+// ExpectedValueEQ applies the EQ predicate on the "expected_value" field.
+func ExpectedValueEQ(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldEQ(FieldExpectedValue, v))
+}
+
+// ExpectedValueNEQ applies the NEQ predicate on the "expected_value" field.
+func ExpectedValueNEQ(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldNEQ(FieldExpectedValue, v))
+}
+
+// ExpectedValueIn applies the In predicate on the "expected_value" field.
+func ExpectedValueIn(vs ...decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldIn(FieldExpectedValue, vs...))
+}
+
+// ExpectedValueNotIn applies the NotIn predicate on the "expected_value" field.
+func ExpectedValueNotIn(vs ...decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldNotIn(FieldExpectedValue, vs...))
+}
+
+// ExpectedValueGT applies the GT predicate on the "expected_value" field.
+func ExpectedValueGT(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldGT(FieldExpectedValue, v))
+}
+
+// ExpectedValueGTE applies the GTE predicate on the "expected_value" field.
+func ExpectedValueGTE(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldGTE(FieldExpectedValue, v))
+}
+
+// ExpectedValueLT applies the LT predicate on the "expected_value" field.
+func ExpectedValueLT(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldLT(FieldExpectedValue, v))
+}
+
+// ExpectedValueLTE applies the LTE predicate on the "expected_value" field.
+func ExpectedValueLTE(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldLTE(FieldExpectedValue, v))
+}
+
+// ScannedValueEQ applies the EQ predicate on the "scanned_value" field.
+func ScannedValueEQ(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldEQ(FieldScannedValue, v))
+}
+
+// ScannedValueNEQ applies the NEQ predicate on the "scanned_value" field.
+func ScannedValueNEQ(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldNEQ(FieldScannedValue, v))
+}
+
+// ScannedValueIn applies the In predicate on the "scanned_value" field.
+func ScannedValueIn(vs ...decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldIn(FieldScannedValue, vs...))
+}
+
+// ScannedValueNotIn applies the NotIn predicate on the "scanned_value" field.
+func ScannedValueNotIn(vs ...decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldNotIn(FieldScannedValue, vs...))
+}
+
+// ScannedValueGT applies the GT predicate on the "scanned_value" field.
+func ScannedValueGT(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldGT(FieldScannedValue, v))
+}
+
+// ScannedValueGTE applies the GTE predicate on the "scanned_value" field.
+func ScannedValueGTE(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldGTE(FieldScannedValue, v))
+}
+
+// ScannedValueLT applies the LT predicate on the "scanned_value" field.
+func ScannedValueLT(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldLT(FieldScannedValue, v))
+}
+
+// ScannedValueLTE applies the LTE predicate on the "scanned_value" field.
+func ScannedValueLTE(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldLTE(FieldScannedValue, v))
+}
+
+// MissingValueEQ applies the EQ predicate on the "missing_value" field.
+func MissingValueEQ(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldEQ(FieldMissingValue, v))
+}
+
+// MissingValueNEQ applies the NEQ predicate on the "missing_value" field.
+func MissingValueNEQ(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldNEQ(FieldMissingValue, v))
+}
+
+// MissingValueIn applies the In predicate on the "missing_value" field.
+func MissingValueIn(vs ...decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldIn(FieldMissingValue, vs...))
+}
+
+// MissingValueNotIn applies the NotIn predicate on the "missing_value" field.
+func MissingValueNotIn(vs ...decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldNotIn(FieldMissingValue, vs...))
+}
+
+// MissingValueGT applies the GT predicate on the "missing_value" field.
+func MissingValueGT(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldGT(FieldMissingValue, v))
+}
+
+// MissingValueGTE applies the GTE predicate on the "missing_value" field.
+func MissingValueGTE(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldGTE(FieldMissingValue, v))
+}
+
+// MissingValueLT applies the LT predicate on the "missing_value" field.
+func MissingValueLT(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldLT(FieldMissingValue, v))
+}
+
+// MissingValueLTE applies the LTE predicate on the "missing_value" field.
+func MissingValueLTE(v decimal.Decimal) predicate.StockCount {
+	return predicate.StockCount(sql.FieldLTE(FieldMissingValue, v))
 }
 
 // CountedByEQ applies the EQ predicate on the "counted_by" field.

@@ -8,17 +8,19 @@ import (
 	"time"
 
 	sharedpagination "github.com/Bengo-Hub/pagination"
+	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
 	"github.com/bengobox/library-service/internal/ent/acquisitionfund"
 	"github.com/bengobox/library-service/internal/ent/bibrecord"
-	entvendor "github.com/bengobox/library-service/internal/ent/vendor"
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
+	"github.com/bengobox/library-service/internal/ent/branch"
 	"github.com/bengobox/library-service/internal/ent/ebookloan"
 	"github.com/bengobox/library-service/internal/ent/fine"
 	"github.com/bengobox/library-service/internal/ent/loan"
 	"github.com/bengobox/library-service/internal/ent/member"
 	"github.com/bengobox/library-service/internal/ent/purchaseorder"
+	entvendor "github.com/bengobox/library-service/internal/ent/vendor"
 )
 
 // wantCSV returns true when the caller requests CSV output (?format=csv).
@@ -156,10 +158,10 @@ func (h *ReportsHandler) ItemMovement(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type row struct {
-		CopyID   string `json:"copy_id"`
-		Barcode  string `json:"barcode"`
-		Title    string `json:"title"`
-		Checkouts int   `json:"checkouts"`
+		CopyID    string `json:"copy_id"`
+		Barcode   string `json:"barcode"`
+		Title     string `json:"title"`
+		Checkouts int    `json:"checkouts"`
 	}
 	rows := make([]row, 0, len(counts))
 	for cid, n := range counts {
@@ -343,8 +345,18 @@ func (h *ReportsHandler) CatalogStats(w http.ResponseWriter, r *http.Request) {
 	}
 
 	byStatus := map[string]int{}
+	valueByStatus := map[string]decimal.Decimal{}
+	valueByBranch := map[uuid.UUID]decimal.Decimal{}
+	totalValue := decimal.Zero
 	for _, c := range copies {
 		byStatus[c.Status.String()]++
+		cost := decimal.Zero
+		if c.AcquisitionCost != nil {
+			cost = *c.AcquisitionCost
+		}
+		valueByStatus[c.Status.String()] = valueByStatus[c.Status.String()].Add(cost)
+		valueByBranch[c.BranchID] = valueByBranch[c.BranchID].Add(cost)
+		totalValue = totalValue.Add(cost)
 	}
 
 	type kv struct {
@@ -360,12 +372,44 @@ func (h *ReportsHandler) CatalogStats(w http.ResponseWriter, r *http.Request) {
 		return out
 	}
 
+	type kvValue struct {
+		Key   string  `json:"key"`
+		Value float64 `json:"value"`
+	}
+	toKVValue := func(m map[string]decimal.Decimal) []kvValue {
+		out := make([]kvValue, 0, len(m))
+		for k, v := range m {
+			out = append(out, kvValue{k, v.InexactFloat64()})
+		}
+		sort.Slice(out, func(i, j int) bool { return out[i].Value > out[j].Value })
+		return out
+	}
+
+	branchNames := map[uuid.UUID]string{}
+	if len(valueByBranch) > 0 {
+		branches, _ := h.db.Branch.Query().Where(branch.TenantID(tenantID)).All(ctx)
+		for _, b := range branches {
+			branchNames[b.ID] = b.Name
+		}
+	}
+	valueByBranchNamed := map[string]decimal.Decimal{}
+	for id, v := range valueByBranch {
+		name, ok := branchNames[id]
+		if !ok {
+			name = id.String()
+		}
+		valueByBranchNamed[name] = v
+	}
+
 	respondJSON(w, http.StatusOK, map[string]any{
-		"total_titles": len(bibs),
-		"total_copies": len(copies),
-		"by_format":    toKV(byFormat),
-		"by_language":  toKV(byLang),
-		"by_copy_status": toKV(byStatus),
+		"total_titles":         len(bibs),
+		"total_copies":         len(copies),
+		"by_format":            toKV(byFormat),
+		"by_language":          toKV(byLang),
+		"by_copy_status":       toKV(byStatus),
+		"total_value":          totalValue.InexactFloat64(),
+		"value_by_copy_status": toKVValue(valueByStatus),
+		"value_by_branch":      toKVValue(valueByBranchNamed),
 	})
 }
 
@@ -383,10 +427,10 @@ func (h *ReportsHandler) EbookUsage(w http.ResponseWriter, r *http.Request) {
 		Where(ebookloan.TenantID(tenantID), ebookloan.IssuedAtGTE(since)).All(ctx)
 
 	type ebookStat struct {
-		EbookID   string  `json:"ebook_id"`
-		Title     string  `json:"title"`
-		Loans     int     `json:"loans"`
-		AvgHours  float64 `json:"avg_hours"`
+		EbookID  string  `json:"ebook_id"`
+		Title    string  `json:"title"`
+		Loans    int     `json:"loans"`
+		AvgHours float64 `json:"avg_hours"`
 	}
 	statsMap := map[string]*ebookStat{}
 	totalHours := map[string]float64{}
@@ -428,9 +472,9 @@ func (h *ReportsHandler) EbookUsage(w http.ResponseWriter, r *http.Request) {
 		Where(ebookloan.TenantID(tenantID), ebookloan.ReturnedAtIsNil(), ebookloan.ExpiresAtGT(time.Now())).Count(ctx)
 
 	respondJSON(w, http.StatusOK, map[string]any{
-		"total_loans":        len(loans),
-		"active_loans_now":   activeLoanCount,
-		"popular_titles":     rows,
+		"total_loans":      len(loans),
+		"active_loans_now": activeLoanCount,
+		"popular_titles":   rows,
 	})
 }
 

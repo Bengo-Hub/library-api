@@ -1414,6 +1414,9 @@ var (
 		{Name: "expected_count", Type: field.TypeInt, Default: 0},
 		{Name: "scanned_count", Type: field.TypeInt, Default: 0},
 		{Name: "missing_count", Type: field.TypeInt, Default: 0},
+		{Name: "expected_value", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "scanned_value", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "missing_value", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
 		{Name: "counted_by", Type: field.TypeString, Nullable: true},
 		{Name: "completed_at", Type: field.TypeTime, Nullable: true},
 	}

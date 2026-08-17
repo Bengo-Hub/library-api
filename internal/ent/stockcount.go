@@ -12,6 +12,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"github.com/bengobox/library-service/internal/ent/stockcount"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 )
 
 // StockCount is the model entity for the StockCount schema.
@@ -39,6 +40,12 @@ type StockCount struct {
 	ScannedCount int `json:"scanned_count,omitempty"`
 	// MissingCount holds the value of the "missing_count" field.
 	MissingCount int `json:"missing_count,omitempty"`
+	// ExpectedValue holds the value of the "expected_value" field.
+	ExpectedValue decimal.Decimal `json:"expected_value,omitempty"`
+	// ScannedValue holds the value of the "scanned_value" field.
+	ScannedValue decimal.Decimal `json:"scanned_value,omitempty"`
+	// MissingValue holds the value of the "missing_value" field.
+	MissingValue decimal.Decimal `json:"missing_value,omitempty"`
 	// CountedBy holds the value of the "counted_by" field.
 	CountedBy string `json:"counted_by,omitempty"`
 	// CompletedAt holds the value of the "completed_at" field.
@@ -53,6 +60,8 @@ func (*StockCount) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case stockcount.FieldScannedCopyIds:
 			values[i] = new([]byte)
+		case stockcount.FieldExpectedValue, stockcount.FieldScannedValue, stockcount.FieldMissingValue:
+			values[i] = new(decimal.Decimal)
 		case stockcount.FieldExpectedCount, stockcount.FieldScannedCount, stockcount.FieldMissingCount:
 			values[i] = new(sql.NullInt64)
 		case stockcount.FieldReference, stockcount.FieldStatus, stockcount.FieldCountedBy:
@@ -144,6 +153,24 @@ func (_m *StockCount) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.MissingCount = int(value.Int64)
 			}
+		case stockcount.FieldExpectedValue:
+			if value, ok := values[i].(*decimal.Decimal); !ok {
+				return fmt.Errorf("unexpected type %T for field expected_value", values[i])
+			} else if value != nil {
+				_m.ExpectedValue = *value
+			}
+		case stockcount.FieldScannedValue:
+			if value, ok := values[i].(*decimal.Decimal); !ok {
+				return fmt.Errorf("unexpected type %T for field scanned_value", values[i])
+			} else if value != nil {
+				_m.ScannedValue = *value
+			}
+		case stockcount.FieldMissingValue:
+			if value, ok := values[i].(*decimal.Decimal); !ok {
+				return fmt.Errorf("unexpected type %T for field missing_value", values[i])
+			} else if value != nil {
+				_m.MissingValue = *value
+			}
 		case stockcount.FieldCountedBy:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field counted_by", values[i])
@@ -222,6 +249,15 @@ func (_m *StockCount) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("missing_count=")
 	builder.WriteString(fmt.Sprintf("%v", _m.MissingCount))
+	builder.WriteString(", ")
+	builder.WriteString("expected_value=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ExpectedValue))
+	builder.WriteString(", ")
+	builder.WriteString("scanned_value=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ScannedValue))
+	builder.WriteString(", ")
+	builder.WriteString("missing_value=")
+	builder.WriteString(fmt.Sprintf("%v", _m.MissingValue))
 	builder.WriteString(", ")
 	builder.WriteString("counted_by=")
 	builder.WriteString(_m.CountedBy)

@@ -7,6 +7,7 @@ import (
 	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 
 	"github.com/bengobox/library-service/internal/ent"
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
@@ -54,9 +55,15 @@ func (h *CatalogHandler) StartStocktake(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	expected, _ := h.countableCopies(r, tenantID, branchID)
+	expectedValue := decimal.Zero
+	for _, c := range expected {
+		if c.AcquisitionCost != nil {
+			expectedValue = expectedValue.Add(*c.AcquisitionCost)
+		}
+	}
 	row, err := h.db.StockCount.Create().
 		SetTenantID(tenantID).SetBranchID(branchID).SetReference(req.Reference).
-		SetExpectedCount(len(expected)).SetCountedBy(UserIDFrom(r)).Save(r.Context())
+		SetExpectedCount(len(expected)).SetExpectedValue(expectedValue).SetCountedBy(UserIDFrom(r)).Save(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "create_failed")
 		return
@@ -76,7 +83,8 @@ func (h *CatalogHandler) ScanStocktake(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req struct {
-		Barcode string `json:"barcode"`
+		Barcode string   `json:"barcode"`
+		Amount  *float64 `json:"amount"`
 	}
 	if err := Decode(r, &req); err != nil || req.Barcode == "" {
 		respondError(w, http.StatusBadRequest, "barcode is required", "invalid_request")
@@ -100,16 +108,40 @@ func (h *CatalogHandler) ScanStocktake(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusConflict, "copy belongs to a different branch", "wrong_branch")
 		return
 	}
-	// Dedupe + append.
+
+	// A staff-entered amount updates the copy's acquisition cost (e.g. filling in a value that
+	// was never recorded, or correcting one found during physical counting).
+	oldValue := decimal.Zero
+	if c.AcquisitionCost != nil {
+		oldValue = *c.AcquisitionCost
+	}
+	newValue := oldValue
+	if req.Amount != nil {
+		newValue = decimal.NewFromFloat(*req.Amount)
+		c, err = h.db.BookCopy.UpdateOneID(c.ID).SetAcquisitionCost(newValue).Save(r.Context())
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, err.Error(), "copy_update_failed")
+			return
+		}
+	}
+
+	// Dedupe + append; scanned_value only moves by the value actually newly accounted for
+	// (full value on a first scan, just the correction delta on a re-scan).
 	seen := map[string]bool{}
 	for _, s := range sc.ScannedCopyIds {
 		seen[s] = true
 	}
-	if !seen[c.ID.String()] {
+	alreadyScanned := seen[c.ID.String()]
+	valueDelta := decimal.Zero
+	if !alreadyScanned {
 		sc.ScannedCopyIds = append(sc.ScannedCopyIds, c.ID.String())
+		valueDelta = newValue
+	} else if req.Amount != nil {
+		valueDelta = newValue.Sub(oldValue)
 	}
 	updated, err := h.db.StockCount.UpdateOneID(sc.ID).
-		SetScannedCopyIds(sc.ScannedCopyIds).SetScannedCount(len(sc.ScannedCopyIds)).Save(r.Context())
+		SetScannedCopyIds(sc.ScannedCopyIds).SetScannedCount(len(sc.ScannedCopyIds)).
+		SetScannedValue(sc.ScannedValue.Add(valueDelta)).Save(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "scan_failed")
 		return
@@ -143,14 +175,19 @@ func (h *CatalogHandler) FinalizeStocktake(w http.ResponseWriter, r *http.Reques
 	}
 	copies, _ := h.countableCopies(r, tenantID, sc.BranchID)
 	missing := 0
+	missingValue := decimal.Zero
 	for _, c := range copies {
 		if !scanned[c.ID.String()] {
+			if c.AcquisitionCost != nil {
+				missingValue = missingValue.Add(*c.AcquisitionCost)
+			}
 			_, _ = h.db.BookCopy.UpdateOneID(c.ID).SetStatus(bookcopy.StatusLOST).Save(r.Context())
 			missing++
 		}
 	}
 	updated, err := h.db.StockCount.UpdateOneID(sc.ID).
-		SetStatus(stockcount.StatusCOMPLETED).SetMissingCount(missing).SetCompletedAt(time.Now()).Save(r.Context())
+		SetStatus(stockcount.StatusCOMPLETED).SetMissingCount(missing).SetMissingValue(missingValue).
+		SetCompletedAt(time.Now()).Save(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "finalize_failed")
 		return

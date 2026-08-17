@@ -37424,6 +37424,9 @@ type StockCountMutation struct {
 	addscanned_count       *int
 	missing_count          *int
 	addmissing_count       *int
+	expected_value         *decimal.Decimal
+	scanned_value          *decimal.Decimal
+	missing_value          *decimal.Decimal
 	counted_by             *string
 	completed_at           *time.Time
 	clearedFields          map[string]struct{}
@@ -37998,6 +38001,114 @@ func (m *StockCountMutation) ResetMissingCount() {
 	m.addmissing_count = nil
 }
 
+// SetExpectedValue sets the "expected_value" field.
+func (m *StockCountMutation) SetExpectedValue(d decimal.Decimal) {
+	m.expected_value = &d
+}
+
+// ExpectedValue returns the value of the "expected_value" field in the mutation.
+func (m *StockCountMutation) ExpectedValue() (r decimal.Decimal, exists bool) {
+	v := m.expected_value
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExpectedValue returns the old "expected_value" field's value of the StockCount entity.
+// If the StockCount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StockCountMutation) OldExpectedValue(ctx context.Context) (v decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExpectedValue is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExpectedValue requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExpectedValue: %w", err)
+	}
+	return oldValue.ExpectedValue, nil
+}
+
+// ResetExpectedValue resets all changes to the "expected_value" field.
+func (m *StockCountMutation) ResetExpectedValue() {
+	m.expected_value = nil
+}
+
+// SetScannedValue sets the "scanned_value" field.
+func (m *StockCountMutation) SetScannedValue(d decimal.Decimal) {
+	m.scanned_value = &d
+}
+
+// ScannedValue returns the value of the "scanned_value" field in the mutation.
+func (m *StockCountMutation) ScannedValue() (r decimal.Decimal, exists bool) {
+	v := m.scanned_value
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldScannedValue returns the old "scanned_value" field's value of the StockCount entity.
+// If the StockCount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StockCountMutation) OldScannedValue(ctx context.Context) (v decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldScannedValue is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldScannedValue requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldScannedValue: %w", err)
+	}
+	return oldValue.ScannedValue, nil
+}
+
+// ResetScannedValue resets all changes to the "scanned_value" field.
+func (m *StockCountMutation) ResetScannedValue() {
+	m.scanned_value = nil
+}
+
+// SetMissingValue sets the "missing_value" field.
+func (m *StockCountMutation) SetMissingValue(d decimal.Decimal) {
+	m.missing_value = &d
+}
+
+// MissingValue returns the value of the "missing_value" field in the mutation.
+func (m *StockCountMutation) MissingValue() (r decimal.Decimal, exists bool) {
+	v := m.missing_value
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMissingValue returns the old "missing_value" field's value of the StockCount entity.
+// If the StockCount object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *StockCountMutation) OldMissingValue(ctx context.Context) (v decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMissingValue is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMissingValue requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMissingValue: %w", err)
+	}
+	return oldValue.MissingValue, nil
+}
+
+// ResetMissingValue resets all changes to the "missing_value" field.
+func (m *StockCountMutation) ResetMissingValue() {
+	m.missing_value = nil
+}
+
 // SetCountedBy sets the "counted_by" field.
 func (m *StockCountMutation) SetCountedBy(s string) {
 	m.counted_by = &s
@@ -38130,7 +38241,7 @@ func (m *StockCountMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *StockCountMutation) Fields() []string {
-	fields := make([]string, 0, 12)
+	fields := make([]string, 0, 15)
 	if m.created_at != nil {
 		fields = append(fields, stockcount.FieldCreatedAt)
 	}
@@ -38160,6 +38271,15 @@ func (m *StockCountMutation) Fields() []string {
 	}
 	if m.missing_count != nil {
 		fields = append(fields, stockcount.FieldMissingCount)
+	}
+	if m.expected_value != nil {
+		fields = append(fields, stockcount.FieldExpectedValue)
+	}
+	if m.scanned_value != nil {
+		fields = append(fields, stockcount.FieldScannedValue)
+	}
+	if m.missing_value != nil {
+		fields = append(fields, stockcount.FieldMissingValue)
 	}
 	if m.counted_by != nil {
 		fields = append(fields, stockcount.FieldCountedBy)
@@ -38195,6 +38315,12 @@ func (m *StockCountMutation) Field(name string) (ent.Value, bool) {
 		return m.ScannedCount()
 	case stockcount.FieldMissingCount:
 		return m.MissingCount()
+	case stockcount.FieldExpectedValue:
+		return m.ExpectedValue()
+	case stockcount.FieldScannedValue:
+		return m.ScannedValue()
+	case stockcount.FieldMissingValue:
+		return m.MissingValue()
 	case stockcount.FieldCountedBy:
 		return m.CountedBy()
 	case stockcount.FieldCompletedAt:
@@ -38228,6 +38354,12 @@ func (m *StockCountMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldScannedCount(ctx)
 	case stockcount.FieldMissingCount:
 		return m.OldMissingCount(ctx)
+	case stockcount.FieldExpectedValue:
+		return m.OldExpectedValue(ctx)
+	case stockcount.FieldScannedValue:
+		return m.OldScannedValue(ctx)
+	case stockcount.FieldMissingValue:
+		return m.OldMissingValue(ctx)
 	case stockcount.FieldCountedBy:
 		return m.OldCountedBy(ctx)
 	case stockcount.FieldCompletedAt:
@@ -38310,6 +38442,27 @@ func (m *StockCountMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetMissingCount(v)
+		return nil
+	case stockcount.FieldExpectedValue:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExpectedValue(v)
+		return nil
+	case stockcount.FieldScannedValue:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetScannedValue(v)
+		return nil
+	case stockcount.FieldMissingValue:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMissingValue(v)
 		return nil
 	case stockcount.FieldCountedBy:
 		v, ok := value.(string)
@@ -38469,6 +38622,15 @@ func (m *StockCountMutation) ResetField(name string) error {
 		return nil
 	case stockcount.FieldMissingCount:
 		m.ResetMissingCount()
+		return nil
+	case stockcount.FieldExpectedValue:
+		m.ResetExpectedValue()
+		return nil
+	case stockcount.FieldScannedValue:
+		m.ResetScannedValue()
+		return nil
+	case stockcount.FieldMissingValue:
+		m.ResetMissingValue()
 		return nil
 	case stockcount.FieldCountedBy:
 		m.ResetCountedBy()

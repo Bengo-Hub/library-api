@@ -1197,6 +1197,18 @@ func init() {
 	stockcountDescMissingCount := stockcountFields[6].Descriptor()
 	// stockcount.DefaultMissingCount holds the default value on creation for the missing_count field.
 	stockcount.DefaultMissingCount = stockcountDescMissingCount.Default.(int)
+	// stockcountDescExpectedValue is the schema descriptor for expected_value field.
+	stockcountDescExpectedValue := stockcountFields[7].Descriptor()
+	// stockcount.DefaultExpectedValue holds the default value on creation for the expected_value field.
+	stockcount.DefaultExpectedValue = stockcountDescExpectedValue.Default.(decimal.Decimal)
+	// stockcountDescScannedValue is the schema descriptor for scanned_value field.
+	stockcountDescScannedValue := stockcountFields[8].Descriptor()
+	// stockcount.DefaultScannedValue holds the default value on creation for the scanned_value field.
+	stockcount.DefaultScannedValue = stockcountDescScannedValue.Default.(decimal.Decimal)
+	// stockcountDescMissingValue is the schema descriptor for missing_value field.
+	stockcountDescMissingValue := stockcountFields[9].Descriptor()
+	// stockcount.DefaultMissingValue holds the default value on creation for the missing_value field.
+	stockcount.DefaultMissingValue = stockcountDescMissingValue.Default.(decimal.Decimal)
 	// stockcountDescID is the schema descriptor for id field.
 	stockcountDescID := stockcountMixinFields0[0].Descriptor()
 	// stockcount.DefaultID holds the default value on creation for the id field.
