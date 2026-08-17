@@ -22,14 +22,12 @@ type avSeed struct {
 // These match Koha's standard categories and are marked is_system=true.
 var systemAVs = []avSeed{
 	// LOC — Shelving Locations
-	{"LOC", "GEN", "General Stacks", "Main circulating collection", 1},
-	{"LOC", "REF", "Reference", "Non-circulating reference material", 2},
-	{"LOC", "CHI", "Children's Section", "Children's collection", 3},
-	{"LOC", "JUV", "Young Adult", "Young adult section", 4},
-	{"LOC", "PER", "Periodicals", "Magazines, journals, newspapers", 5},
-	{"LOC", "AV", "AV / Media", "Audio-visual and digital media", 6},
-	{"LOC", "RSRV", "Course Reserve", "Short-loan course reserve shelf", 7},
-	{"LOC", "RARE", "Special Collections", "Rare and archival material", 8},
+	{"LOC", "REF", "Reference", "Non-circulating reference material", 1},
+	{"LOC", "JUV", "Junior", "Junior section", 2},
+	{"LOC", "PER", "Periodicals", "Magazines, journals, newspapers", 3},
+	{"LOC", "AV", "AV / Media", "Audio-visual and digital media", 4},
+	{"LOC", "RSRV", "Course Reserve", "Short-loan course reserve shelf", 5},
+	{"LOC", "RARE", "Special Collections", "Rare and archival material", 6},
 
 	// CCODE — Collection Codes
 	{"CCODE", "GEN", "General", "", 1},
@@ -65,9 +63,48 @@ var systemAVs = []avSeed{
 	{"PAYMENT_TYPE", "WAIVER", "Waiver", "Administrative waiver", 4},
 }
 
+// legacyAVRelabels updates the label/description of system authorized values that were
+// renamed in a later curation pass, keyed by category+value (the seed check below is keyed
+// on value, not label, so a plain rename never reaches already-seeded tenants otherwise).
+var legacyAVRelabels = []avSeed{
+	{"LOC", "JUV", "Junior", "Junior section", 2},
+}
+
+// legacyAVRemovals deletes system authorized values dropped from the curated set (e.g.
+// merged into another value or judged redundant), so already-seeded tenants don't keep
+// stale shelving locations around.
+var legacyAVRemovals = []struct{ Category, Value string }{
+	{"LOC", "GEN"},
+	{"LOC", "CHI"},
+}
+
 // SeedAuthorizedValues idempotently inserts system authorized values for the
 // given tenant. Safe to call on every startup.
 func SeedAuthorizedValues(ctx context.Context, db *ent.Client, tenantID uuid.UUID, log *zap.Logger) error {
+	for _, av := range legacyAVRelabels {
+		n, err := db.AuthorizedValue.Update().
+			Where(authorizedvalue.TenantIDEQ(tenantID), authorizedvalue.CategoryEQ(av.Category), authorizedvalue.ValueEQ(av.Value)).
+			SetLabel(av.Label).
+			SetDescription(av.Description).
+			Save(ctx)
+		if err != nil {
+			log.Warn("relabel legacy authorized value failed", zap.String("category", av.Category), zap.String("value", av.Value), zap.Error(err))
+		} else if n > 0 {
+			log.Info("relabeled legacy authorized value", zap.String("category", av.Category), zap.String("value", av.Value), zap.String("label", av.Label))
+		}
+	}
+
+	for _, r := range legacyAVRemovals {
+		n, err := db.AuthorizedValue.Delete().
+			Where(authorizedvalue.TenantIDEQ(tenantID), authorizedvalue.CategoryEQ(r.Category), authorizedvalue.ValueEQ(r.Value)).
+			Exec(ctx)
+		if err != nil {
+			log.Warn("remove legacy authorized value failed", zap.String("category", r.Category), zap.String("value", r.Value), zap.Error(err))
+		} else if n > 0 {
+			log.Info("removed legacy authorized value", zap.String("category", r.Category), zap.String("value", r.Value))
+		}
+	}
+
 	for _, av := range systemAVs {
 		exists, err := db.AuthorizedValue.Query().
 			Where(
