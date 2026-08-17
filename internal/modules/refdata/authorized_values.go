@@ -22,12 +22,13 @@ type avSeed struct {
 // These match Koha's standard categories and are marked is_system=true.
 var systemAVs = []avSeed{
 	// LOC — Shelving Locations
-	{"LOC", "REF", "Reference", "Non-circulating reference material", 1},
-	{"LOC", "JUV", "Junior", "Junior section", 2},
-	{"LOC", "PER", "Periodicals", "Magazines, journals, newspapers", 3},
-	{"LOC", "AV", "AV / Media", "Audio-visual and digital media", 4},
-	{"LOC", "RSRV", "Course Reserve", "Short-loan course reserve shelf", 5},
-	{"LOC", "RARE", "Special Collections", "Rare and archival material", 6},
+	{"LOC", "GEN", "Adult", "Main circulating adult section", 1},
+	{"LOC", "REF", "Reference", "Non-circulating reference material", 2},
+	{"LOC", "JUV", "Junior", "Junior section", 3},
+	{"LOC", "PER", "Periodicals", "Magazines, journals, newspapers", 4},
+	{"LOC", "AV", "AV / Media", "Audio-visual and digital media", 5},
+	{"LOC", "RSRV", "Course Reserve", "Short-loan course reserve shelf", 6},
+	{"LOC", "RARE", "Special Collections", "Rare and archival material", 7},
 
 	// CCODE — Collection Codes
 	{"CCODE", "GEN", "General", "", 1},
@@ -67,14 +68,14 @@ var systemAVs = []avSeed{
 // renamed in a later curation pass, keyed by category+value (the seed check below is keyed
 // on value, not label, so a plain rename never reaches already-seeded tenants otherwise).
 var legacyAVRelabels = []avSeed{
-	{"LOC", "JUV", "Junior", "Junior section", 2},
+	{"LOC", "GEN", "Adult", "Main circulating adult section", 1},
+	{"LOC", "JUV", "Junior", "Junior section", 3},
 }
 
 // legacyAVRemovals deletes system authorized values dropped from the curated set (e.g.
 // merged into another value or judged redundant), so already-seeded tenants don't keep
 // stale shelving locations around.
 var legacyAVRemovals = []struct{ Category, Value string }{
-	{"LOC", "GEN"},
 	{"LOC", "CHI"},
 }
 
