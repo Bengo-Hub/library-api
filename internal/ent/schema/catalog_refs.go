@@ -68,7 +68,7 @@ func (Subject) Indexes() []ent.Index {
 	}
 }
 
-// Collection is a hierarchical shelving/grouping (e.g. Reference, Children's, Research).
+// Collection is a hierarchical shelving/grouping (e.g. Reference, Junior, Research).
 // is_reference_only marks collections whose copies cannot leave the building.
 type Collection struct {
 	ent.Schema

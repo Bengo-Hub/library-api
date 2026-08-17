@@ -1,5 +1,5 @@
 // Package refdata seeds shared reference data. Global library collections (Fiction, Reference,
-// Children's…) are seeded once under the nil-UUID "global" tenant so every tenant sees them as
+// Junior…) are seeded once under the nil-UUID "global" tenant so every tenant sees them as
 // defaults; a tenant can still create its own custom collections (its real tenant_id). This
 // follows the "shared core reference data" rule while keeping collections joinable per tenant.
 package refdata
@@ -30,8 +30,9 @@ var defaultCollections = []defaultCollection{
 	{"Fiction", "FIC", false},
 	{"Non-Fiction", "NONFIC", false},
 	{"Reference", "REF", true},
-	{"Children's", "JUV", false},
+	{"Junior", "JUV", false},
 	{"Young Adult", "YA", false},
+	{"Adult", "ADU", false},
 	{"Biography & Memoir", "BIO", false},
 	{"Textbooks & Academic", "TXT", false},
 	{"Periodicals & Journals", "PER", false},
@@ -41,9 +42,28 @@ var defaultCollections = []defaultCollection{
 	{"Research", "RES", false},
 }
 
+// legacyCollectionRenames maps names seeded by older versions of defaultCollections to their
+// current name, so already-seeded tenants get the rename in place instead of ending up with
+// both the old and new global collection.
+var legacyCollectionRenames = map[string]string{
+	"Children's": "Junior",
+}
+
 // SeedGlobalCollections idempotently inserts the global default collections (by name under the
 // nil tenant). Safe to run on every boot.
 func SeedGlobalCollections(ctx context.Context, client *ent.Client, log *zap.Logger) error {
+	for oldName, newName := range legacyCollectionRenames {
+		n, err := client.Collection.Update().
+			Where(collection.TenantID(GlobalTenantID), collection.Name(oldName)).
+			SetName(newName).
+			Save(ctx)
+		if err != nil {
+			log.Warn("rename legacy global collection failed", zap.String("from", oldName), zap.String("to", newName), zap.Error(err))
+		} else if n > 0 {
+			log.Info("renamed legacy global collection", zap.String("from", oldName), zap.String("to", newName))
+		}
+	}
+
 	for _, c := range defaultCollections {
 		exists, err := client.Collection.Query().
 			Where(collection.TenantID(GlobalTenantID), collection.Name(c.Name)).Exist(ctx)

@@ -64,7 +64,7 @@ erDiagram
 | `authors` | `id`, `tenant_id`, `name`, `sort_name`, `biography` | Controlled author/contributor authority. BibRecord also denormalizes display names for fast OPAC. |
 | `publishers` | `id`, `tenant_id`, `name`, `place` | Controlled publisher authority. |
 | `subjects` | `id`, `tenant_id`, `name`, `code`, `scheme` (LCSH/DDC/LOCAL), `parent_id?` | Hierarchical subject headings (self-referential). |
-| `collections` | `id`, `tenant_id`, `name`, `code`, `parent_id?`, `is_reference_only` | Hierarchical shelving/grouping (Reference, Children's, …). `is_reference_only` copies never leave the building. |
+| `collections` | `id`, `tenant_id`, `name`, `code`, `parent_id?`, `is_reference_only` | Hierarchical shelving/grouping (Reference, Junior, …). `is_reference_only` copies never leave the building. |
 
 ### Enums
 
