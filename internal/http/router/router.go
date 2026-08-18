@@ -194,6 +194,10 @@ func New(d Deps) http.Handler {
 			c.With(act("copies", "add")).Post("/copies", d.Catalog.CreateCopy)
 			c.With(act("copies", "change")).Put("/copies/{id}", d.Catalog.UpdateCopy)
 			c.With(act("copies", "delete")).Delete("/copies/{id}", d.Catalog.DeleteCopy)
+			// Hard delete is deliberately its own permission code (not folded into
+			// copies.manage, which library_staff already holds) — admin-only by default.
+			c.With(libmw.RequireServicePermission(d.RBAC, "library.copies.hard_delete")).
+				Delete("/copies/{id}/hard", d.Catalog.HardDeleteCopy)
 			c.With(view("copies")).Get("/copies/by-barcode/{barcode}", d.Catalog.GetCopyByBarcode)
 			c.With(view("copies")).Get("/copies/{id}/label.pdf", d.Catalog.CopyLabel)
 			c.With(view("copies")).Post("/copies/labels/print", d.Catalog.PrintCopyLabels)

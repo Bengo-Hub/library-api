@@ -415,6 +415,7 @@ func PermissionCatalog() []map[string]string {
 	}
 	addCrud("catalog", "catalog")
 	addCrud("copies", "copies")
+	specs = append(specs, spec{"library.copies.hard_delete", "Permanently delete withdrawn copies (irreversible)"})
 	addCrud("collections", "collections")
 	addCrud("members", "members")
 	addCrud("member_tiers", "member tiers")

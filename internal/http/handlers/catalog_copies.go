@@ -14,6 +14,8 @@ import (
 	"github.com/bengobox/library-service/internal/ent/bibrecord"
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
 	"github.com/bengobox/library-service/internal/ent/branch"
+	"github.com/bengobox/library-service/internal/ent/copytransfer"
+	"github.com/bengobox/library-service/internal/ent/hold"
 	"github.com/bengobox/library-service/internal/ent/loan"
 	"github.com/bengobox/library-service/internal/modules/sequence"
 )
@@ -227,6 +229,64 @@ func (h *CatalogHandler) DeleteCopy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := h.db.BookCopy.UpdateOneID(id).SetStatus(bookcopy.StatusWITHDRAWN).Save(r.Context()); err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "delete_failed")
+		return
+	}
+	respondJSON(w, http.StatusOK, map[string]any{"deleted": true})
+}
+
+// HardDeleteCopy permanently removes a copy row (admin-only; gated by the standalone
+// library.copies.hard_delete permission, not folded into copies.manage — see
+// rbac/service.go staffPermissions). Unlike DeleteCopy this is irreversible, so it only
+// proceeds when the copy is already withdrawn/lost (i.e. already taken out of circulation
+// via the normal soft-delete) and has no loan/hold/transfer history — hard-deleting a copy
+// with history would leave those rows pointing at a copy_id that no longer exists.
+// @Summary Permanently delete a withdrawn copy with no history
+// @Tags Catalog
+// @Router /{tenant}/library/catalog/copies/{id}/hard [delete]
+func (h *CatalogHandler) HardDeleteCopy(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := TenantUUID(r)
+	if !ok {
+		respondError(w, http.StatusUnauthorized, "missing tenant", "unauthorized")
+		return
+	}
+	id, err := ParseUUIDParam(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "bad id", "invalid_request")
+		return
+	}
+	existing, err := h.db.BookCopy.Query().Where(bookcopy.IDEQ(id), bookcopy.TenantID(tenantID)).Only(r.Context())
+	if ent.IsNotFound(err) {
+		respondError(w, http.StatusNotFound, "not found", "not_found")
+		return
+	} else if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "get_failed")
+		return
+	}
+	if existing.Status != bookcopy.StatusWITHDRAWN && existing.Status != bookcopy.StatusLOST {
+		respondError(w, http.StatusConflict, "this copy must be withdrawn or marked lost before it can be permanently deleted", "not_withdrawn")
+		return
+	}
+	loanCount, err := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.CopyID(id)).Count(r.Context())
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "check_failed")
+		return
+	}
+	holdCount, err := h.db.Hold.Query().Where(hold.TenantID(tenantID), hold.CopyID(id)).Count(r.Context())
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "check_failed")
+		return
+	}
+	transferCount, err := h.db.CopyTransfer.Query().Where(copytransfer.TenantID(tenantID), copytransfer.CopyID(id)).Count(r.Context())
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "check_failed")
+		return
+	}
+	if loanCount+holdCount+transferCount > 0 {
+		respondError(w, http.StatusConflict, "this copy has loan, hold, or transfer history and cannot be permanently deleted", "has_history")
+		return
+	}
+	if _, err := h.db.BookCopy.Delete().Where(bookcopy.IDEQ(id), bookcopy.TenantID(tenantID)).Exec(r.Context()); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "delete_failed")
 		return
 	}
