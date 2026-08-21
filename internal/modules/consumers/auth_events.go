@@ -73,6 +73,7 @@ func (c *AuthEventsConsumer) Start(ctx context.Context, nc *nats.Conn) error {
 		{"auth.user.updated", "lib-auth-user-updated", c.handleUserUpdated},
 		// Terminal/PIN provisioning: store the bcrypt PIN hash so /library/auth/pin/* works.
 		{"auth.user.pin_set", "lib-auth-user-pin-set", c.handlePinSet},
+		{"auth.user.deleted", "lib-auth-user-deleted", c.handleUserDeleted},
 	}
 
 	for _, s := range subs {
@@ -160,6 +161,22 @@ func (c *AuthEventsConsumer) handlePinSet(ctx context.Context, evt *sharedevents
 	}
 	c.log.Info("stored terminal PIN hash",
 		zap.String("user_id", userIDStr), zap.String("tenant_id", evt.TenantID.String()))
+	return nil
+}
+
+// handleUserDeleted hard-deletes this user's local library_users row after auth-api
+// permanently deletes the account (AdminPurgeUser). No ent-level FK children were found
+// pointing at LibraryUser, so this is a single delete — no transaction needed. user_id
+// here is a string field (the auth user UUID as text), not the row's own PK.
+func (c *AuthEventsConsumer) handleUserDeleted(ctx context.Context, evt *sharedevents.Event) error {
+	userIDStr, _ := evt.Payload["user_id"].(string)
+	if userIDStr == "" {
+		return fmt.Errorf("missing user_id in auth.user.deleted event")
+	}
+	if _, err := c.orm.LibraryUser.Delete().Where(entlibraryuser.UserID(userIDStr)).Exec(ctx); err != nil {
+		return fmt.Errorf("delete library user: %w", err)
+	}
+	c.log.Info("user hard-deleted from auth.user.deleted event", zap.String("user_id", userIDStr))
 	return nil
 }
 
