@@ -506,9 +506,11 @@ func fetchSRUMetadata(ctx context.Context, isbn string) *isbnMetadata {
 	p := previews[0]
 	return &isbnMetadata{
 		Title:           p.Title,
+		Subtitle:        p.Subtitle,
 		Authors:         p.Authors,
 		Publisher:       p.PublisherName,
 		PublicationYear: p.PublicationYear,
+		Pages:           p.Pages,
 	}
 }
 

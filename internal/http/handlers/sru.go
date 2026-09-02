@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -42,11 +43,32 @@ type marcRecordIn struct {
 }
 
 type sruPreview struct {
-	Title           string `json:"title"`
+	Title           string   `json:"title"`
+	Subtitle        string   `json:"subtitle,omitempty"`
 	Authors         []string `json:"authors"`
-	ISBN13          string `json:"isbn13"`
-	PublisherName   string `json:"publisher_name"`
-	PublicationYear int    `json:"publication_year"`
+	ISBN13          string   `json:"isbn13"`
+	PublisherName   string   `json:"publisher_name"`
+	PublicationYear int      `json:"publication_year"`
+	// Pages parses MARC field 300 (physical description, e.g. "xxix, 431 p. :") when present —
+	// real LoC records commonly carry this even when Open Library/Google Books miss a title.
+	Pages int `json:"pages,omitempty"`
+}
+
+// pageCountPattern extracts the page count from a MARC 300$a extent string like "323 p." or
+// "xxix, 431 p. :" — the arabic number immediately preceding "p." is the main pagination; leading
+// roman-numeral front-matter counts (front matter, e.g. "xxix,") don't match \d+ so are skipped.
+var pageCountPattern = regexp.MustCompile(`(\d+)\s*p\.`)
+
+func extractPageCount(extent string) (int, bool) {
+	m := pageCountPattern.FindStringSubmatch(extent)
+	if m == nil {
+		return 0, false
+	}
+	n, err := strconv.Atoi(m[1])
+	if err != nil || n <= 0 {
+		return 0, false
+	}
+	return n, true
 }
 
 // SRUSearch godoc
@@ -133,11 +155,10 @@ func marcToPreview(m marcRecordIn) sruPreview {
 				p.Authors = append(p.Authors, v)
 			}
 		case "245":
-			t := sub("a")
-			if b := sub("b"); b != "" {
-				t = strings.TrimSpace(t) + " : " + b
-			}
-			p.Title = t
+			// $a and $b were previously concatenated into one Title string, so subtitle was never
+			// available as its own field for a cataloging-UI prefill — split them.
+			p.Title = sub("a")
+			p.Subtitle = sub("b")
 		case "260", "264":
 			if v := sub("b"); v != "" {
 				p.PublisherName = v
@@ -145,6 +166,15 @@ func marcToPreview(m marcRecordIn) sruPreview {
 			if v := sub("c"); v != "" {
 				if y, err := strconv.Atoi(digitsOnly(v)); err == nil {
 					p.PublicationYear = y
+				}
+			}
+		case "300":
+			// Physical description (extent), e.g. "xxix, 431 p. :" — pagination was previously
+			// never parsed at all, even when present in the real MARC record (confirmed live: LoC
+			// SRU records for real ISBNs do carry this field).
+			if v := sub("a"); v != "" {
+				if pages, ok := extractPageCount(v); ok {
+					p.Pages = pages
 				}
 			}
 		}
