@@ -3,7 +3,7 @@
 **Service:** library-api
 **Language:** Go 1.26
 **Production domain:** `libraryapi.codevertexafrica.com`
-**Last updated:** 2026-07-31
+**Last updated:** 2026-09-02
 **Status:** Phase 1 (MVP) shipped — full backend + frontend. Catalog/OPAC, circulation (checkout/return/renew + holds + in-house reading), members/tiers/policies, fines + membership fees, and e-books (in-browser reader + Controlled Digital Lending) are live, with auth/SSO, treasury, notifications, subscriptions and outbox plumbing wired.
 
 ---
@@ -112,6 +112,28 @@ All four pillars + full platform plumbing.
 | shopspring/decimal | Money/rate precision |
 
 ---
+
+## Recent hardening (2026-09-02, client-reported fixes)
+
+A live client (MCCL Library, Migori) reported four issues that traced to real bugs, plus one more
+found during the audit itself. All fixed without any schema/migration change — see
+`.claude/memory/project_library_management.md` Session 18 for full detail.
+
+- **`AcquisitionHandler.ReceiveLine`** (`acquisition_orders.go`) never set `acquisition_date`/
+  `acquisition_cost` on auto-created copies, and — because the UI never sent a `branch_id` and
+  `BookCopy.branch_id` is a required field — silently created **zero** copies per receive while still
+  advancing the PO line to RECEIVED. A field-name mismatch (`quantity` vs. the backend's
+  `received_qty`) meant the endpoint 400'd on every call regardless. All three fixed; the endpoint now
+  also reports `copies_created`/`copies_failed` instead of swallowing errors.
+- **LoC SRU parsing** (`sru.go`) never read MARC field 300 (pagination) and folded 245 `$b` into the
+  title instead of a separate subtitle — confirmed via live curl against real US ISBNs that the raw
+  MARC record carries this data and the parser was simply discarding it. Fixed; Google Books' 429
+  rate-limit (a pre-existing, separately-documented prod gap) was reconfirmed live and left as-is
+  (infra/cost decision, not a code bug).
+- **`Search`/`ListBibs`** (`catalog_bibs.go`) only matched title/subtitle/summary/publisher/ISBN — a
+  scanned copy's own accession barcode (distinct from the manufacturer ISBN barcode) could never
+  resolve to its title. Added a copy-barcode/accession-number OR-clause, reusing the same lookup
+  direction `ListAllCopies` already does.
 
 ## Risks
 
