@@ -12,6 +12,7 @@ import (
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
+	"github.com/bengobox/library-service/internal/ent"
 	"github.com/bengobox/library-service/internal/ent/bibrecord"
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
 	"github.com/bengobox/library-service/internal/ent/purchaseorder"
@@ -43,6 +44,20 @@ type receiveLineRequest struct {
 	ReceivedQty int    `json:"received_qty"`
 	BranchID    string `json:"branch_id"`
 	ShelfLoc    string `json:"shelf_location"`
+	// ReceivedDate is the ONE date this whole receiving action/batch should carry for audit purposes
+	// (defaults to the PO's own order_date, else today) — stamped onto every BookCopy this call
+	// creates, so a shipment received across several real data-entry days still shares one acquisition
+	// date instead of each copy getting whatever day it happened to be keyed in.
+	ReceivedDate string `json:"received_date"`
+}
+
+// receiveLineResponse adds visibility into how many copies this receive actually created — the
+// previous silent-swallow-on-error loop could create zero real BookCopy rows while still reporting
+// 200 and advancing the line to RECEIVED.
+type receiveLineResponse struct {
+	*ent.PurchaseOrderLine
+	CopiesCreated int `json:"copies_created"`
+	CopiesFailed  int `json:"copies_failed,omitempty"`
 }
 
 func (h *AcquisitionHandler) ListOrders(w http.ResponseWriter, r *http.Request) {
@@ -328,7 +343,19 @@ func (h *AcquisitionHandler) ReceiveLine(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// One acquisition date for this whole receiving action: explicit received_date, else the PO's own
+	// order_date, else today. Every BookCopy created below shares it — the audit-consistency fix.
+	receivedDate, dateOK := parseDate(req.ReceivedDate)
+	if !dateOK {
+		if po, perr := h.db.PurchaseOrder.Get(ctx, poID); perr == nil && po.OrderDate != nil {
+			receivedDate = *po.OrderDate
+		} else {
+			receivedDate = time.Now()
+		}
+	}
+
 	// Auto-create BookCopy records for received quantity.
+	copiesCreated, copiesFailed := 0, 0
 	if line.BibRecordID != nil {
 		_, bibErr := h.db.BibRecord.Query().Where(bibrecord.IDEQ(*line.BibRecordID)).Only(ctx)
 		if bibErr == nil {
@@ -338,15 +365,25 @@ func (h *AcquisitionHandler) ReceiveLine(w http.ResponseWriter, r *http.Request)
 					branchID = bid
 				}
 			}
+			// BookCopy.branch_id is a required field — with none supplied (the UI didn't send one
+			// until this fix), every Save() below failed validation and was silently swallowed,
+			// so a receive could advance the line to RECEIVED while creating zero real copies.
+			if branchID == uuid.Nil {
+				if def := EnsureDefaultBranch(ctx, h.db, tenantID); def != nil {
+					branchID = def.ID
+				}
+			}
 			for i := 0; i < req.ReceivedQty; i++ {
 				copyTx, txErr := h.db.Tx(ctx)
 				if txErr != nil {
+					copiesFailed++
 					continue
 				}
 				accNo, _ := sequence.Next(ctx, copyTx, tenantID, sequence.KindAccession, "ACC", 6)
 				cc := copyTx.BookCopy.Create().
 					SetTenantID(tenantID).SetBibRecordID(*line.BibRecordID).
-					SetStatus(bookcopy.StatusAVAILABLE)
+					SetStatus(bookcopy.StatusAVAILABLE).
+					SetAcquisitionDate(receivedDate)
 				if accNo != "" {
 					cc = cc.SetAccessionNo(accNo)
 				}
@@ -356,18 +393,27 @@ func (h *AcquisitionHandler) ReceiveLine(w http.ResponseWriter, r *http.Request)
 				if req.ShelfLoc != "" {
 					cc = cc.SetShelfLocation(req.ShelfLoc)
 				}
+				if line.UnitPrice.IsPositive() {
+					cc = cc.SetAcquisitionCost(line.UnitPrice)
+				}
 				if _, saveErr := cc.Save(ctx); saveErr != nil {
 					_ = copyTx.Rollback()
+					copiesFailed++
 					continue
 				}
 				_ = copyTx.Commit()
+				copiesCreated++
 			}
 		}
 	}
 
 	// Advance PO status if all lines are received.
 	h.advancePOStatus(ctx, tenantID, poID)
-	respondJSON(w, http.StatusOK, updatedLine)
+	respondJSON(w, http.StatusOK, receiveLineResponse{
+		PurchaseOrderLine: updatedLine,
+		CopiesCreated:     copiesCreated,
+		CopiesFailed:      copiesFailed,
+	})
 }
 
 func (h *AcquisitionHandler) recomputePOTotal(ctx context.Context, tenantID, poID uuid.UUID) {
