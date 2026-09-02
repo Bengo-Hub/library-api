@@ -82,6 +82,7 @@ func (h *CatalogHandler) ListBibs(w http.ResponseWriter, r *http.Request) {
 			bibrecord.TitleContainsFold(s),
 			bibrecord.Isbn13ContainsFold(s),
 			bibrecord.Isbn10ContainsFold(s),
+			bibrecord.IDIn(bibIDsMatchingCopyIdentifier(r.Context(), h.db, tenantID, s)...),
 		))
 	}
 	if f := r.URL.Query().Get("format"); f != "" {
@@ -94,6 +95,28 @@ func (h *CatalogHandler) ListBibs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(rows, total, params))
+}
+
+// bibIDsMatchingCopyIdentifier resolves BibRecord IDs whose copies carry a barcode or accession
+// number matching term, so a scanned copy label (the library's own accession barcode, distinct from
+// the manufacturer ISBN barcode printed on the book) resolves to its title on ListBibs/Search —
+// mirrors ListAllCopies' bib-title lookup (catalog_copies.go) in the opposite direction. An empty
+// result is safe: ent compiles IDIn() with zero ids to a predicate that matches nothing, the same
+// convention ListAllCopies already relies on for its own possibly-empty ID slice.
+func bibIDsMatchingCopyIdentifier(ctx context.Context, db *ent.Client, tenantID uuid.UUID, term string) []uuid.UUID {
+	ids, _ := db.BookCopy.Query().
+		Where(bookcopy.TenantID(tenantID), bookcopy.Or(
+			bookcopy.BarcodeContainsFold(term),
+			bookcopy.AccessionNoContainsFold(term),
+		)).
+		Select(bookcopy.FieldBibRecordID).Strings(ctx)
+	out := make([]uuid.UUID, 0, len(ids))
+	for _, s := range ids {
+		if u, err := uuid.Parse(s); err == nil {
+			out = append(out, u)
+		}
+	}
+	return out
 }
 
 // CreateBib godoc
@@ -251,7 +274,9 @@ func (h *CatalogHandler) Search(w http.ResponseWriter, r *http.Request) {
 	s := qp.Get("q")
 
 	q := h.db.BibRecord.Query().Where(bibrecord.TenantID(tenantID))
-	// Full-text-ish multi-field match (title/subtitle/summary/publisher/ISBN).
+	// Full-text-ish multi-field match (title/subtitle/summary/publisher/ISBN), plus any copy whose
+	// own barcode/accession number matches — a scanned copy label is a library-assigned identifier
+	// distinct from the manufacturer ISBN barcode, so it can never match the fields above directly.
 	if s != "" {
 		q = q.Where(bibrecord.Or(
 			bibrecord.TitleContainsFold(s),
@@ -260,6 +285,7 @@ func (h *CatalogHandler) Search(w http.ResponseWriter, r *http.Request) {
 			bibrecord.PublisherNameContainsFold(s),
 			bibrecord.Isbn13ContainsFold(s),
 			bibrecord.Isbn10ContainsFold(s),
+			bibrecord.IDIn(bibIDsMatchingCopyIdentifier(r.Context(), h.db, tenantID, s)...),
 		))
 	}
 	// Facets.
