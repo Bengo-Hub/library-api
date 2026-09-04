@@ -140,7 +140,7 @@ func New(ctx context.Context) (*App, error) {
 	cacheAside := sharedcache.New(redisClient, log)
 
 	// RBAC (seed global roles once).
-	rbacService := rbac.NewService(ormClient, log)
+	rbacService := rbac.NewService(ormClient, log, cfg.Auth.ServiceURL)
 	if err := rbacService.SeedGlobalRoles(ctx); err != nil {
 		log.Warn("seed global roles failed", zap.Error(err))
 	}

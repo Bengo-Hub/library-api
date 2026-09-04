@@ -6,7 +6,10 @@ package rbac
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"strings"
+	"time"
 
 	authclient "github.com/Bengo-Hub/shared-auth-client"
 	"github.com/google/uuid"
@@ -28,13 +31,17 @@ const (
 
 // Service provides RBAC operations backed by Ent.
 type Service struct {
-	db  *ent.Client
-	log *zap.Logger
+	db             *ent.Client
+	log            *zap.Logger
+	authServiceURL string
+	httpClient     *http.Client
 }
 
-// NewService creates the RBAC service.
-func NewService(db *ent.Client, log *zap.Logger) *Service {
-	return &Service{db: db, log: log}
+// NewService creates the RBAC service. authServiceURL (auth-api's public base URL) is used
+// best-effort to backfill the local tenant projection's display name — never on the request's
+// own auth path, so a slow/unreachable auth-api never blocks login.
+func NewService(db *ent.Client, log *zap.Logger, authServiceURL string) *Service {
+	return &Service{db: db, log: log, authServiceURL: authServiceURL, httpClient: &http.Client{Timeout: 3 * time.Second}}
 }
 
 // crudCodes returns the Django-style CRUD permission codes for a module
@@ -143,8 +150,27 @@ func (s *Service) EnsureUserFromToken(ctx context.Context, claims *authclient.Cl
 	// Cache the tenant slug→id mapping locally so the PUBLIC PIN-login routes (which have no
 	// JWT) can resolve the org slug. Best-effort, get-or-create by the auth tenant UUID.
 	if slug := claims.GetTenantSlug(); slug != "" {
-		if exists, _ := s.db.Tenant.Query().Where(tenant.IDEQ(tenantID)).Exist(ctx); !exists {
-			_, _ = s.db.Tenant.Create().SetID(tenantID).SetSlug(slug).Save(ctx)
+		existingTenant, err := s.db.Tenant.Query().Where(tenant.IDEQ(tenantID)).Only(ctx)
+		switch {
+		case ent.IsNotFound(err):
+			// JWT claims never carry the tenant's display name (only its slug), so fetch it
+			// from auth-api's public by-id lookup -- the same mechanism notifications-api's
+			// own event-driven tenant resolver uses to sync a local projection. Best-effort:
+			// a name-fetch failure still leaves slug resolution working, just blank display
+			// name until the next self-heal below picks it up.
+			name := s.fetchTenantName(ctx, tenantID)
+			create := s.db.Tenant.Create().SetID(tenantID).SetSlug(slug)
+			if name != "" {
+				create.SetName(name)
+			}
+			_, _ = create.Save(ctx)
+		case err == nil && existingTenant.Name == "":
+			// Self-heal a tenant provisioned before this backfill existed (or whose earlier
+			// name-fetch attempt failed) -- runs on every authenticated request per this
+			// function's own doc comment, so this recovers on the next login either way.
+			if name := s.fetchTenantName(ctx, tenantID); name != "" {
+				_, _ = s.db.Tenant.UpdateOneID(tenantID).SetName(name).Save(ctx)
+			}
 		}
 	}
 	roles := MapGlobalRoles(claims.Roles)
@@ -177,6 +203,41 @@ func (s *Service) EnsureUserFromToken(ctx context.Context, claims *authclient.Cl
 	}
 	_, err = u.Save(ctx)
 	return err
+}
+
+// fetchTenantName resolves a tenant's display name via auth-api's public by-id lookup
+// (GET /api/v1/tenants/by-id/{id}, no auth required -- same trust tier as the by-slug
+// endpoint, safe fields only). Best-effort: any failure (network, non-200, bad JSON)
+// returns "" rather than an error, since this only ever backfills a display-only field
+// and must never block the login path it's called from.
+func (s *Service) fetchTenantName(ctx context.Context, tenantID uuid.UUID) string {
+	if s.authServiceURL == "" {
+		return ""
+	}
+	reqCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	url := strings.TrimRight(s.authServiceURL, "/") + "/api/v1/tenants/by-id/" + tenantID.String()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet, url, nil)
+	if err != nil {
+		return ""
+	}
+	resp, err := s.httpClient.Do(req)
+	if err != nil {
+		s.log.Warn("fetchTenantName: request failed", zap.String("tenant_id", tenantID.String()), zap.Error(err))
+		return ""
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		s.log.Warn("fetchTenantName: non-200 response", zap.String("tenant_id", tenantID.String()), zap.Int("status", resp.StatusCode))
+		return ""
+	}
+	var body struct {
+		Name string `json:"name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		return ""
+	}
+	return body.Name
 }
 
 // resolveSSOBranchID maps the SSO-selected outlet (claims OutletID/OutletCode) to a library
