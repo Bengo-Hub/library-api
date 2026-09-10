@@ -86,7 +86,7 @@ Library charges (overdue/lost/damage **fines**, **membership fees**, and **e-boo
 
 **Integration type:** mutations-only gate (UI/API) + S2S entitlement client (consumers).
 
-- **Mutations-only gate:** `RequireActiveSubscriptionForMutations` lets all GET/HEAD/OPTIONS through; mutations require an active subscription. Superuser / platform-owner / demo-bypass / PAYG (`IsGatingExempt`) tenants always pass. The 403 envelope is `{error,code:"subscription_inactive",upgrade:true}` (frontends open the upgrade flow).
+- **Mutations-only gate:** `authclient.RequireActiveSubscriptionForMutationsWithGrace(7)` (shared package) lets all GET/HEAD/OPTIONS through; mutations require an active subscription. Platform-owner / demo-bypass / PAYG / explicitly-exempt-tenant (`IsGatingExempt`) tenants always pass — a tenant superuser does NOT. The 403 envelope is `{error,code:"subscription_inactive",upgrade:true}` (frontends open the upgrade flow).
 - **Consumer gating (S2S):** `subscriptions.Client.ConsumerHasFeature(tenant_id, feature_code)` mirrors the inventory-api client — cached (60s) and **fail-open** (a subscriptions outage never drops event processing). Demo-bypass and `billing_mode=service_charge` (PAYG) tenants are always allowed.
 - Feature catalog uses `library_*` codes (e.g. `library_circulation`, `library_ebooks`).
 

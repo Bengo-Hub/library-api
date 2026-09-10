@@ -67,7 +67,7 @@ library-api/
 │   │   ├── handlers/           # catalog, circulation, members, fines, ebooks (+ ebook_purchase), reports, rbac, swagger, …
 │   │   ├── middleware/
 │   │   │   ├── permission.go   # RequireServicePermission (union RBAC)
-│   │   │   └── subscription.go # RequireActiveSubscriptionForMutations
+│   │   │   └── subscription.go # RequireFeature (per-feature lock; the mutations gate is authclient.RequireActiveSubscriptionForMutationsWithGrace, wired directly in router.go)
 │   │   └── router/router.go    # chi route registration (single mount under /api/v1/{tenant}/library)
 │   ├── modules/
 │   │   ├── circulation/        # service.go (rules engine) + scheduler.go (overdue sweep)
@@ -96,7 +96,7 @@ Every tenant request flows through the same ordered middleware stack mounted onc
 1. **Global middleware** — `RequestID`, `RealIP`, `httpware.Logging`/`Recover`, 30s `Timeout`, 50 MB `RequestSize` (e-book uploads), CORS.
 2. **`RequireAuth`** (`shared-auth-client`) — validates the Bearer JWT against JWKS (`sso.codevertexafrica.com`), or an `X-API-Key` for S2S. Claims land in request context.
 3. **JIT heal** — `rbac.Service.EnsureUserFromToken` upserts the local `LibraryUser` from JWT claims and re-applies mapped roles **on every request** (not only first-create), so a user provisioned before a role mapping existed self-heals (treasury #30 gotcha).
-4. **Mutations-only subscription gate** — `RequireActiveSubscriptionForMutations`: GET/HEAD/OPTIONS always pass; mutations require an active subscription, with superuser / platform-owner / demo / PAYG (`IsGatingExempt`) bypass. Emits the standard `{error,code:"subscription_inactive",upgrade:true}` envelope frontends parse.
+4. **Mutations-only subscription gate** — `authclient.RequireActiveSubscriptionForMutationsWithGrace(7)` (shared package, wired directly in `router.go`): GET/HEAD/OPTIONS always pass; mutations require an active subscription (7-day post-expiry grace), with platform-owner / demo / PAYG / explicitly-exempt-tenant (`IsGatingExempt`) bypass. **Tenant superuser does NOT bypass this** — a tenant admin is still a paying customer, not the platform owner. Emits the standard `{error,code:"subscription_inactive",upgrade:true}` envelope frontends parse.
 5. **`RequireServicePermission(perms…)`** (where mounted) — union RBAC: (a) superuser/platform-owner bypass → (b) JWT-carried permission → (c) local RBAC fallback (`HasAnyPermission`) → else 403 `permission_denied`.
 
 `GET /auth/me` returns the effective identity: **SSO JWT permissions ∪ local RBAC permissions** (`reference_service_rbac_authme_sync`).
