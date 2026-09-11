@@ -114,6 +114,12 @@ func New(d Deps) http.Handler {
 		// Mutations-only subscription gate (GET always passes). Uniform 7-day grace
 		// for EXPIRED tenants via the shared grace-aware middleware.
 		lib.Use(authclient.RequireActiveSubscriptionForMutationsWithGrace(7))
+		// Mutations-only annual support-fee gate for a perpetual/one-time-license tenant (e.g.
+		// mccl on LIBRARY_PROFESSIONAL_ONE_TIME) whose support fee has gone unpaid past its 7-day
+		// grace window — independent axis from the subscription gate above (a one-time license
+		// never expires, so RequireActiveSubscriptionForMutationsWithGrace alone never catches
+		// this). No-ops for every tenant without a support-fee obligation at all (absent claim).
+		lib.Use(authclient.RequireSupportFeeCurrentForMutations(7))
 
 		lib.Get("/auth/me", d.Auth.Me)
 		if d.PINAuth != nil {
