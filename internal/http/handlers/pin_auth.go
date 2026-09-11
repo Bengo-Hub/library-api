@@ -143,6 +143,7 @@ func (h *PINAuthHandler) terminalClaimsFor(ctx context.Context, t *ent.Tenant, u
 		tc.SubscriptionFeatures = e.Features
 		tc.BillingMode = e.BillingMode
 		tc.IsDemo = tc.IsDemo || e.IsDemoBypass
+		tc.ActiveServiceTags = e.ActiveServiceTags
 	}
 	return tc
 }

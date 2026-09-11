@@ -27,6 +27,11 @@ type Entitlements struct {
 	Status       string   `json:"status"`
 	BillingMode  string   `json:"billing_mode"`
 	IsDemoBypass bool     `json:"is_demo_bypass"`
+	// ActiveServiceTags feeds shared-auth-client's RequireServiceAccess module gate — without
+	// decoding it here, EVERY PIN/terminal session fleet-wide carries zero service tags
+	// regardless of the tenant's real plan (2026-09-11 incident: SSO logins worked, PIN logins
+	// didn't, because an SSO-only fix upstream never reaches this separate token-minting path).
+	ActiveServiceTags []string `json:"active_service_tags"`
 }
 
 // Client interacts with subscriptions-api over S2S (X-API-Key, no user JWT).
