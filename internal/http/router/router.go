@@ -19,21 +19,21 @@ import (
 
 // Deps bundles everything the router mounts.
 type Deps struct {
-	Log            *zap.Logger
-	Health         *handlers.HealthHandler
-	Auth           *handlers.AuthHandler
-	Catalog        *handlers.CatalogHandler
-	Branch         *handlers.BranchHandler
-	Member         *handlers.MemberHandler
-	Circulation    *handlers.CirculationHandler
-	Hold           *handlers.HoldHandler
-	Fine           *handlers.FineHandler
-	Ebook          *handlers.EbookHandler
-	Reports        *handlers.ReportsHandler
-	RBACHandler    *handlers.RBACHandler
-	Membership     *handlers.MembershipHandler
-	Sequence       *handlers.SequenceHandler
-	PINAuth        *handlers.PINAuthHandler
+	Log              *zap.Logger
+	Health           *handlers.HealthHandler
+	Auth             *handlers.AuthHandler
+	Catalog          *handlers.CatalogHandler
+	Branch           *handlers.BranchHandler
+	Member           *handlers.MemberHandler
+	Circulation      *handlers.CirculationHandler
+	Hold             *handlers.HoldHandler
+	Fine             *handlers.FineHandler
+	Ebook            *handlers.EbookHandler
+	Reports          *handlers.ReportsHandler
+	RBACHandler      *handlers.RBACHandler
+	Membership       *handlers.MembershipHandler
+	Sequence         *handlers.SequenceHandler
+	PINAuth          *handlers.PINAuthHandler
 	PlatformConfig   *handlers.PlatformConfigHandler
 	CirculationRules *handlers.CirculationRuleHandler
 	Holiday          *handlers.HolidayHandler
@@ -42,9 +42,9 @@ type Deps struct {
 	Serial           *handlers.SerialHandler
 	PatronPortal     *handlers.PatronPortalHandler
 	AuthMiddleware   *authclient.AuthMiddleware
-	RBAC           *rbac.Service
-	AllowedOrigins []string
-	MediaRoot      string
+	RBAC             *rbac.Service
+	AllowedOrigins   []string
+	MediaRoot        string
 }
 
 // New builds the chi router with the standard middleware stack and all library routes.
@@ -121,256 +121,265 @@ func New(d Deps) http.Handler {
 			lib.Get("/auth/me/card.pdf", d.PINAuth.MyCard) // staff prints their own card
 		}
 
-		// Platform-owner-only configuration (credential-encryption key + integration secrets
-		// like the ISBNdb API key). Platform owners bypass the subscription gate above.
-		if d.PlatformConfig != nil {
-			lib.Route("/platform", func(p chi.Router) {
-				p.Use(libmw.RequirePlatformOwner())
-				d.PlatformConfig.RegisterRoutes(p)
+		// Module gate: block the WHOLE library module (reads and writes alike) for a tenant
+		// whose plan never included it. Kept OUTSIDE (auth/me above) so a non-entitled tenant's
+		// frontend can still bootstrap identity/RBAC instead of a raw 403 on its first call.
+		// Shadows `lib` for the rest of this route tree — every registration below this point
+		// is unchanged syntactically, just now behind the extra gate.
+		lib.Group(func(lib chi.Router) {
+			lib.Use(authclient.RequireServiceAccess("library"))
+
+			// Platform-owner-only configuration (credential-encryption key + integration secrets
+			// like the ISBNdb API key). Platform owners bypass the subscription gate above.
+			if d.PlatformConfig != nil {
+				lib.Route("/platform", func(p chi.Router) {
+					p.Use(libmw.RequirePlatformOwner())
+					d.PlatformConfig.RegisterRoutes(p)
+				})
+			}
+			// Per-route Django-style permission gates (library.{module}.{action}). `view` accepts
+			// view|manage; `act` accepts the specific action|manage. library_admin (*) + superuser +
+			// platform owner bypass. This is Layer-3 RBAC on top of the subscription/feature gates.
+			view := func(mod string) func(http.Handler) http.Handler {
+				return libmw.RequireServicePermission(d.RBAC, "library."+mod+".view", "library."+mod+".manage")
+			}
+			act := func(mod, action string) func(http.Handler) http.Handler {
+				return libmw.RequireServicePermission(d.RBAC, "library."+mod+"."+action, "library."+mod+".manage")
+			}
+
+			lib.With(view("reports")).Get("/reports/summary", d.Reports.Summary)
+			lib.With(view("reports")).Get("/reports/popular", d.Reports.Popular)
+			lib.With(view("reports")).Get("/reports/circulation", d.Reports.Circulation)
+			lib.With(view("reports")).Get("/reports/overdue", d.Reports.Overdue)
+			lib.With(view("reports")).Get("/reports/member-activity", d.Reports.MemberActivity)
+			lib.With(view("reports")).Get("/reports/overdue-aging", d.Reports.OverdueAging)
+			lib.With(view("reports")).Get("/reports/item-movement", d.Reports.ItemMovement)
+			lib.With(view("reports")).Get("/reports/fine-aging", d.Reports.FineAging)
+			lib.With(view("reports")).Get("/reports/acquisition-spend", d.Reports.AcquisitionSpend)
+			lib.With(view("reports")).Get("/reports/catalog-stats", d.Reports.CatalogStats)
+			lib.With(view("reports")).Get("/reports/ebook-usage", d.Reports.EbookUsage)
+			lib.With(view("reports")).Get("/reports/member-trend", d.Reports.MemberActivityTrend)
+
+			// Patron self-service portal — any authenticated member.
+			if d.PatronPortal != nil {
+				lib.Get("/me/loans", d.PatronPortal.MyLoans)
+				lib.Get("/me/holds", d.PatronPortal.MyHolds)
+				lib.Get("/me/fines", d.PatronPortal.MyFines)
+				lib.Post("/me/holds", d.PatronPortal.MyPlaceHold)
+				lib.Post("/me/loans/{id}/renew", d.PatronPortal.MyRenewLoan)
+				lib.Post("/me/fines/{id}/pay", d.PatronPortal.MyPayFine)
+			}
+
+			// Catalog (OPAC search + bib/copy management) — feature gate + per-route permission gate.
+			lib.Route("/catalog", func(c chi.Router) {
+				c.Use(libmw.RequireFeature("library_catalog"))
+				// Catalog (bibs) — members have catalog.view (OPAC); staff/admin add/change/delete.
+				c.With(view("catalog")).Get("/bibs", d.Catalog.ListBibs)
+				c.With(act("catalog", "add")).Post("/bibs", d.Catalog.CreateBib)
+				c.With(view("catalog")).Get("/search", d.Catalog.Search)
+				c.With(view("catalog")).Get("/facets", d.Catalog.Facets)
+				c.With(view("catalog")).Get("/isbn/{isbn}", d.Catalog.ISBNLookup)
+				c.With(view("catalog")).Get("/sru/search", d.Catalog.SRUSearch)
+				c.With(view("catalog")).Get("/bibs/{id}", d.Catalog.GetBib)
+				c.With(view("catalog")).Get("/bibs/{id}/marc.xml", d.Catalog.MarcXML)
+				c.With(view("catalog")).Get("/bibs/{id}/marc.json", d.Catalog.MarcJSON)
+				c.With(view("catalog")).Get("/bibs/{id}/recommendations", d.Catalog.Recommend)
+				c.With(act("catalog", "change")).Put("/bibs/{id}", d.Catalog.UpdateBib)
+				c.With(act("catalog", "delete")).Delete("/bibs/{id}", d.Catalog.DeleteBib)
+				c.With(act("catalog", "change")).Post("/bibs/{id}/cover", d.Catalog.UploadCover)
+				c.With(act("catalog", "add")).Post("/import/marc", d.Catalog.ImportMarc)
+				// Cataloging dictionaries (author/publisher/place/subject pickers)
+				c.With(view("catalog")).Get("/terms", d.Catalog.ListTerms)
+				c.With(act("catalog", "add")).Post("/terms", d.Catalog.CreateTerm)
+				// Collections
+				c.With(view("catalog")).Get("/collections", d.Catalog.ListCollections)
+				c.With(act("collections", "add")).Post("/collections", d.Catalog.CreateCollection)
+				c.With(act("collections", "change")).Put("/collections/{id}", d.Catalog.UpdateCollection)
+				c.With(act("collections", "delete")).Delete("/collections/{id}", d.Catalog.DeleteCollection)
+				// Copies & holdings
+				c.With(view("copies")).Get("/bibs/{id}/copies", d.Catalog.ListCopies)
+				c.With(view("copies")).Get("/copies", d.Catalog.ListAllCopies)
+				c.With(act("copies", "add")).Post("/copies", d.Catalog.CreateCopy)
+				c.With(act("copies", "change")).Put("/copies/{id}", d.Catalog.UpdateCopy)
+				c.With(act("copies", "delete")).Delete("/copies/{id}", d.Catalog.DeleteCopy)
+				// Hard delete is deliberately its own permission code (not folded into
+				// copies.manage, which library_staff already holds) — admin-only by default.
+				c.With(libmw.RequireServicePermission(d.RBAC, "library.copies.hard_delete")).
+					Delete("/copies/{id}/hard", d.Catalog.HardDeleteCopy)
+				c.With(view("copies")).Get("/copies/by-barcode/{barcode}", d.Catalog.GetCopyByBarcode)
+				c.With(view("copies")).Get("/copies/{id}/label.pdf", d.Catalog.CopyLabel)
+				c.With(view("copies")).Post("/copies/labels/print", d.Catalog.PrintCopyLabels)
+				// Transfers
+				c.With(view("transfers")).Get("/transfers", d.Catalog.ListTransfers)
+				c.With(act("transfers", "add")).Post("/transfers", d.Catalog.CreateTransfer)
+				c.With(act("transfers", "receive")).Post("/transfers/{id}/receive", d.Catalog.ReceiveTransfer)
+				// Stocktake
+				c.With(view("stocktake")).Get("/stocktake", d.Catalog.ListStocktakes)
+				c.With(act("stocktake", "add")).Post("/stocktake", d.Catalog.StartStocktake)
+				c.With(act("stocktake", "scan")).Post("/stocktake/{id}/scan", d.Catalog.ScanStocktake)
+				c.With(act("stocktake", "finalize")).Post("/stocktake/{id}/finalize", d.Catalog.FinalizeStocktake)
 			})
-		}
-		// Per-route Django-style permission gates (library.{module}.{action}). `view` accepts
-		// view|manage; `act` accepts the specific action|manage. library_admin (*) + superuser +
-		// platform owner bypass. This is Layer-3 RBAC on top of the subscription/feature gates.
-		view := func(mod string) func(http.Handler) http.Handler {
-			return libmw.RequireServicePermission(d.RBAC, "library."+mod+".view", "library."+mod+".manage")
-		}
-		act := func(mod, action string) func(http.Handler) http.Handler {
-			return libmw.RequireServicePermission(d.RBAC, "library."+mod+"."+action, "library."+mod+".manage")
-		}
 
-		lib.With(view("reports")).Get("/reports/summary", d.Reports.Summary)
-		lib.With(view("reports")).Get("/reports/popular", d.Reports.Popular)
-		lib.With(view("reports")).Get("/reports/circulation", d.Reports.Circulation)
-		lib.With(view("reports")).Get("/reports/overdue", d.Reports.Overdue)
-		lib.With(view("reports")).Get("/reports/member-activity", d.Reports.MemberActivity)
-		lib.With(view("reports")).Get("/reports/overdue-aging", d.Reports.OverdueAging)
-		lib.With(view("reports")).Get("/reports/item-movement", d.Reports.ItemMovement)
-		lib.With(view("reports")).Get("/reports/fine-aging", d.Reports.FineAging)
-		lib.With(view("reports")).Get("/reports/acquisition-spend", d.Reports.AcquisitionSpend)
-		lib.With(view("reports")).Get("/reports/catalog-stats", d.Reports.CatalogStats)
-		lib.With(view("reports")).Get("/reports/ebook-usage", d.Reports.EbookUsage)
-		lib.With(view("reports")).Get("/reports/member-trend", d.Reports.MemberActivityTrend)
+			// Branches — staff read (copy form / branch filter); admin manages.
+			lib.With(view("branches")).Get("/branches", d.Branch.List)
+			lib.With(act("branches", "add")).Post("/branches", d.Branch.Create)
+			lib.With(act("branches", "change")).Put("/branches/{id}", d.Branch.Update)
 
-		// Patron self-service portal — any authenticated member.
-		if d.PatronPortal != nil {
-			lib.Get("/me/loans", d.PatronPortal.MyLoans)
-			lib.Get("/me/holds", d.PatronPortal.MyHolds)
-			lib.Get("/me/fines", d.PatronPortal.MyFines)
-			lib.Post("/me/holds", d.PatronPortal.MyPlaceHold)
-			lib.Post("/me/loans/{id}/renew", d.PatronPortal.MyRenewLoan)
-			lib.Post("/me/fines/{id}/pay", d.PatronPortal.MyPayFine)
-		}
+			// Members + tiers + policies + membership fees — feature gate + per-route permission gate.
+			lib.Group(func(m chi.Router) {
+				m.Use(libmw.RequireFeature("library_members"))
+				m.With(view("members")).Get("/members", d.Member.ListMembers)
+				m.With(act("members", "add")).Post("/members", d.Member.CreateMember)
+				m.With(act("members", "add")).Post("/members/import", d.Member.ImportMembers)
+				m.With(view("members")).Get("/members/import/template", d.Member.ImportMembersTemplate)
+				m.With(view("members")).Get("/members/import/{job_id}", d.Member.ImportMembersStatus)
+				m.With(view("members")).Get("/members/import/{job_id}/errors", d.Member.ImportMembersErrors)
+				m.With(view("members")).Get("/members/{id}", d.Member.GetMember)
+				m.With(act("members", "change")).Put("/members/{id}", d.Member.UpdateMember)
+				m.With(act("members", "delete")).Delete("/members/{id}", d.Member.DeleteMember)
+				m.With(view("members")).Get("/members/{id}/card.pdf", d.Member.MemberCard)
+				m.With(view("members")).Get("/members/{id}/loans", d.Member.MemberLoans)
+				m.With(view("members")).Get("/members/{id}/fines", d.Member.MemberFines)
+				m.With(view("members")).Get("/members/{id}/notification-prefs", d.Member.GetNotificationPrefs)
+				m.With(act("members", "change")).Put("/members/{id}/notification-prefs", d.Member.UpdateNotificationPrefs)
+				m.With(view("member_tiers")).Get("/member-tiers", d.Member.ListTiers)
+				m.With(act("member_tiers", "add")).Post("/member-tiers", d.Member.CreateTier)
+				m.With(act("member_tiers", "change")).Put("/member-tiers/{id}", d.Member.UpdateTier)
+				m.With(view("loan_policies")).Get("/loan-policies", d.Member.ListPolicies)
+				m.With(act("loan_policies", "add")).Post("/loan-policies", d.Member.CreatePolicy)
+				m.With(act("loan_policies", "change")).Put("/loan-policies/{id}", d.Member.UpdatePolicy)
+				m.With(view("membership_fees")).Get("/membership-fees", d.Membership.List)
+				m.With(act("membership_fees", "add")).Post("/members/{id}/membership-fee", d.Membership.Issue)
+				m.With(act("membership_fees", "pay")).Post("/membership-fees/{id}/pay", d.Membership.Pay)
+			})
 
-		// Catalog (OPAC search + bib/copy management) — feature gate + per-route permission gate.
-		lib.Route("/catalog", func(c chi.Router) {
-			c.Use(libmw.RequireFeature("library_catalog"))
-			// Catalog (bibs) — members have catalog.view (OPAC); staff/admin add/change/delete.
-			c.With(view("catalog")).Get("/bibs", d.Catalog.ListBibs)
-			c.With(act("catalog", "add")).Post("/bibs", d.Catalog.CreateBib)
-			c.With(view("catalog")).Get("/search", d.Catalog.Search)
-			c.With(view("catalog")).Get("/facets", d.Catalog.Facets)
-			c.With(view("catalog")).Get("/isbn/{isbn}", d.Catalog.ISBNLookup)
-			c.With(view("catalog")).Get("/sru/search", d.Catalog.SRUSearch)
-			c.With(view("catalog")).Get("/bibs/{id}", d.Catalog.GetBib)
-			c.With(view("catalog")).Get("/bibs/{id}/marc.xml", d.Catalog.MarcXML)
-			c.With(view("catalog")).Get("/bibs/{id}/marc.json", d.Catalog.MarcJSON)
-			c.With(view("catalog")).Get("/bibs/{id}/recommendations", d.Catalog.Recommend)
-			c.With(act("catalog", "change")).Put("/bibs/{id}", d.Catalog.UpdateBib)
-			c.With(act("catalog", "delete")).Delete("/bibs/{id}", d.Catalog.DeleteBib)
-			c.With(act("catalog", "change")).Post("/bibs/{id}/cover", d.Catalog.UploadCover)
-			c.With(act("catalog", "add")).Post("/import/marc", d.Catalog.ImportMarc)
-			// Cataloging dictionaries (author/publisher/place/subject pickers)
-			c.With(view("catalog")).Get("/terms", d.Catalog.ListTerms)
-			c.With(act("catalog", "add")).Post("/terms", d.Catalog.CreateTerm)
-			// Collections
-			c.With(view("catalog")).Get("/collections", d.Catalog.ListCollections)
-			c.With(act("collections", "add")).Post("/collections", d.Catalog.CreateCollection)
-			c.With(act("collections", "change")).Put("/collections/{id}", d.Catalog.UpdateCollection)
-			c.With(act("collections", "delete")).Delete("/collections/{id}", d.Catalog.DeleteCollection)
-			// Copies & holdings
-			c.With(view("copies")).Get("/bibs/{id}/copies", d.Catalog.ListCopies)
-			c.With(view("copies")).Get("/copies", d.Catalog.ListAllCopies)
-			c.With(act("copies", "add")).Post("/copies", d.Catalog.CreateCopy)
-			c.With(act("copies", "change")).Put("/copies/{id}", d.Catalog.UpdateCopy)
-			c.With(act("copies", "delete")).Delete("/copies/{id}", d.Catalog.DeleteCopy)
-			// Hard delete is deliberately its own permission code (not folded into
-			// copies.manage, which library_staff already holds) — admin-only by default.
-			c.With(libmw.RequireServicePermission(d.RBAC, "library.copies.hard_delete")).
-				Delete("/copies/{id}/hard", d.Catalog.HardDeleteCopy)
-			c.With(view("copies")).Get("/copies/by-barcode/{barcode}", d.Catalog.GetCopyByBarcode)
-			c.With(view("copies")).Get("/copies/{id}/label.pdf", d.Catalog.CopyLabel)
-			c.With(view("copies")).Post("/copies/labels/print", d.Catalog.PrintCopyLabels)
-			// Transfers
-			c.With(view("transfers")).Get("/transfers", d.Catalog.ListTransfers)
-			c.With(act("transfers", "add")).Post("/transfers", d.Catalog.CreateTransfer)
-			c.With(act("transfers", "receive")).Post("/transfers/{id}/receive", d.Catalog.ReceiveTransfer)
-			// Stocktake
-			c.With(view("stocktake")).Get("/stocktake", d.Catalog.ListStocktakes)
-			c.With(act("stocktake", "add")).Post("/stocktake", d.Catalog.StartStocktake)
-			c.With(act("stocktake", "scan")).Post("/stocktake/{id}/scan", d.Catalog.ScanStocktake)
-			c.With(act("stocktake", "finalize")).Post("/stocktake/{id}/finalize", d.Catalog.FinalizeStocktake)
+			// Circulation (checkout/return/renew/mark-lost) — feature gate + per-action permission gate.
+			lib.Group(func(c chi.Router) {
+				c.Use(libmw.RequireFeature("library_circulation"))
+				c.With(act("circulation", "checkout")).Post("/circulation/checkout", d.Circulation.Checkout)
+				c.With(act("circulation", "return")).Post("/circulation/return", d.Circulation.Return)
+				c.With(act("circulation", "renew")).Post("/circulation/renew/{loan_id}", d.Circulation.Renew)
+				c.With(act("circulation", "manage")).Post("/circulation/loans/{loan_id}/mark-lost", d.Circulation.MarkLost)
+				c.With(act("circulation", "manage")).Post("/circulation/loans/{loan_id}/recall", d.Circulation.Recall)
+				c.With(view("circulation")).Get("/circulation/loans", d.Circulation.ListLoans)
+			})
+
+			// Holds & reservations — feature gate + per-action permission gate.
+			lib.Group(func(h chi.Router) {
+				h.Use(libmw.RequireFeature("library_holds"))
+				h.With(view("holds")).Get("/holds", d.Hold.List)
+				h.With(act("holds", "place")).Post("/holds", d.Hold.Place)
+				h.With(act("holds", "change")).Post("/holds/{id}/ready", d.Hold.MarkReady)
+				h.With(act("holds", "delete")).Delete("/holds/{id}", d.Hold.Cancel)
+			})
+
+			// Fines & fees — feature gate + per-action permission gate.
+			lib.Group(func(f chi.Router) {
+				f.Use(libmw.RequireFeature("library_fines"))
+				f.With(view("fines")).Get("/fines", d.Fine.List)
+				f.With(act("membership_fees", "add")).Post("/fines/membership", d.Fine.AssessMembershipFee)
+				f.With(act("fines", "waive")).Post("/fines/{id}/waive", d.Fine.Waive)
+				f.With(act("fines", "pay")).Post("/fines/{id}/pay", d.Fine.Pay)
+			})
+
+			// E-books & controlled digital lending — feature gate + per-action permission gate.
+			lib.Group(func(e chi.Router) {
+				e.Use(libmw.RequireFeature("library_ebooks"))
+				e.With(view("ebooks")).Get("/ebooks", d.Ebook.List)
+				e.With(act("ebooks", "add")).Post("/ebooks", d.Ebook.Create)
+				e.With(act("ebooks", "lend")).Post("/ebooks/{id}/lend", d.Ebook.Lend)
+				e.With(view("ebooks")).Get("/ebooks/{id}/read", d.Ebook.Read)
+				e.With(view("ebooks")).Post("/ebooks/loans/{id}/position", d.Ebook.SavePosition)
+				e.With(act("ebooks", "change")).Post("/ebooks/{id}/purchase", d.Ebook.Purchase)
+				e.With(view("ebooks")).Get("/ebooks/{id}/download", d.Ebook.Download)
+			})
+
+			// RBAC / team — admin only (team.view / team.manage).
+			lib.With(view("team")).Get("/rbac/roles", d.RBACHandler.ListRoles)
+			lib.With(act("team", "manage")).Post("/rbac/roles", d.RBACHandler.CreateRole)
+			lib.With(act("team", "manage")).Put("/rbac/roles/{id}", d.RBACHandler.UpdateRole)
+			lib.With(act("team", "manage")).Delete("/rbac/roles/{id}", d.RBACHandler.DeleteRole)
+			lib.With(view("team")).Get("/rbac/permissions", d.RBACHandler.ListPermissions)
+			lib.With(view("team")).Get("/team", d.RBACHandler.ListTeam)
+			if d.PINAuth != nil {
+				lib.With(view("team")).Get("/team/{user_id}/card.pdf", d.PINAuth.StaffCard)
+			}
+			lib.With(act("team", "manage")).Put("/team/{user_id}/roles", d.RBACHandler.AssignRoles)
+			lib.With(act("team", "manage")).Put("/team/{user_id}/branches", d.RBACHandler.AssignBranches)
+
+			// Settings — document-sequence configuration (membership_no, accession_no, …).
+			if d.Sequence != nil {
+				lib.With(view("settings")).Get("/settings/sequences", d.Sequence.List)
+				lib.With(act("settings", "manage")).Put("/settings/sequences/{kind}", d.Sequence.Update)
+			}
+
+			// Admin — 3D circulation rules matrix (branch × tier × format).
+			if d.CirculationRules != nil {
+				lib.With(view("settings")).Get("/admin/circulation-rules", d.CirculationRules.List)
+				lib.With(act("settings", "manage")).Post("/admin/circulation-rules", d.CirculationRules.Create)
+				lib.With(act("settings", "manage")).Put("/admin/circulation-rules/{id}", d.CirculationRules.Update)
+				lib.With(act("settings", "manage")).Delete("/admin/circulation-rules/{id}", d.CirculationRules.Delete)
+			}
+
+			// Admin — library holiday calendar.
+			if d.Holiday != nil {
+				lib.With(view("settings")).Get("/admin/holidays", d.Holiday.List)
+				lib.With(act("settings", "manage")).Post("/admin/holidays", d.Holiday.Create)
+				lib.With(act("settings", "manage")).Put("/admin/holidays/{id}", d.Holiday.Update)
+				lib.With(act("settings", "manage")).Delete("/admin/holidays/{id}", d.Holiday.Delete)
+			}
+
+			// Admin — authorized values (controlled vocabulary).
+			if d.AuthorizedValues != nil {
+				lib.With(view("settings")).Get("/admin/authorized-values/categories", d.AuthorizedValues.ListCategories)
+				lib.With(view("settings")).Get("/admin/authorized-values", d.AuthorizedValues.List)
+				lib.With(act("settings", "manage")).Post("/admin/authorized-values", d.AuthorizedValues.Create)
+				lib.With(act("settings", "manage")).Put("/admin/authorized-values/{id}", d.AuthorizedValues.Update)
+				lib.With(act("settings", "manage")).Delete("/admin/authorized-values/{id}", d.AuthorizedValues.Delete)
+			}
+
+			// Serials — subscriptions, issues, routing lists.
+			if d.Serial != nil {
+				lib.With(view("serials")).Get("/serials/subscriptions", d.Serial.ListSubscriptions)
+				lib.With(act("serials", "add")).Post("/serials/subscriptions", d.Serial.CreateSubscription)
+				lib.With(view("serials")).Get("/serials/subscriptions/{id}", d.Serial.GetSubscription)
+				lib.With(act("serials", "change")).Put("/serials/subscriptions/{id}", d.Serial.UpdateSubscription)
+				lib.With(view("serials")).Post("/serials/subscriptions/{id}/predict", d.Serial.PredictIssues)
+				lib.With(view("serials")).Get("/serials/subscriptions/{id}/routing", d.Serial.ListRouting)
+				lib.With(act("serials", "change")).Post("/serials/subscriptions/{id}/routing", d.Serial.AddRouting)
+
+				lib.With(view("serials")).Get("/serials/issues", d.Serial.ListIssues)
+				lib.With(act("serials", "add")).Post("/serials/issues", d.Serial.CreateIssue)
+				lib.With(act("serials", "change")).Post("/serials/issues/{id}/receive", d.Serial.ReceiveIssue)
+				lib.With(act("serials", "change")).Post("/serials/issues/{id}/claim", d.Serial.ClaimIssue)
+			}
+
+			// Acquisitions — vendors, budgets/funds, purchase orders, invoices.
+			if d.Acquisition != nil {
+				lib.With(view("acquisitions")).Get("/acquisitions/vendors", d.Acquisition.ListVendors)
+				lib.With(act("acquisitions", "add")).Post("/acquisitions/vendors", d.Acquisition.CreateVendor)
+				lib.With(view("acquisitions")).Get("/acquisitions/vendors/{id}", d.Acquisition.GetVendor)
+				lib.With(act("acquisitions", "change")).Put("/acquisitions/vendors/{id}", d.Acquisition.UpdateVendor)
+
+				lib.With(view("acquisitions")).Get("/acquisitions/budgets", d.Acquisition.ListBudgets)
+				lib.With(act("acquisitions", "add")).Post("/acquisitions/budgets", d.Acquisition.CreateBudget)
+				lib.With(act("acquisitions", "change")).Put("/acquisitions/budgets/{id}", d.Acquisition.UpdateBudget)
+				lib.With(view("acquisitions")).Get("/acquisitions/budgets/{budget_id}/funds", d.Acquisition.ListFunds)
+				lib.With(act("acquisitions", "add")).Post("/acquisitions/budgets/{budget_id}/funds", d.Acquisition.CreateFund)
+
+				lib.With(view("acquisitions")).Get("/acquisitions/orders", d.Acquisition.ListOrders)
+				lib.With(act("acquisitions", "add")).Post("/acquisitions/orders", d.Acquisition.CreateOrder)
+				lib.With(view("acquisitions")).Get("/acquisitions/orders/{id}", d.Acquisition.GetOrder)
+				lib.With(act("acquisitions", "change")).Put("/acquisitions/orders/{id}", d.Acquisition.UpdateOrder)
+				lib.With(act("acquisitions", "change")).Post("/acquisitions/orders/{id}/submit", d.Acquisition.SubmitOrder)
+				lib.With(act("acquisitions", "add")).Post("/acquisitions/orders/{id}/lines", d.Acquisition.AddLine)
+				lib.With(act("acquisitions", "change")).Post("/acquisitions/orders/{id}/lines/{line_id}/receive", d.Acquisition.ReceiveLine)
+
+				lib.With(view("acquisitions")).Get("/acquisitions/invoices", d.Acquisition.ListInvoices)
+				lib.With(view("acquisitions")).Get("/acquisitions/invoices/{id}", d.Acquisition.GetInvoice)
+				lib.With(act("acquisitions", "add")).Post("/acquisitions/invoices", d.Acquisition.CreateInvoice)
+			}
 		})
-
-		// Branches — staff read (copy form / branch filter); admin manages.
-		lib.With(view("branches")).Get("/branches", d.Branch.List)
-		lib.With(act("branches", "add")).Post("/branches", d.Branch.Create)
-		lib.With(act("branches", "change")).Put("/branches/{id}", d.Branch.Update)
-
-		// Members + tiers + policies + membership fees — feature gate + per-route permission gate.
-		lib.Group(func(m chi.Router) {
-			m.Use(libmw.RequireFeature("library_members"))
-			m.With(view("members")).Get("/members", d.Member.ListMembers)
-			m.With(act("members", "add")).Post("/members", d.Member.CreateMember)
-			m.With(act("members", "add")).Post("/members/import", d.Member.ImportMembers)
-			m.With(view("members")).Get("/members/import/template", d.Member.ImportMembersTemplate)
-			m.With(view("members")).Get("/members/import/{job_id}", d.Member.ImportMembersStatus)
-			m.With(view("members")).Get("/members/import/{job_id}/errors", d.Member.ImportMembersErrors)
-			m.With(view("members")).Get("/members/{id}", d.Member.GetMember)
-			m.With(act("members", "change")).Put("/members/{id}", d.Member.UpdateMember)
-			m.With(act("members", "delete")).Delete("/members/{id}", d.Member.DeleteMember)
-			m.With(view("members")).Get("/members/{id}/card.pdf", d.Member.MemberCard)
-			m.With(view("members")).Get("/members/{id}/loans", d.Member.MemberLoans)
-			m.With(view("members")).Get("/members/{id}/fines", d.Member.MemberFines)
-			m.With(view("members")).Get("/members/{id}/notification-prefs", d.Member.GetNotificationPrefs)
-			m.With(act("members", "change")).Put("/members/{id}/notification-prefs", d.Member.UpdateNotificationPrefs)
-			m.With(view("member_tiers")).Get("/member-tiers", d.Member.ListTiers)
-			m.With(act("member_tiers", "add")).Post("/member-tiers", d.Member.CreateTier)
-			m.With(act("member_tiers", "change")).Put("/member-tiers/{id}", d.Member.UpdateTier)
-			m.With(view("loan_policies")).Get("/loan-policies", d.Member.ListPolicies)
-			m.With(act("loan_policies", "add")).Post("/loan-policies", d.Member.CreatePolicy)
-			m.With(act("loan_policies", "change")).Put("/loan-policies/{id}", d.Member.UpdatePolicy)
-			m.With(view("membership_fees")).Get("/membership-fees", d.Membership.List)
-			m.With(act("membership_fees", "add")).Post("/members/{id}/membership-fee", d.Membership.Issue)
-			m.With(act("membership_fees", "pay")).Post("/membership-fees/{id}/pay", d.Membership.Pay)
-		})
-
-		// Circulation (checkout/return/renew/mark-lost) — feature gate + per-action permission gate.
-		lib.Group(func(c chi.Router) {
-			c.Use(libmw.RequireFeature("library_circulation"))
-			c.With(act("circulation", "checkout")).Post("/circulation/checkout", d.Circulation.Checkout)
-			c.With(act("circulation", "return")).Post("/circulation/return", d.Circulation.Return)
-			c.With(act("circulation", "renew")).Post("/circulation/renew/{loan_id}", d.Circulation.Renew)
-			c.With(act("circulation", "manage")).Post("/circulation/loans/{loan_id}/mark-lost", d.Circulation.MarkLost)
-			c.With(act("circulation", "manage")).Post("/circulation/loans/{loan_id}/recall", d.Circulation.Recall)
-			c.With(view("circulation")).Get("/circulation/loans", d.Circulation.ListLoans)
-		})
-
-		// Holds & reservations — feature gate + per-action permission gate.
-		lib.Group(func(h chi.Router) {
-			h.Use(libmw.RequireFeature("library_holds"))
-			h.With(view("holds")).Get("/holds", d.Hold.List)
-			h.With(act("holds", "place")).Post("/holds", d.Hold.Place)
-			h.With(act("holds", "change")).Post("/holds/{id}/ready", d.Hold.MarkReady)
-			h.With(act("holds", "delete")).Delete("/holds/{id}", d.Hold.Cancel)
-		})
-
-		// Fines & fees — feature gate + per-action permission gate.
-		lib.Group(func(f chi.Router) {
-			f.Use(libmw.RequireFeature("library_fines"))
-			f.With(view("fines")).Get("/fines", d.Fine.List)
-			f.With(act("membership_fees", "add")).Post("/fines/membership", d.Fine.AssessMembershipFee)
-			f.With(act("fines", "waive")).Post("/fines/{id}/waive", d.Fine.Waive)
-			f.With(act("fines", "pay")).Post("/fines/{id}/pay", d.Fine.Pay)
-		})
-
-		// E-books & controlled digital lending — feature gate + per-action permission gate.
-		lib.Group(func(e chi.Router) {
-			e.Use(libmw.RequireFeature("library_ebooks"))
-			e.With(view("ebooks")).Get("/ebooks", d.Ebook.List)
-			e.With(act("ebooks", "add")).Post("/ebooks", d.Ebook.Create)
-			e.With(act("ebooks", "lend")).Post("/ebooks/{id}/lend", d.Ebook.Lend)
-			e.With(view("ebooks")).Get("/ebooks/{id}/read", d.Ebook.Read)
-			e.With(view("ebooks")).Post("/ebooks/loans/{id}/position", d.Ebook.SavePosition)
-			e.With(act("ebooks", "change")).Post("/ebooks/{id}/purchase", d.Ebook.Purchase)
-			e.With(view("ebooks")).Get("/ebooks/{id}/download", d.Ebook.Download)
-		})
-
-		// RBAC / team — admin only (team.view / team.manage).
-		lib.With(view("team")).Get("/rbac/roles", d.RBACHandler.ListRoles)
-		lib.With(act("team", "manage")).Post("/rbac/roles", d.RBACHandler.CreateRole)
-		lib.With(act("team", "manage")).Put("/rbac/roles/{id}", d.RBACHandler.UpdateRole)
-		lib.With(act("team", "manage")).Delete("/rbac/roles/{id}", d.RBACHandler.DeleteRole)
-		lib.With(view("team")).Get("/rbac/permissions", d.RBACHandler.ListPermissions)
-		lib.With(view("team")).Get("/team", d.RBACHandler.ListTeam)
-		if d.PINAuth != nil {
-			lib.With(view("team")).Get("/team/{user_id}/card.pdf", d.PINAuth.StaffCard)
-		}
-		lib.With(act("team", "manage")).Put("/team/{user_id}/roles", d.RBACHandler.AssignRoles)
-		lib.With(act("team", "manage")).Put("/team/{user_id}/branches", d.RBACHandler.AssignBranches)
-
-		// Settings — document-sequence configuration (membership_no, accession_no, …).
-		if d.Sequence != nil {
-			lib.With(view("settings")).Get("/settings/sequences", d.Sequence.List)
-			lib.With(act("settings", "manage")).Put("/settings/sequences/{kind}", d.Sequence.Update)
-		}
-
-		// Admin — 3D circulation rules matrix (branch × tier × format).
-		if d.CirculationRules != nil {
-			lib.With(view("settings")).Get("/admin/circulation-rules", d.CirculationRules.List)
-			lib.With(act("settings", "manage")).Post("/admin/circulation-rules", d.CirculationRules.Create)
-			lib.With(act("settings", "manage")).Put("/admin/circulation-rules/{id}", d.CirculationRules.Update)
-			lib.With(act("settings", "manage")).Delete("/admin/circulation-rules/{id}", d.CirculationRules.Delete)
-		}
-
-		// Admin — library holiday calendar.
-		if d.Holiday != nil {
-			lib.With(view("settings")).Get("/admin/holidays", d.Holiday.List)
-			lib.With(act("settings", "manage")).Post("/admin/holidays", d.Holiday.Create)
-			lib.With(act("settings", "manage")).Put("/admin/holidays/{id}", d.Holiday.Update)
-			lib.With(act("settings", "manage")).Delete("/admin/holidays/{id}", d.Holiday.Delete)
-		}
-
-		// Admin — authorized values (controlled vocabulary).
-		if d.AuthorizedValues != nil {
-			lib.With(view("settings")).Get("/admin/authorized-values/categories", d.AuthorizedValues.ListCategories)
-			lib.With(view("settings")).Get("/admin/authorized-values", d.AuthorizedValues.List)
-			lib.With(act("settings", "manage")).Post("/admin/authorized-values", d.AuthorizedValues.Create)
-			lib.With(act("settings", "manage")).Put("/admin/authorized-values/{id}", d.AuthorizedValues.Update)
-			lib.With(act("settings", "manage")).Delete("/admin/authorized-values/{id}", d.AuthorizedValues.Delete)
-		}
-
-		// Serials — subscriptions, issues, routing lists.
-		if d.Serial != nil {
-			lib.With(view("serials")).Get("/serials/subscriptions", d.Serial.ListSubscriptions)
-			lib.With(act("serials", "add")).Post("/serials/subscriptions", d.Serial.CreateSubscription)
-			lib.With(view("serials")).Get("/serials/subscriptions/{id}", d.Serial.GetSubscription)
-			lib.With(act("serials", "change")).Put("/serials/subscriptions/{id}", d.Serial.UpdateSubscription)
-			lib.With(view("serials")).Post("/serials/subscriptions/{id}/predict", d.Serial.PredictIssues)
-			lib.With(view("serials")).Get("/serials/subscriptions/{id}/routing", d.Serial.ListRouting)
-			lib.With(act("serials", "change")).Post("/serials/subscriptions/{id}/routing", d.Serial.AddRouting)
-
-			lib.With(view("serials")).Get("/serials/issues", d.Serial.ListIssues)
-			lib.With(act("serials", "add")).Post("/serials/issues", d.Serial.CreateIssue)
-			lib.With(act("serials", "change")).Post("/serials/issues/{id}/receive", d.Serial.ReceiveIssue)
-			lib.With(act("serials", "change")).Post("/serials/issues/{id}/claim", d.Serial.ClaimIssue)
-		}
-
-		// Acquisitions — vendors, budgets/funds, purchase orders, invoices.
-		if d.Acquisition != nil {
-			lib.With(view("acquisitions")).Get("/acquisitions/vendors", d.Acquisition.ListVendors)
-			lib.With(act("acquisitions", "add")).Post("/acquisitions/vendors", d.Acquisition.CreateVendor)
-			lib.With(view("acquisitions")).Get("/acquisitions/vendors/{id}", d.Acquisition.GetVendor)
-			lib.With(act("acquisitions", "change")).Put("/acquisitions/vendors/{id}", d.Acquisition.UpdateVendor)
-
-			lib.With(view("acquisitions")).Get("/acquisitions/budgets", d.Acquisition.ListBudgets)
-			lib.With(act("acquisitions", "add")).Post("/acquisitions/budgets", d.Acquisition.CreateBudget)
-			lib.With(act("acquisitions", "change")).Put("/acquisitions/budgets/{id}", d.Acquisition.UpdateBudget)
-			lib.With(view("acquisitions")).Get("/acquisitions/budgets/{budget_id}/funds", d.Acquisition.ListFunds)
-			lib.With(act("acquisitions", "add")).Post("/acquisitions/budgets/{budget_id}/funds", d.Acquisition.CreateFund)
-
-			lib.With(view("acquisitions")).Get("/acquisitions/orders", d.Acquisition.ListOrders)
-			lib.With(act("acquisitions", "add")).Post("/acquisitions/orders", d.Acquisition.CreateOrder)
-			lib.With(view("acquisitions")).Get("/acquisitions/orders/{id}", d.Acquisition.GetOrder)
-			lib.With(act("acquisitions", "change")).Put("/acquisitions/orders/{id}", d.Acquisition.UpdateOrder)
-			lib.With(act("acquisitions", "change")).Post("/acquisitions/orders/{id}/submit", d.Acquisition.SubmitOrder)
-			lib.With(act("acquisitions", "add")).Post("/acquisitions/orders/{id}/lines", d.Acquisition.AddLine)
-			lib.With(act("acquisitions", "change")).Post("/acquisitions/orders/{id}/lines/{line_id}/receive", d.Acquisition.ReceiveLine)
-
-			lib.With(view("acquisitions")).Get("/acquisitions/invoices", d.Acquisition.ListInvoices)
-			lib.With(view("acquisitions")).Get("/acquisitions/invoices/{id}", d.Acquisition.GetInvoice)
-			lib.With(act("acquisitions", "add")).Post("/acquisitions/invoices", d.Acquisition.CreateInvoice)
-		}
 	})
 
 	return r
