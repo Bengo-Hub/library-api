@@ -144,6 +144,13 @@ func (h *PINAuthHandler) terminalClaimsFor(ctx context.Context, t *ent.Tenant, u
 		tc.BillingMode = e.BillingMode
 		tc.IsDemo = tc.IsDemo || e.IsDemoBypass
 		tc.ActiveServiceTags = e.ActiveServiceTags
+		tc.SupportFeeStatus = e.SupportFeeStatus
+		if e.SupportFeeDueAt != "" {
+			if pt, perr := time.Parse(time.RFC3339, e.SupportFeeDueAt); perr == nil {
+				unix := pt.Unix()
+				tc.SupportFeeDueAt = &unix
+			}
+		}
 	}
 	return tc
 }

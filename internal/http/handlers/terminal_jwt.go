@@ -37,6 +37,13 @@ type terminalClaims struct {
 	// RequireServiceAccess module gate. Missing here was the exact 2026-09-11 gap: SSO logins
 	// carried it, PIN/terminal logins silently didn't.
 	ActiveServiceTags []string `json:"active_service_tags,omitempty"`
+	// SupportFeeStatus/SupportFeeDueAt mirror the SSO JWT claims of the same name — feed
+	// shared-auth-client's RequireSupportFeeCurrentForMutations. Same rationale as
+	// ActiveServiceTags: without minting these here too, a PIN session for a perpetual/
+	// one-time-license tenant (e.g. mccl, on LIBRARY_PROFESSIONAL_ONE_TIME) would be silently
+	// exempt from the support-fee gate regardless of the tenant's real status.
+	SupportFeeStatus string `json:"support_fee_status,omitempty"`
+	SupportFeeDueAt  *int64 `json:"support_fee_due_at,omitempty"`
 	jwt.RegisteredClaims
 }
 
@@ -87,6 +94,8 @@ func terminalToAuthClaims(tc *terminalClaims) *authclient.Claims {
 		SubscriptionFeatures: tc.SubscriptionFeatures,
 		SubscriptionLimits:   tc.SubscriptionLimits,
 		ActiveServiceTags:    tc.ActiveServiceTags,
+		SupportFeeStatus:     tc.SupportFeeStatus,
+		SupportFeeDueAt:      tc.SupportFeeDueAt,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject: tc.UserID,
 			Issuer:  tc.Issuer,
