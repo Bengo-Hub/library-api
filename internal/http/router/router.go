@@ -182,6 +182,7 @@ func New(d Deps) http.Handler {
 				// Catalog (bibs) — members have catalog.view (OPAC); staff/admin add/change/delete.
 				c.With(view("catalog")).Get("/bibs", d.Catalog.ListBibs)
 				c.With(act("catalog", "add")).Post("/bibs", d.Catalog.CreateBib)
+				c.With(view("catalog")).Get("/bibs/check-duplicate", d.Catalog.CheckDuplicate)
 				c.With(view("catalog")).Get("/search", d.Catalog.Search)
 				c.With(view("catalog")).Get("/facets", d.Catalog.Facets)
 				c.With(view("catalog")).Get("/isbn/{isbn}", d.Catalog.ISBNLookup)

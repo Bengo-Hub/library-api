@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	sharedcache "github.com/Bengo-Hub/cache"
 	sharedpagination "github.com/Bengo-Hub/pagination"
@@ -16,6 +17,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/branch"
 	"github.com/bengobox/library-service/internal/ent/collection"
 	"github.com/bengobox/library-service/internal/ent/hold"
+	"github.com/bengobox/library-service/internal/ent/predicate"
 	"github.com/bengobox/library-service/internal/ent/subject"
 	"github.com/bengobox/library-service/internal/events"
 	"github.com/bengobox/library-service/internal/modules/refdata"
@@ -25,8 +27,8 @@ import (
 // CatalogHandler serves bibliographic + copy endpoints.
 type CatalogHandler struct {
 	db        *ent.Client
-	secrets   *secrets.Store // platform secret store; supplies the optional ISBNdb key for lookups
-	mediaRoot string         // on-disk media root (cover uploads); "" disables uploads
+	secrets   *secrets.Store     // platform secret store; supplies the optional ISBNdb key for lookups
+	mediaRoot string             // on-disk media root (cover uploads); "" disables uploads
 	cache     *sharedcache.Aside // may be nil (Redis unconfigured) — callers fall back to a live fetch
 	log       *zap.Logger
 }
@@ -39,17 +41,17 @@ func NewCatalogHandler(db *ent.Client, secretStore *secrets.Store, mediaRoot str
 
 // bibRequest is the create/update payload for a bibliographic record.
 type bibRequest struct {
-	Title         string   `json:"title"`
-	Subtitle      string   `json:"subtitle"`
-	ISBN13        string   `json:"isbn13"`
-	ISBN10        string   `json:"isbn10"`
-	Authors       []string `json:"authors"`
-	PublisherName string   `json:"publisher_name"`
-	Format        string   `json:"format"`
-	Language      string   `json:"language"`
-	DDC           string   `json:"ddc_classification"`
-	PublishYear   int      `json:"publication_year"`
-	PageCount     int      `json:"page_count"`
+	Title             string   `json:"title"`
+	Subtitle          string   `json:"subtitle"`
+	ISBN13            string   `json:"isbn13"`
+	ISBN10            string   `json:"isbn10"`
+	Authors           []string `json:"authors"`
+	PublisherName     string   `json:"publisher_name"`
+	Format            string   `json:"format"`
+	Language          string   `json:"language"`
+	DDC               string   `json:"ddc_classification"`
+	PublishYear       int      `json:"publication_year"`
+	PageCount         int      `json:"page_count"`
 	Summary           string   `json:"summary"`
 	CoverImageURL     string   `json:"cover_image_url"`
 	CoverBackImageURL string   `json:"cover_back_image_url"`
@@ -59,6 +61,7 @@ type bibRequest struct {
 	PublicationPlace  string   `json:"publication_place"`
 	Subjects          []string `json:"subjects"`
 	OtherISBNs        []string `json:"other_isbns"`
+	Force             bool     `json:"force"` // bypass a soft duplicate-title warning; never bypasses an ISBN conflict
 }
 
 // ListBibs godoc
@@ -135,6 +138,9 @@ func (h *CatalogHandler) CreateBib(w http.ResponseWriter, r *http.Request) {
 	var req bibRequest
 	if err := Decode(r, &req); err != nil || req.Title == "" {
 		respondError(w, http.StatusBadRequest, "title is required", "invalid_request")
+		return
+	}
+	if blocked := h.rejectDuplicateBib(r.Context(), w, tenantID, req, nil); blocked {
 		return
 	}
 	tx, err := h.db.Tx(r.Context())
@@ -219,6 +225,9 @@ func (h *CatalogHandler) UpdateBib(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "bad body", "invalid_request")
 		return
 	}
+	if blocked := h.rejectDuplicateBib(r.Context(), w, tenantID, req, &id); blocked {
+		return
+	}
 	u := h.db.BibRecord.UpdateOneID(id)
 	if req.Title != "" {
 		u.SetTitle(req.Title)
@@ -252,6 +261,132 @@ func (h *CatalogHandler) DeleteBib(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	respondJSON(w, http.StatusOK, map[string]any{"deleted": true})
+}
+
+// bibDuplicateMatch is the lightweight shape returned for a possible-duplicate hit — just enough
+// for the cataloging UI to show "this already exists" and link to it, without the cost of a full
+// opacRow (copy/hold counts) for what is usually a live-typing check.
+type bibDuplicateMatch struct {
+	ID       uuid.UUID `json:"id"`
+	Title    string    `json:"title"`
+	Subtitle string    `json:"subtitle,omitempty"`
+	Authors  []string  `json:"authors,omitempty"`
+	Format   string    `json:"format"`
+	Isbn13   string    `json:"isbn13,omitempty"`
+	Isbn10   string    `json:"isbn10,omitempty"`
+	CoverURL string    `json:"cover_image_url,omitempty"`
+}
+
+func toBibDuplicateMatch(b *ent.BibRecord) bibDuplicateMatch {
+	return bibDuplicateMatch{
+		ID: b.ID, Title: b.Title, Subtitle: b.Subtitle, Authors: b.Authors,
+		Format: string(b.Format), Isbn13: b.Isbn13, Isbn10: b.Isbn10, CoverURL: b.CoverImageURL,
+	}
+}
+
+// findDuplicateBibs looks for existing tenant bib records that collide with the given ISBN(s) or
+// title (case/whitespace-insensitive exact match), excluding excludeID (the record being edited,
+// if any) so an unrelated field edit never flags a title against itself. isbn13/isbn10 checks are
+// exact-field matches only (no ISBN-10<->13 cross-conversion) — that already covers the reported
+// bug (the same ISBN typed twice), and keeps the query index-friendly.
+func (h *CatalogHandler) findDuplicateBibs(ctx context.Context, tenantID uuid.UUID, isbn13, isbn10, title string, excludeID *uuid.UUID) (isbnMatches, titleMatches []*ent.BibRecord) {
+	isbn13 = strings.TrimSpace(isbn13)
+	isbn10 = strings.TrimSpace(isbn10)
+	title = strings.TrimSpace(title)
+
+	if isbn13 != "" || isbn10 != "" {
+		var isbnPreds []predicate.BibRecord
+		if isbn13 != "" {
+			isbnPreds = append(isbnPreds, bibrecord.Isbn13EQ(isbn13))
+		}
+		if isbn10 != "" {
+			isbnPreds = append(isbnPreds, bibrecord.Isbn10EQ(isbn10))
+		}
+		q := h.db.BibRecord.Query().Where(bibrecord.TenantID(tenantID), bibrecord.Or(isbnPreds...))
+		if excludeID != nil {
+			q = q.Where(bibrecord.IDNEQ(*excludeID))
+		}
+		isbnMatches, _ = q.Limit(5).All(ctx)
+	}
+	if title != "" {
+		q := h.db.BibRecord.Query().Where(bibrecord.TenantID(tenantID), bibrecord.TitleEqualFold(title))
+		if excludeID != nil {
+			q = q.Where(bibrecord.IDNEQ(*excludeID))
+		}
+		titleMatches, _ = q.Limit(5).All(ctx)
+	}
+	return isbnMatches, titleMatches
+}
+
+// rejectDuplicateBib runs findDuplicateBibs for a create/update request and, if it finds a
+// collision, writes the 409 response and returns true (caller must stop). An ISBN match is always
+// rejected — the same ISBN identifies the same edition, so the fix is to open the existing title
+// and add a copy, never a second bib record. A title-only match is rejected UNLESS the caller set
+// Force (librarians do legitimately catalog same-titled but genuinely distinct works/editions).
+func (h *CatalogHandler) rejectDuplicateBib(ctx context.Context, w http.ResponseWriter, tenantID uuid.UUID, req bibRequest, excludeID *uuid.UUID) bool {
+	isbnMatches, titleMatches := h.findDuplicateBibs(ctx, tenantID, req.ISBN13, req.ISBN10, req.Title, excludeID)
+	if len(isbnMatches) > 0 {
+		out := make([]bibDuplicateMatch, len(isbnMatches))
+		for i, b := range isbnMatches {
+			out[i] = toBibDuplicateMatch(b)
+		}
+		respondJSON(w, http.StatusConflict, map[string]any{
+			"error":   "a title with this ISBN already exists in your catalog — open it and add a copy instead of creating a new title",
+			"code":    "duplicate_isbn",
+			"matches": out,
+		})
+		return true
+	}
+	if len(titleMatches) > 0 && !req.Force {
+		out := make([]bibDuplicateMatch, len(titleMatches))
+		for i, b := range titleMatches {
+			out[i] = toBibDuplicateMatch(b)
+		}
+		respondJSON(w, http.StatusConflict, map[string]any{
+			"error":   "a title with this exact name already exists in your catalog — confirm this is a different work/edition to continue",
+			"code":    "duplicate_title",
+			"matches": out,
+		})
+		return true
+	}
+	return false
+}
+
+// CheckDuplicate godoc
+// @Summary Live pre-flight duplicate check while cataloging (title/ISBN), non-blocking
+// @Tags Catalog
+// @Param title query string false "Working title"
+// @Param isbn13 query string false "ISBN-13 typed so far"
+// @Param isbn10 query string false "ISBN-10 typed so far"
+// @Param exclude_id query string false "Bib id to exclude (editing an existing title)"
+// @Success 200 {object} map[string]any
+// @Router /{tenant}/library/catalog/bibs/check-duplicate [get]
+func (h *CatalogHandler) CheckDuplicate(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := TenantUUID(r)
+	if !ok {
+		respondError(w, http.StatusUnauthorized, "missing tenant", "unauthorized")
+		return
+	}
+	qp := r.URL.Query()
+	var excludeID *uuid.UUID
+	if s := qp.Get("exclude_id"); s != "" {
+		if id, err := uuid.Parse(s); err == nil {
+			excludeID = &id
+		}
+	}
+	isbnMatches, titleMatches := h.findDuplicateBibs(r.Context(), tenantID, qp.Get("isbn13"), qp.Get("isbn10"), qp.Get("title"), excludeID)
+	isbnOut := make([]bibDuplicateMatch, len(isbnMatches))
+	for i, b := range isbnMatches {
+		isbnOut[i] = toBibDuplicateMatch(b)
+	}
+	titleOut := make([]bibDuplicateMatch, len(titleMatches))
+	for i, b := range titleMatches {
+		titleOut[i] = toBibDuplicateMatch(b)
+	}
+	respondJSON(w, http.StatusOK, map[string]any{
+		"isbn_matches":  isbnOut,
+		"title_matches": titleOut,
+	})
 }
 
 // opacRow is one OPAC search hit with live availability.

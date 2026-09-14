@@ -113,6 +113,11 @@ func (h *CatalogHandler) ImportMarc(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "a title is required (245$a)", "invalid_request")
 		return
 	}
+	// Same duplicate guard as CreateBib — an imported MARC/SRU record is just another way a title
+	// enters the catalog, so it must not bypass the ISBN/title collision check.
+	if blocked := h.rejectDuplicateBib(r.Context(), w, tenantID, req, nil); blocked {
+		return
+	}
 	c := h.db.BibRecord.Create().SetTenantID(tenantID).SetTitle(req.Title)
 	applyBibFields(c, req)
 	row, err := c.Save(r.Context())
