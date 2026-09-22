@@ -357,8 +357,12 @@ func (h *AcquisitionHandler) ReceiveLine(w http.ResponseWriter, r *http.Request)
 	// Auto-create BookCopy records for received quantity.
 	copiesCreated, copiesFailed := 0, 0
 	if line.BibRecordID != nil {
-		_, bibErr := h.db.BibRecord.Query().Where(bibrecord.IDEQ(*line.BibRecordID)).Only(ctx)
+		bib, bibErr := h.db.BibRecord.Query().Where(bibrecord.IDEQ(*line.BibRecordID)).Only(ctx)
 		if bibErr == nil {
+			// Every copy created for this line is another physical unit of the SAME title, so they
+			// all share one inherited call number (see defaultCallNumber in catalog_copies.go) —
+			// there's no per-copy override field on a receive line, unlike the manual Add-Copy form.
+			callNo := defaultCallNumber(bib)
 			branchID := uuid.Nil
 			if req.BranchID != "" {
 				if bid, err2 := uuid.Parse(req.BranchID); err2 == nil {
@@ -392,6 +396,9 @@ func (h *AcquisitionHandler) ReceiveLine(w http.ResponseWriter, r *http.Request)
 				}
 				if req.ShelfLoc != "" {
 					cc = cc.SetShelfLocation(req.ShelfLoc)
+				}
+				if callNo != "" {
+					cc = cc.SetCallNumber(callNo)
 				}
 				if line.UnitPrice.IsPositive() {
 					cc = cc.SetAcquisitionCost(line.UnitPrice)

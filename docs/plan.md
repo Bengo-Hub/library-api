@@ -135,6 +135,22 @@ found during the audit itself. All fixed without any schema/migration change —
   resolve to its title. Added a copy-barcode/accession-number OR-clause, reusing the same lookup
   direction `ListAllCopies` already does.
 
+## Title-level call number default (2026-09-22)
+
+`BibRecord.lc_call_number` existed in the schema/migration since the original scaffold but nothing
+ever wrote to it — `bibRequest` had no field for it (removed from the UI's title form in the
+2026-07-31 audit specifically because it was an independently-edited duplicate of the per-copy
+`BookCopy.call_number`, never actually kept in sync). Reactivated it as a proper DEFAULT rather than
+a duplicate: `bibRequest.lc_call_number` is now applied on create/update
+(`applyBibFields`/`applyBibUpdate`); a new `defaultCallNumber(bib)` helper (`catalog_copies.go`,
+LC call number else Dewey classification) is consulted by `CreateCopy` when a caller omits
+`call_number`, and by the Purchase Order `ReceiveLine` batch-create (which already queried the bib
+row for existence but discarded it) for every auto-created copy in the batch. The per-copy
+`BookCopy.call_number` stays the authoritative, independently-editable value — this only removes the
+need to retype the same call number for every physical copy of one title. Mirrors the manual
+`b.LcCallNumber`-then-`DdcClassification` fallback `refdata.SeedDemoCopies` already used for demo
+data (left as-is; different package, narrowly scoped to seeding).
+
 ## Risks
 
 | Risk | Impact | Mitigation |

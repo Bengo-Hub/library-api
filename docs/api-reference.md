@@ -54,7 +54,7 @@ All routes pass through `RequireAuth` → JIT heal → mutations-only subscripti
 | PUT | `/catalog/bibs/{id}` | Update a bib | same body as create |
 | DELETE | `/catalog/bibs/{id}` | Delete a bib | — |
 | GET | `/catalog/bibs/{id}/copies` | List copies of a bib | → `listEnvelope` |
-| POST | `/catalog/copies` | Create a copy (holding) | `bib_record_id`*, `branch_id`*, `barcode`*, `accession_no`, `call_number`, `shelf_location`, `is_reference_only`, `acquisition_cost`, `loan_policy_id` |
+| POST | `/catalog/copies` | Create a copy (holding) | `bib_record_id`*, `branch_id`*, `barcode`*, `accession_no`, `call_number` (omit to inherit the bib's default `lc_call_number`/`ddc_classification`), `shelf_location`, `is_reference_only`, `acquisition_cost`, `loan_policy_id` |
 | PUT | `/catalog/copies/{id}` | Update a copy | copy fields incl. `status` |
 | GET | `/catalog/copies/by-barcode/{barcode}` | Resolve a copy by scanned barcode | → `ent.BookCopy` |
 | GET | `/catalog/copies/{id}/label.pdf` | Copy spine-label PDF | → `application/pdf` (Blob) |

@@ -138,6 +138,22 @@ func (h *CatalogHandler) toCopyResponse(c *ent.BookCopy, branchName, bibTitle, l
 	return resp
 }
 
+// defaultCallNumber resolves the call number a NEW copy of this bib should start with when the
+// caller didn't supply one explicitly: the LC call number if catalogued, else the Dewey
+// classification, else "". The copy keeps its own call_number afterward (e.g. a branch-specific
+// reclassification) — this only seeds the common case where every physical copy of a title shares
+// one shelf classification, instead of a librarian retyping it for every copy. Mirrors the manual
+// per-copy logic refdata.SeedDemoCopies already used for demo data.
+func defaultCallNumber(b *ent.BibRecord) string {
+	if b == nil {
+		return ""
+	}
+	if b.LcCallNumber != "" {
+		return b.LcCallNumber
+	}
+	return b.DdcClassification
+}
+
 // singleCopyResponse resolves the branch name + active loan for one copy (create/update/lookup).
 func (h *CatalogHandler) singleCopyResponse(r *http.Request, tenantID uuid.UUID, c *ent.BookCopy) copyResponse {
 	resps := h.buildCopyResponses(r, tenantID, []*ent.BookCopy{c})
@@ -345,6 +361,10 @@ func (h *CatalogHandler) CreateCopy(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, "could not resolve a branch", "no_branch")
 		return
 	}
+	// Best-effort: when the caller didn't send a call_number, inherit the title's own default (see
+	// defaultCallNumber) so every copy of a title doesn't need it retyped. A lookup failure never
+	// blocks the create — the copy just ends up with no call number, same as before this change.
+	bib, _ := h.db.BibRecord.Query().Where(bibrecord.IDEQ(bibID), bibrecord.TenantID(tenantID)).Only(r.Context())
 
 	tx, err := h.db.Tx(r.Context())
 	if err != nil {
@@ -370,6 +390,8 @@ func (h *CatalogHandler) CreateCopy(w http.ResponseWriter, r *http.Request) {
 		SetNotes(req.Notes)
 	if req.CallNumber != "" {
 		c.SetCallNumber(req.CallNumber)
+	} else if cn := defaultCallNumber(bib); cn != "" {
+		c.SetCallNumber(cn)
 	}
 	if req.ShelfLocation != "" {
 		c.SetShelfLocation(req.ShelfLocation)

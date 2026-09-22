@@ -41,15 +41,19 @@ func NewCatalogHandler(db *ent.Client, secretStore *secrets.Store, mediaRoot str
 
 // bibRequest is the create/update payload for a bibliographic record.
 type bibRequest struct {
-	Title             string   `json:"title"`
-	Subtitle          string   `json:"subtitle"`
-	ISBN13            string   `json:"isbn13"`
-	ISBN10            string   `json:"isbn10"`
-	Authors           []string `json:"authors"`
-	PublisherName     string   `json:"publisher_name"`
-	Format            string   `json:"format"`
-	Language          string   `json:"language"`
-	DDC               string   `json:"ddc_classification"`
+	Title         string   `json:"title"`
+	Subtitle      string   `json:"subtitle"`
+	ISBN13        string   `json:"isbn13"`
+	ISBN10        string   `json:"isbn10"`
+	Authors       []string `json:"authors"`
+	PublisherName string   `json:"publisher_name"`
+	Format        string   `json:"format"`
+	Language      string   `json:"language"`
+	DDC           string   `json:"ddc_classification"`
+	// CallNumber is the DEFAULT call number a new copy of this title starts with (CreateCopy /
+	// ReceiveLine fall back to it when a caller doesn't send one) — not the authoritative per-copy
+	// value, which stays on BookCopy.call_number and can still diverge per copy.
+	CallNumber        string   `json:"lc_call_number"`
 	PublishYear       int      `json:"publication_year"`
 	PageCount         int      `json:"page_count"`
 	Summary           string   `json:"summary"`
@@ -603,6 +607,9 @@ func applyBibFields(c *ent.BibRecordCreate, req bibRequest) {
 	if req.DDC != "" {
 		c.SetDdcClassification(req.DDC)
 	}
+	if req.CallNumber != "" {
+		c.SetLcCallNumber(req.CallNumber)
+	}
 	if req.PublishYear > 0 {
 		c.SetPublicationYear(req.PublishYear)
 	}
@@ -664,6 +671,9 @@ func applyBibUpdate(u *ent.BibRecordUpdateOne, req bibRequest) {
 	}
 	if req.DDC != "" {
 		u.SetDdcClassification(req.DDC)
+	}
+	if req.CallNumber != "" {
+		u.SetLcCallNumber(req.CallNumber)
 	}
 	if req.PublishYear > 0 {
 		u.SetPublicationYear(req.PublishYear)
