@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"encoding/json"
+	sharedcache "github.com/Bengo-Hub/cache"
 	"net/http"
 	"time"
 
@@ -539,6 +540,10 @@ func (s *SerialIssueScheduler) Start(ctx context.Context, interval time.Duration
 }
 
 func (s *SerialIssueScheduler) sweep(ctx context.Context) {
+	// Runs on every replica's ticker; only the first replica in each period does the work.
+	if !sharedcache.ClaimPeriod(ctx, "library:serial-issues", 24*time.Hour) {
+		return
+	}
 	now := time.Now()
 	issues, err := s.db.SerialIssue.Query().
 		Where(

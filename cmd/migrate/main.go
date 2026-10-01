@@ -17,6 +17,11 @@ import (
 	"github.com/bengobox/library-service/internal/ent/migrate"
 )
 
+// migrationLockKey serializes migrations across pods: every replica runs this binary on start
+// and concurrent schema runs can race on the same DDL. Stable and unique per service
+// ("LIBM", library migrate).
+const migrationLockKey int64 = 0x4C49_424D
+
 // cmd/migrate applies the embedded Atlas versioned migrations. Uses POSTGRES_MIGRATE_URL
 // (direct, bypassing pgbouncer) when set, else POSTGRES_URL.
 func main() {
@@ -39,14 +44,24 @@ func main() {
 	if err := sqlDB.Ping(); err != nil {
 		log.Fatalf("db ping: %v", err)
 	}
+	// One connection: the advisory lock and every migration statement share one session.
+	sqlDB.SetMaxOpenConns(1)
+	sqlDB.SetMaxIdleConns(1)
+	if _, err := sqlDB.Exec("SELECT pg_advisory_lock($1)", migrationLockKey); err != nil {
+		log.Fatalf("acquire migration lock: %v", err)
+	}
 
 	drv := entsql.OpenDB(dialect.Postgres, sqlDB)
 	client := ent.NewClient(ent.Driver(drv))
 	defer client.Close()
 
 	ctx := context.Background()
-	if err := client.Schema.Create(ctx, schema.WithDir(migrate.Dir)); err != nil {
-		log.Fatalf("schema create: %v", err)
+	migrateErr := client.Schema.Create(ctx, schema.WithDir(migrate.Dir))
+	if _, err := sqlDB.Exec("SELECT pg_advisory_unlock($1)", migrationLockKey); err != nil {
+		log.Printf("release migration lock: %v", err)
+	}
+	if migrateErr != nil {
+		log.Fatalf("schema create: %v", migrateErr)
 	}
 
 	fmt.Println("migrations completed successfully")

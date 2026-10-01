@@ -1,6 +1,7 @@
 package router
 
 import (
+	ratelimit "github.com/Bengo-Hub/shared-ratelimit"
 	"net/http"
 	"time"
 
@@ -45,6 +46,8 @@ type Deps struct {
 	RBAC             *rbac.Service
 	AllowedOrigins   []string
 	MediaRoot        string
+	// Limiter is the shared request limiter (nil disables limiting, e.g. in tests).
+	Limiter *ratelimit.Limiter
 }
 
 // New builds the chi router with the standard middleware stack and all library routes.
@@ -52,11 +55,13 @@ func New(d Deps) http.Handler {
 	r := chi.NewRouter()
 
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
+	// Never chi RealIP: it trusts client-sent True-Client-IP/X-Forwarded-For.
+	r.Use(ratelimit.TrustedRealIP)
 	r.Use(httpware.RequestID)
 	r.Use(httpware.Logging(d.Log))
 	r.Use(httpware.Recover(d.Log))
-	r.Use(middleware.Timeout(30 * time.Second))
+	// Timeout would cancel long-lived streams; skip it for WebSocket/SSE.
+	r.Use(httpware.BypassForStreaming(middleware.Timeout(30 * time.Second)))
 	r.Use(middleware.RequestSize(50 << 20)) // 50 MB (e-book uploads)
 	r.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   d.AllowedOrigins,
@@ -66,6 +71,14 @@ func New(d Deps) http.Handler {
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
+	// Per-IP abuse limit (library had none). After CORS so 429s carry CORS headers; streams
+	// and health probes are exempt.
+	pinLimit := func(next http.Handler) http.Handler { return next }
+	if d.Limiter != nil {
+		r.Use(d.Limiter.Middleware(ratelimit.IPKey, 300, time.Minute))
+		// PIN and card identification are guessable secrets: 10 tries per IP per minute.
+		pinLimit = d.Limiter.MiddlewareWith(ratelimit.IPKey, ratelimit.Options{Name: "pin", Limit: 10, Window: time.Minute})
+	}
 
 	r.Get("/healthz", d.Health.Liveness)
 	r.Get("/readyz", d.Health.Readiness)
@@ -79,14 +92,18 @@ func New(d Deps) http.Handler {
 		http.Redirect(w, req, "/v1/docs/", http.StatusMovedPermanently)
 	})
 	if d.MediaRoot != "" {
-		r.Handle("/media/*", withMediaCacheControl(http.StripPrefix("/media", http.FileServer(http.Dir(d.MediaRoot)))))
+		// Covers are overwritten in place on re-upload under the same name, so nothing here is
+		// immutable: 1 day + stale-while-revalidate. No directory listings.
+		r.Handle("/media/*", http.StripPrefix("/media", httpware.StaticMedia(d.MediaRoot, httpware.MediaOptions{
+			Immutable: func(string) bool { return false },
+		})))
 	}
 
 	// Public PIN/terminal auth (no SSO) — desk/kiosk quick login.
 	if d.PINAuth != nil {
-		r.Post("/api/v1/{tenant}/library/auth/pin", d.PINAuth.Login)
-		r.Post("/api/v1/{tenant}/library/auth/pin/identify", d.PINAuth.IdentifyByPIN)
-		r.Post("/api/v1/{tenant}/library/auth/pin/card", d.PINAuth.IdentifyByCard)
+		r.With(pinLimit).Post("/api/v1/{tenant}/library/auth/pin", d.PINAuth.Login)
+		r.With(pinLimit).Post("/api/v1/{tenant}/library/auth/pin/identify", d.PINAuth.IdentifyByPIN)
+		r.With(pinLimit).Post("/api/v1/{tenant}/library/auth/pin/card", d.PINAuth.IdentifyByCard)
 		r.Get("/api/v1/{tenant}/library/auth/pin/profiles", d.PINAuth.StaffProfiles)
 		r.Get("/api/v1/{tenant}/library/auth/pin/branches", d.PINAuth.PINBranches)
 	}
@@ -390,15 +407,4 @@ func New(d Deps) http.Handler {
 	})
 
 	return r
-}
-
-// withMediaCacheControl adds a day-long Cache-Control header to static /media/* responses
-// (cover images + thumbnails). Covers are overwritten in place on re-upload under the same
-// filename, so a shorter TTL than "immutable" is used to bound staleness after a re-upload
-// without requiring the UI to cache-bust with a query param.
-func withMediaCacheControl(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Cache-Control", "public, max-age=86400")
-		next.ServeHTTP(w, r)
-	})
 }

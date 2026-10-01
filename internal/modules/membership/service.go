@@ -5,6 +5,7 @@ package membership
 
 import (
 	"context"
+	sharedcache "github.com/Bengo-Hub/cache"
 	"time"
 
 	"github.com/google/uuid"
@@ -92,6 +93,10 @@ func (s *Service) StartScheduler(ctx context.Context, interval time.Duration) {
 }
 
 func (s *Service) sweep(ctx context.Context) {
+	// Runs on every replica's ticker; only the first replica in each period does the work.
+	if !sharedcache.ClaimPeriod(ctx, "library:membership-fees", 24*time.Hour) {
+		return
+	}
 	cutoff := time.Now().AddDate(0, 0, 14) // 14-day renewal window
 	due, err := s.db.Member.Query().
 		Where(member.StatusEQ(member.StatusACTIVE), member.ExpiresAtLT(cutoff), member.ExpiresAtNotNil()).

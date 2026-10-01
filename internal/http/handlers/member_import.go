@@ -1,11 +1,14 @@
 package handlers
 
 import (
+	"context"
 	"encoding/csv"
+	"encoding/json"
+	sharedcache "github.com/Bengo-Hub/cache"
+	"github.com/redis/go-redis/v9"
 	"net/http"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -17,13 +20,15 @@ import (
 	"github.com/bengobox/library-service/internal/modules/sequence"
 )
 
-// importJob tracks a bulk member-import job in memory.
+// importJob is a bulk member-import job's progress, as reported to the polling UI.
 type importJob struct {
 	ID       string        `json:"id"`
 	Status   string        `json:"status"` // running / done
 	Total    int           `json:"total"`
 	Imported int           `json:"imported"`
 	Errors   []importError `json:"errors"`
+	// ErrorCount is the total number of failed rows; Errors keeps at most maxStoredImportErrors.
+	ErrorCount int `json:"error_count"`
 }
 
 type importError struct {
@@ -32,22 +37,67 @@ type importError struct {
 	Message string `json:"message"`
 }
 
-var (
-	importJobs   = map[string]*importJob{}
-	importJobsMu sync.RWMutex
+const (
+	importJobTTL          = 24 * time.Hour
+	maxStoredImportErrors = 5000
+	importSaveEvery       = 50
+	importJobTimeout      = 30 * time.Minute
 )
 
-func setImportJob(job *importJob) {
-	importJobsMu.Lock()
-	importJobs[job.ID] = job
-	importJobsMu.Unlock()
+// Import job snapshots live in Redis so the status and errors endpoints work on whichever
+// replica the poll lands on (they were in a per-pod map: a poll routed to another pod got 404,
+// and the map never shrank). Without Redis a bounded per-pod cache is used.
+var (
+	importJobRedis redis.UniversalClient
+	importJobLocal = sharedcache.NewLocal[string, []byte](200, importJobTTL)
+)
+
+// SetImportJobRedis wires the shared store for import job snapshots (call once at startup).
+func SetImportJobRedis(rdb *redis.Client) {
+	if rdb == nil {
+		importJobRedis = nil
+		return
+	}
+	importJobRedis = rdb
 }
 
-func getImportJob(id string) (*importJob, bool) {
-	importJobsMu.RLock()
-	defer importJobsMu.RUnlock()
-	j, ok := importJobs[id]
-	return j, ok
+func importJobKey(tenantID uuid.UUID, id string) string {
+	return "library:member-import:" + tenantID.String() + ":" + id
+}
+
+func saveImportJob(ctx context.Context, tenantID uuid.UUID, job importJob) {
+	b, err := json.Marshal(job)
+	if err != nil {
+		return
+	}
+	key := importJobKey(tenantID, job.ID)
+	if importJobRedis != nil {
+		cctx, cancel := context.WithTimeout(ctx, time.Second)
+		err = importJobRedis.Set(cctx, key, b, importJobTTL).Err()
+		cancel()
+		if err == nil {
+			return
+		}
+	}
+	importJobLocal.Set(key, b)
+}
+
+func loadImportJob(ctx context.Context, tenantID uuid.UUID, id string) (importJob, bool) {
+	var job importJob
+	key := importJobKey(tenantID, id)
+	var raw []byte
+	if importJobRedis != nil {
+		cctx, cancel := context.WithTimeout(ctx, time.Second)
+		raw, _ = importJobRedis.Get(cctx, key).Bytes()
+		cancel()
+	}
+	if raw == nil {
+		raw, _ = importJobLocal.Get(key)
+	}
+	if raw == nil || json.Unmarshal(raw, &job) != nil {
+		return job, false
+	}
+	return job, true
 }
 
 // ImportMembers godoc
@@ -84,16 +134,27 @@ func (h *MemberHandler) ImportMembers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	job := &importJob{
+	job := importJob{
 		ID:     uuid.NewString(),
 		Status: "running",
 		Total:  len(records) - 1,
 	}
-	setImportJob(job)
+	saveImportJob(r.Context(), tenantID, job)
 	respondJSON(w, http.StatusAccepted, map[string]string{"job_id": job.ID, "status": "running"})
 
+	// The request context is cancelled as soon as this handler returns the 202, which made
+	// every database call in the import fail; the import runs on a detached, bounded context.
+	// The goroutine owns job outright (snapshots are copies), so there is nothing to lock.
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), importJobTimeout)
 	go func() {
+		defer cancel()
 		log := h.log.With(zap.String("job_id", job.ID))
+		addErr := func(e importError) {
+			job.ErrorCount++
+			if len(job.Errors) < maxStoredImportErrors {
+				job.Errors = append(job.Errors, e)
+			}
+		}
 		header := normaliseHeader(records[0])
 		col := func(row []string, name string) string {
 			idx, ok2 := header[name]
@@ -106,7 +167,7 @@ func (h *MemberHandler) ImportMembers(w http.ResponseWriter, r *http.Request) {
 		// Resolve default tier for this tenant.
 		defaultTier, _ := h.db.MemberTier.Query().
 			Where(membertier.TenantID(tenantID)).
-			First(r.Context())
+			First(ctx)
 
 		for i, record := range records[1:] {
 			rowNum := i + 2
@@ -115,9 +176,7 @@ func (h *MemberHandler) ImportMembers(w http.ResponseWriter, r *http.Request) {
 				displayName = col(record, "name")
 			}
 			if displayName == "" {
-				importJobsMu.Lock()
-				job.Errors = append(job.Errors, importError{Row: rowNum, Field: "display_name", Message: "required"})
-				importJobsMu.Unlock()
+				addErr(importError{Row: rowNum, Field: "display_name", Message: "required"})
 				continue
 			}
 
@@ -131,20 +190,18 @@ func (h *MemberHandler) ImportMembers(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 			if tierID == uuid.Nil {
-				importJobsMu.Lock()
-				job.Errors = append(job.Errors, importError{Row: rowNum, Field: "tier_id", Message: "no tier configured"})
-				importJobsMu.Unlock()
+				addErr(importError{Row: rowNum, Field: "tier_id", Message: "no tier configured"})
 				continue
 			}
 
-			tx, err := h.db.Tx(r.Context())
+			tx, err := h.db.Tx(ctx)
 			if err != nil {
 				log.Warn("tx failed", zap.Int("row", rowNum), zap.Error(err))
 				continue
 			}
 			memberNo := col(record, "membership_no")
 			if memberNo == "" {
-				memberNo, err = sequence.Next(r.Context(), tx, tenantID, sequence.KindMembership, "MBR", 5)
+				memberNo, err = sequence.Next(ctx, tx, tenantID, sequence.KindMembership, "MBR", 5)
 				if err != nil {
 					_ = tx.Rollback()
 					log.Warn("sequence failed", zap.Int("row", rowNum), zap.Error(err))
@@ -162,28 +219,24 @@ func (h *MemberHandler) ImportMembers(w http.ResponseWriter, r *http.Request) {
 			if st := strings.ToUpper(col(record, "status")); st != "" {
 				c.SetStatus(member.Status(st))
 			}
-			if _, saveErr := c.Save(r.Context()); saveErr != nil {
+			if _, saveErr := c.Save(ctx); saveErr != nil {
 				_ = tx.Rollback()
-				importJobsMu.Lock()
-				job.Errors = append(job.Errors, importError{Row: rowNum, Field: "-", Message: saveErr.Error()})
-				importJobsMu.Unlock()
+				addErr(importError{Row: rowNum, Field: "-", Message: saveErr.Error()})
 				continue
 			}
 			if commitErr := tx.Commit(); commitErr != nil {
-				importJobsMu.Lock()
-				job.Errors = append(job.Errors, importError{Row: rowNum, Field: "-", Message: "commit: " + commitErr.Error()})
-				importJobsMu.Unlock()
+				addErr(importError{Row: rowNum, Field: "-", Message: "commit: " + commitErr.Error()})
 				continue
 			}
-			importJobsMu.Lock()
 			job.Imported++
-			importJobsMu.Unlock()
+			if (i+1)%importSaveEvery == 0 {
+				saveImportJob(ctx, tenantID, job)
+			}
 		}
 
-		importJobsMu.Lock()
 		job.Status = "done"
-		importJobsMu.Unlock()
-		log.Info("member import done", zap.Int("imported", job.Imported), zap.Int("errors", len(job.Errors)))
+		saveImportJob(ctx, tenantID, job)
+		log.Info("member import done", zap.Int("imported", job.Imported), zap.Int("errors", job.ErrorCount))
 	}()
 }
 
@@ -192,16 +245,17 @@ func (h *MemberHandler) ImportMembers(w http.ResponseWriter, r *http.Request) {
 // @Tags Members
 // @Router /{tenant}/library/members/import/{job_id} [get]
 func (h *MemberHandler) ImportMembersStatus(w http.ResponseWriter, r *http.Request) {
-	jobID := chi.URLParam(r, "job_id")
-	job, ok := getImportJob(jobID)
+	tenantID, ok := TenantUUID(r)
+	if !ok {
+		respondError(w, http.StatusUnauthorized, "missing tenant", "unauthorized")
+		return
+	}
+	job, ok := loadImportJob(r.Context(), tenantID, chi.URLParam(r, "job_id"))
 	if !ok {
 		respondError(w, http.StatusNotFound, "job not found", "not_found")
 		return
 	}
-	importJobsMu.RLock()
-	snap := *job
-	importJobsMu.RUnlock()
-	respondJSON(w, http.StatusOK, snap)
+	respondJSON(w, http.StatusOK, job)
 }
 
 // ImportMembersTemplate godoc
@@ -222,15 +276,17 @@ func (h *MemberHandler) ImportMembersTemplate(w http.ResponseWriter, r *http.Req
 // @Tags Members
 // @Router /{tenant}/library/members/import/{job_id}/errors [get]
 func (h *MemberHandler) ImportMembersErrors(w http.ResponseWriter, r *http.Request) {
-	jobID := chi.URLParam(r, "job_id")
-	job, ok := getImportJob(jobID)
+	tenantID, ok := TenantUUID(r)
+	if !ok {
+		respondError(w, http.StatusUnauthorized, "missing tenant", "unauthorized")
+		return
+	}
+	job, ok := loadImportJob(r.Context(), tenantID, chi.URLParam(r, "job_id"))
 	if !ok {
 		respondError(w, http.StatusNotFound, "job not found", "not_found")
 		return
 	}
-	importJobsMu.RLock()
-	errs := append([]importError(nil), job.Errors...)
-	importJobsMu.RUnlock()
+	errs := job.Errors
 
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="import_errors.csv"`)
@@ -250,4 +306,3 @@ func normaliseHeader(row []string) map[string]int {
 	}
 	return m
 }
-

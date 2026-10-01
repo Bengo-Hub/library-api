@@ -2,6 +2,7 @@ package membership
 
 import (
 	"context"
+	sharedcache "github.com/Bengo-Hub/cache"
 	"time"
 
 	"github.com/google/uuid"
@@ -47,6 +48,10 @@ func (s *PatronCategoryScheduler) Start(ctx context.Context, interval time.Durat
 }
 
 func (s *PatronCategoryScheduler) sweep(ctx context.Context) {
+	// Runs on every replica's ticker; only the first replica in each period does the work.
+	if !sharedcache.ClaimPeriod(ctx, "library:patron-category", 24*time.Hour) {
+		return
+	}
 	now := time.Now()
 	s.expireMembers(ctx, now)
 	s.graduateMembers(ctx, now)

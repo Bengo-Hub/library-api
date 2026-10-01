@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	ratelimit "github.com/Bengo-Hub/shared-ratelimit"
 	"net/http"
 	"time"
 
@@ -32,11 +33,10 @@ import (
 	"github.com/bengobox/library-service/internal/modules/membership"
 	"github.com/bengobox/library-service/internal/modules/rbac"
 	"github.com/bengobox/library-service/internal/modules/refdata"
-	"github.com/bengobox/library-service/internal/platform/cache"
 	"github.com/bengobox/library-service/internal/platform/database"
 	"github.com/bengobox/library-service/internal/platform/events"
-	"github.com/bengobox/library-service/internal/platform/secrets"
 	"github.com/bengobox/library-service/internal/platform/marketflow"
+	"github.com/bengobox/library-service/internal/platform/secrets"
 	"github.com/bengobox/library-service/internal/platform/subscriptions"
 	"github.com/bengobox/library-service/internal/platform/treasury"
 	"github.com/bengobox/library-service/internal/shared/logger"
@@ -44,20 +44,20 @@ import (
 
 // App holds the wired runtime for the library service.
 type App struct {
-	cfg             *config.Config
-	log             *zap.Logger
-	httpServer      *http.Server
-	db              *pgxpool.Pool
-	cache           *redis.Client
-	events          *nats.Conn
-	orm             *ent.Client
-	outboxPublisher       *eventslib.OutboxPoller
-	circulation           *circulation.Service
-	membership            *membership.Service
+	cfg                     *config.Config
+	log                     *zap.Logger
+	httpServer              *http.Server
+	db                      *pgxpool.Pool
+	cache                   *redis.Client
+	events                  *nats.Conn
+	orm                     *ent.Client
+	outboxPublisher         *eventslib.OutboxPoller
+	circulation             *circulation.Service
+	membership              *membership.Service
 	patronCategoryScheduler *membership.PatronCategoryScheduler
 	serialIssueScheduler    *handlers.SerialIssueScheduler
-	paymentConsumer       *consumers.PaymentConsumer
-	authConsumer          *consumers.AuthEventsConsumer
+	paymentConsumer         *consumers.PaymentConsumer
+	authConsumer            *consumers.AuthEventsConsumer
 }
 
 // New constructs and wires the application.
@@ -85,11 +85,26 @@ func New(ctx context.Context) (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("postgres init: %w", err)
 	}
-	redisClient := cache.NewClient(cfg.Redis)
+	redisClient, redisErr := sharedcache.NewRedis(ctx, sharedcache.RedisConfig{
+		Addr: cfg.Redis.Addr, Username: cfg.Redis.Username, Password: cfg.Redis.Password,
+		DB: cfg.Redis.DB, TLS: cfg.Redis.TLSRequired, DialTimeout: cfg.Redis.DialTimeout,
+	})
+	if redisErr != nil {
+		log.Warn("redis not reachable at startup", zap.Error(redisErr))
+	}
+	// Scheduled sweeps run once per period fleet-wide; import job status is shared.
+	sharedcache.SetLeaseClient(redisClient)
+	handlers.SetImportJobRedis(redisClient)
 
 	natsConn, err := events.Connect(cfg.Events)
 	if err != nil {
 		log.Warn("event bus connection failed", zap.Error(err))
+	}
+	if natsConn != nil {
+		// Drop revoked/rotated API keys from every validator on this pod at once.
+		_ = eventslib.NewBroadcaster(log, natsConn, "auth").Subscribe("apikey.changed", func(m eventslib.BroadcastMessage) {
+			authclient.InvalidateAPIKeyHash(string(m.Data))
+		})
 	}
 	if natsConn != nil {
 		if streamErr := events.EnsureStream(ctx, natsConn, cfg.Events); streamErr != nil {
@@ -191,20 +206,21 @@ func New(ctx context.Context) (*App, error) {
 	membershipSvc := membership.NewService(ormClient, log)
 	secretStore := secrets.NewStore(ormClient, log)
 	deps := router.Deps{
-		Log:            log,
-		Health:         healthHandler,
-		Auth:           handlers.NewAuthHandler(rbacService, log),
-		Catalog:        handlers.NewCatalogHandler(ormClient, secretStore, cfg.Media.Root, cacheAside, log),
-		Branch:         handlers.NewBranchHandler(ormClient, log),
-		Member:         handlers.NewMemberHandler(ormClient, marketflowClient, log),
-		Circulation:    handlers.NewCirculationHandler(ormClient, circulationSvc, log),
-		Hold:           handlers.NewHoldHandler(ormClient, log),
-		Fine:           handlers.NewFineHandler(ormClient, treasuryClient, log),
-		Ebook:          handlers.NewEbookHandler(ormClient, treasuryClient, cfg.Media.EbookRoot, log),
-		Reports:        handlers.NewReportsHandler(ormClient, cacheAside, log),
-		RBACHandler:    handlers.NewRBACHandler(rbacService, log),
-		Membership:     handlers.NewMembershipHandler(ormClient, membershipSvc, treasuryClient, log),
-		Sequence:       handlers.NewSequenceHandler(ormClient, log),
+		Limiter:          ratelimit.NewLimiter(redisClient, log, "library"),
+		Log:              log,
+		Health:           healthHandler,
+		Auth:             handlers.NewAuthHandler(rbacService, log),
+		Catalog:          handlers.NewCatalogHandler(ormClient, secretStore, cfg.Media.Root, cacheAside, log),
+		Branch:           handlers.NewBranchHandler(ormClient, log),
+		Member:           handlers.NewMemberHandler(ormClient, marketflowClient, log),
+		Circulation:      handlers.NewCirculationHandler(ormClient, circulationSvc, log),
+		Hold:             handlers.NewHoldHandler(ormClient, log),
+		Fine:             handlers.NewFineHandler(ormClient, treasuryClient, log),
+		Ebook:            handlers.NewEbookHandler(ormClient, treasuryClient, cfg.Media.EbookRoot, log),
+		Reports:          handlers.NewReportsHandler(ormClient, cacheAside, log),
+		RBACHandler:      handlers.NewRBACHandler(rbacService, log),
+		Membership:       handlers.NewMembershipHandler(ormClient, membershipSvc, treasuryClient, log),
+		Sequence:         handlers.NewSequenceHandler(ormClient, log),
 		PINAuth:          handlers.NewPINAuthHandler(ormClient, rbacService, subsClient, terminalJWTSecret(cfg), log),
 		PlatformConfig:   handlers.NewPlatformConfigHandler(secretStore, log),
 		CirculationRules: handlers.NewCirculationRuleHandler(ormClient, circulationSvc, log),
@@ -213,9 +229,9 @@ func New(ctx context.Context) (*App, error) {
 		Acquisition:      handlers.NewAcquisitionHandler(ormClient, treasuryClient, log),
 		Serial:           handlers.NewSerialHandler(ormClient, log),
 		PatronPortal:     handlers.NewPatronPortalHandler(ormClient, circulationSvc, treasuryClient, log),
-		RBAC:           rbacService,
-		AllowedOrigins: cfg.HTTP.AllowedOrigins,
-		MediaRoot:      cfg.Media.Root,
+		RBAC:             rbacService,
+		AllowedOrigins:   cfg.HTTP.AllowedOrigins,
+		MediaRoot:        cfg.Media.Root,
 	}
 
 	// auth-service JWT validator (JWKS) + optional S2S API key.
@@ -245,12 +261,12 @@ func New(ctx context.Context) (*App, error) {
 	}
 
 	return &App{
-		cfg:             cfg,
-		log:             log,
-		httpServer:      httpServer,
-		db:              dbPool,
-		cache:           redisClient,
-		events:          natsConn,
+		cfg:                     cfg,
+		log:                     log,
+		httpServer:              httpServer,
+		db:                      dbPool,
+		cache:                   redisClient,
+		events:                  natsConn,
 		orm:                     ormClient,
 		outboxPublisher:         outboxPublisher,
 		circulation:             circulationSvc,

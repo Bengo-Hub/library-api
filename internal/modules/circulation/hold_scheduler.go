@@ -2,6 +2,7 @@ package circulation
 
 import (
 	"context"
+	sharedcache "github.com/Bengo-Hub/cache"
 	"time"
 
 	"go.uber.org/zap"
@@ -35,6 +36,10 @@ func (s *Service) StartHoldExpiryScheduler(ctx context.Context, interval time.Du
 }
 
 func (s *Service) sweepExpiredHolds(ctx context.Context) {
+	// Runs on every replica's ticker; only the first replica in each period does the work.
+	if !sharedcache.ClaimPeriod(ctx, "library:expired-holds", time.Hour) {
+		return
+	}
 	now := time.Now()
 	expired, err := s.db.Hold.Query().
 		Where(hold.StatusEQ(hold.StatusREADY), hold.ExpiresAtLT(now)).

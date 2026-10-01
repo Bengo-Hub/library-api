@@ -2,6 +2,7 @@ package circulation
 
 import (
 	"context"
+	sharedcache "github.com/Bengo-Hub/cache"
 	"time"
 
 	"go.uber.org/zap"
@@ -11,9 +12,10 @@ import (
 )
 
 // StartOverdueScheduler periodically flips past-due ACTIVE loans to OVERDUE and emits
-// library.loan.overdue (for the dashboard + overdue notices). Idempotent: only loans not
-// already OVERDUE are touched, so it is safe to run on every replica. Fine accrual itself
-// happens at return time (assessOverdueFine).
+// library.loan.overdue (for the dashboard + overdue notices). Every replica runs the ticker;
+// sweepOverdue claims each hour so only one replica sweeps (two concurrent sweeps both saw the
+// same ACTIVE loans and emitted the overdue event twice). Fine accrual itself happens at
+// return time (assessOverdueFine).
 func (s *Service) StartOverdueScheduler(ctx context.Context, interval time.Duration) {
 	if interval <= 0 {
 		interval = time.Hour
@@ -35,6 +37,10 @@ func (s *Service) StartOverdueScheduler(ctx context.Context, interval time.Durat
 }
 
 func (s *Service) sweepOverdue(ctx context.Context) {
+	// Runs on every replica's ticker; only the first replica in each period does the work.
+	if !sharedcache.ClaimPeriod(ctx, "library:overdue", time.Hour) {
+		return
+	}
 	now := time.Now()
 	due, err := s.db.Loan.Query().
 		Where(loan.StatusEQ(loan.StatusACTIVE), loan.DueAtLT(now), loan.InHouse(false)).
