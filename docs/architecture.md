@@ -157,6 +157,8 @@ E-book lending (`ebooks.go`) takes a `ForUpdate()` row lock on the `ebook` row, 
 
 **Transport:** NATS JetStream (stream `library`, deliver group `library-workers`).
 
+**Retention:** the stream keeps events for 7 days (`MaxAge`, set on new and existing streams at startup in `platform/events/nats.go`), like the other service streams. Limits retention keeps acked events because several consumers read the same subjects, so the age limit is what clears them. Before 2026-10-03 the stream had no age limit and kept every event since July.
+
 **Outbox pattern:** Domain mutations call `events.Publish(ctx, tx.OutboxEvent, …)` to insert an `outbox_events` row inside the same Ent transaction. The shared-events `OutboxPoller` (started in `app.go`) drains `PENDING` rows to NATS. Subject = `{aggregate_type}.{event_type}`; `aggregate_type` is always `"library"`.
 
 **Published events:**
