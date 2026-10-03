@@ -39,10 +39,12 @@ func EnsureStream(ctx context.Context, nc *nats.Conn, cfg config.EventsConfig) e
 
 	info, err := js.StreamInfo(cfg.StreamName)
 	if err == nil {
-		if len(info.Config.Subjects) != len(desiredSubjects) || info.Config.Subjects[0] != desiredSubjects[0] {
+		subjectsDiffer := len(info.Config.Subjects) != len(desiredSubjects) || info.Config.Subjects[0] != desiredSubjects[0]
+		if subjectsDiffer || info.Config.MaxAge != streamMaxAge {
 			info.Config.Subjects = desiredSubjects
+			info.Config.MaxAge = streamMaxAge
 			if _, updateErr := js.UpdateStream(&info.Config); updateErr != nil {
-				return fmt.Errorf("update stream subjects: %w", updateErr)
+				return fmt.Errorf("update stream: %w", updateErr)
 			}
 		}
 		return nil
@@ -52,6 +54,12 @@ func EnsureStream(ctx context.Context, nc *nats.Conn, cfg config.EventsConfig) e
 		Name:     cfg.StreamName,
 		Subjects: desiredSubjects,
 		Replicas: 1,
+		MaxAge:   streamMaxAge,
 	})
 	return err
 }
+
+// streamMaxAge bounds how long events stay in the stream, like the other service streams (7
+// days). Events are kept after consumers ack them (several services read the same event), so
+// without an age limit the stream grew forever: it had kept every event since July 2026.
+const streamMaxAge = 7 * 24 * time.Hour
