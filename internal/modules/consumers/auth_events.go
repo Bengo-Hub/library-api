@@ -13,6 +13,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/bengobox/library-service/internal/ent"
+	entbranch "github.com/bengobox/library-service/internal/ent/branch"
 	entlibraryuser "github.com/bengobox/library-service/internal/ent/libraryuser"
 	"github.com/bengobox/library-service/internal/modules/rbac"
 )
@@ -107,7 +108,36 @@ func (c *AuthEventsConsumer) Start(ctx context.Context, nc *nats.Conn) error {
 	return nil
 }
 
+// libraryServiceRoles are role names only the library uses. Generic staff names (manager,
+// cashier) prove nothing in a tenant that runs several products.
+var libraryServiceRoles = map[string]bool{
+	"librarian": true, "patron": true, rbac.RoleAdmin: true, rbac.RoleStaff: true, rbac.RoleMember: true,
+}
+
+// relevant reports whether an auth.user event concerns the library (shared UserRelevance):
+// admin roles, an SSO outlet linked to a branch, or a library role. Users already here keep
+// their updates; anyone skipped is still provisioned on first sign-in.
+func (c *AuthEventsConsumer) relevant(ctx context.Context, evt *sharedevents.Event) bool {
+	if userID, _ := evt.Payload["user_id"].(string); userID != "" && evt.TenantID != uuid.Nil {
+		if ok, err := c.orm.LibraryUser.Query().
+			Where(entlibraryuser.TenantID(evt.TenantID), entlibraryuser.UserID(userID)).Exist(ctx); err == nil && ok {
+			return true
+		}
+	}
+	r := sharedevents.UserRelevance{
+		ServiceRoles: libraryServiceRoles,
+		OutletKnown: func(ctx context.Context, tid, outletID uuid.UUID) bool {
+			ok, err := c.orm.Branch.Query().Where(entbranch.TenantID(tid), entbranch.OutletID(outletID)).Exist(ctx)
+			return err == nil && ok
+		},
+	}
+	return r.Relevant(ctx, evt.TenantID, evt.Payload)
+}
+
 func (c *AuthEventsConsumer) handleUserCreated(ctx context.Context, evt *sharedevents.Event) error {
+	if !c.relevant(ctx, evt) {
+		return nil
+	}
 	if err := c.syncUser(ctx, evt); err != nil {
 		return fmt.Errorf("sync user from auth.user.created: %w", err)
 	}
@@ -115,6 +145,9 @@ func (c *AuthEventsConsumer) handleUserCreated(ctx context.Context, evt *sharede
 }
 
 func (c *AuthEventsConsumer) handleUserUpdated(ctx context.Context, evt *sharedevents.Event) error {
+	if !c.relevant(ctx, evt) {
+		return nil
+	}
 	if err := c.syncUser(ctx, evt); err != nil {
 		return fmt.Errorf("sync user from auth.user.updated: %w", err)
 	}
