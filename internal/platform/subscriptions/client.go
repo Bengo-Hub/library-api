@@ -38,6 +38,35 @@ type Entitlements struct {
 	// the concrete tenant this covers today.
 	SupportFeeStatus string `json:"support_fee_status,omitempty"`
 	SupportFeeDueAt  string `json:"support_fee_due_at,omitempty"`
+	// ActiveProducts lists the product codes the tenant has switched on. Exempt tenants
+	// never get it; ConsumerHasActiveProduct lets them through by billing mode.
+	ActiveProducts []string `json:"active_products"`
+}
+
+// ConsumerHasActiveProduct reports whether the tenant has productCode switched on, the same
+// check logistics-api makes. Exempt and PAYG tenants pass, and it fails open when the client
+// is not wired, subscriptions-api is unreachable, or the tenant predates per-product lines
+// (ActiveProducts empty). A false result means skip, never retry.
+func (c *Client) ConsumerHasActiveProduct(ctx context.Context, tenantID, productCode string) bool {
+	if c == nil || tenantID == "" || productCode == "" {
+		return true
+	}
+	e := c.cachedEntitlements(ctx, tenantID)
+	if e == nil {
+		return true
+	}
+	if e.BillingMode == "exempt" || e.BillingMode == "service_charge" {
+		return true
+	}
+	if len(e.ActiveProducts) == 0 {
+		return true
+	}
+	for _, p := range e.ActiveProducts {
+		if p == productCode {
+			return true
+		}
+	}
+	return false
 }
 
 // Client interacts with subscriptions-api over S2S (X-API-Key, no user JWT).

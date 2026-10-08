@@ -29,6 +29,9 @@ type AuthEventsConsumer struct {
 	log     *zap.Logger
 	rbacSvc *rbac.Service
 	orm     *ent.Client
+	// ProductActive reports whether the tenant has the library switched on in its
+	// subscription. Nil admits every tenant.
+	ProductActive func(ctx context.Context, tenantID string) bool
 }
 
 func NewAuthEventsConsumer(log *zap.Logger, rbacSvc *rbac.Service, orm *ent.Client) *AuthEventsConsumer {
@@ -123,6 +126,9 @@ func (c *AuthEventsConsumer) relevant(ctx context.Context, evt *sharedevents.Eve
 			Where(entlibraryuser.TenantID(evt.TenantID), entlibraryuser.UserID(userID)).Exist(ctx); err == nil && ok {
 			return true
 		}
+	}
+	if c.ProductActive != nil && !c.ProductActive(ctx, evt.TenantID.String()) {
+		return false
 	}
 	r := sharedevents.UserRelevance{
 		ServiceRoles: libraryServiceRoles,

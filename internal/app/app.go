@@ -260,6 +260,11 @@ func New(ctx context.Context) (*App, error) {
 		IdleTimeout:       cfg.HTTP.IdleTimeout,
 	}
 
+	authConsumer := consumers.NewAuthEventsConsumer(log, rbacService, ormClient)
+	authConsumer.ProductActive = func(ctx context.Context, tenantID string) bool {
+		return subsClient.ConsumerHasActiveProduct(ctx, tenantID, "library")
+	}
+
 	return &App{
 		cfg:                     cfg,
 		log:                     log,
@@ -274,7 +279,7 @@ func New(ctx context.Context) (*App, error) {
 		patronCategoryScheduler: membership.NewPatronCategoryScheduler(ormClient, log),
 		serialIssueScheduler:    handlers.NewSerialIssueScheduler(ormClient, log),
 		paymentConsumer:         consumers.NewPaymentConsumer(ormClient, log),
-		authConsumer:            consumers.NewAuthEventsConsumer(log, rbacService, ormClient),
+		authConsumer:            authConsumer,
 	}, nil
 }
 
