@@ -126,6 +126,11 @@ func CapFineAtReplacementPrice(v bool) predicate.CirculationRule {
 	return predicate.CirculationRule(sql.FieldEQ(FieldCapFineAtReplacementPrice, v))
 }
 
+// LateFeeUsesRentalCharge applies equality check predicate on the "late_fee_uses_rental_charge" field. It's identical to LateFeeUsesRentalChargeEQ.
+func LateFeeUsesRentalCharge(v bool) predicate.CirculationRule {
+	return predicate.CirculationRule(sql.FieldEQ(FieldLateFeeUsesRentalCharge, v))
+}
+
 // RentalCharge applies equality check predicate on the "rental_charge" field. It's identical to RentalChargeEQ.
 func RentalCharge(v decimal.Decimal) predicate.CirculationRule {
 	return predicate.CirculationRule(sql.FieldEQ(FieldRentalCharge, v))
@@ -659,6 +664,16 @@ func CapFineAtReplacementPriceEQ(v bool) predicate.CirculationRule {
 // CapFineAtReplacementPriceNEQ applies the NEQ predicate on the "cap_fine_at_replacement_price" field.
 func CapFineAtReplacementPriceNEQ(v bool) predicate.CirculationRule {
 	return predicate.CirculationRule(sql.FieldNEQ(FieldCapFineAtReplacementPrice, v))
+}
+
+// LateFeeUsesRentalChargeEQ applies the EQ predicate on the "late_fee_uses_rental_charge" field.
+func LateFeeUsesRentalChargeEQ(v bool) predicate.CirculationRule {
+	return predicate.CirculationRule(sql.FieldEQ(FieldLateFeeUsesRentalCharge, v))
+}
+
+// LateFeeUsesRentalChargeNEQ applies the NEQ predicate on the "late_fee_uses_rental_charge" field.
+func LateFeeUsesRentalChargeNEQ(v bool) predicate.CirculationRule {
+	return predicate.CirculationRule(sql.FieldNEQ(FieldLateFeeUsesRentalCharge, v))
 }
 
 // RentalChargeEQ applies the EQ predicate on the "rental_charge" field.

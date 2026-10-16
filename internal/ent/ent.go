@@ -30,6 +30,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/ebookloan"
 	"github.com/bengobox/library-service/internal/ent/ebookpurchase"
 	"github.com/bengobox/library-service/internal/ent/fine"
+	"github.com/bengobox/library-service/internal/ent/finepayment"
 	"github.com/bengobox/library-service/internal/ent/hold"
 	"github.com/bengobox/library-service/internal/ent/libraryholiday"
 	"github.com/bengobox/library-service/internal/ent/libraryrole"
@@ -131,6 +132,7 @@ func checkColumn(t, c string) error {
 			ebookloan.Table:              ebookloan.ValidColumn,
 			ebookpurchase.Table:          ebookpurchase.ValidColumn,
 			fine.Table:                   fine.ValidColumn,
+			finepayment.Table:            finepayment.ValidColumn,
 			hold.Table:                   hold.ValidColumn,
 			libraryholiday.Table:         libraryholiday.ValidColumn,
 			libraryrole.Table:            libraryrole.ValidColumn,

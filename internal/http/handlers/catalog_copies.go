@@ -102,7 +102,7 @@ func (h *CatalogHandler) buildCopyResponses(r *http.Request, tenantID uuid.UUID,
 	dues := map[uuid.UUID]loanInfo{}
 	if len(copyIDs) > 0 {
 		lns, _ := h.db.Loan.Query().
-			Where(loan.TenantID(tenantID), loan.CopyIDIn(copyIDs...), loan.StatusEQ(loan.StatusACTIVE)).All(ctx)
+			Where(loan.TenantID(tenantID), loan.CopyIDIn(copyIDs...), loan.StatusIn(loan.StatusACTIVE, loan.StatusOVERDUE)).All(ctx)
 		for _, l := range lns {
 			dues[l.CopyID] = loanInfo{id: l.ID.String(), due: l.DueAt}
 		}

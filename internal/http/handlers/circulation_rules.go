@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
+	"strings"
 
 	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
@@ -16,9 +18,9 @@ import (
 
 // CirculationRuleHandler serves the 3D circulation rules matrix admin endpoints.
 type CirculationRuleHandler struct {
-	db   *ent.Client
-	svc  *circulation.Service
-	log  *zap.Logger
+	db  *ent.Client
+	svc *circulation.Service
+	log *zap.Logger
 }
 
 // NewCirculationRuleHandler builds the handler.
@@ -27,23 +29,24 @@ func NewCirculationRuleHandler(db *ent.Client, svc *circulation.Service, log *za
 }
 
 type circulationRuleRequest struct {
-	BranchID                   *string `json:"branch_id"`
-	TierID                     *string `json:"tier_id"`
-	ItemFormat                 *string `json:"item_format"`
-	LoanPeriodDays             int     `json:"loan_period_days"`
-	LoanPeriodHours            int     `json:"loan_period_hours"`
-	IsHourly                   bool    `json:"is_hourly"`
-	MaxRenewals                int     `json:"max_renewals"`
-	Holdable                   bool    `json:"holdable"`
-	FinePerDay                 string  `json:"fine_per_day"`
-	GraceDays                  int     `json:"grace_days"`
-	MaxFineCap                 string  `json:"max_fine_cap"`
-	CapFineAtReplacementPrice  bool    `json:"cap_fine_at_replacement_price"`
-	RentalCharge               string  `json:"rental_charge"`
-	ReplacementCost            string  `json:"replacement_cost"`
-	ProcessingFee              string  `json:"processing_fee"`
-	DueDateMode                string  `json:"due_date_mode"`
-	Label                      string  `json:"label"`
+	BranchID                  *string `json:"branch_id"`
+	TierID                    *string `json:"tier_id"`
+	ItemFormat                *string `json:"item_format"`
+	LoanPeriodDays            int     `json:"loan_period_days"`
+	LoanPeriodHours           int     `json:"loan_period_hours"`
+	IsHourly                  bool    `json:"is_hourly"`
+	MaxRenewals               int     `json:"max_renewals"`
+	Holdable                  bool    `json:"holdable"`
+	FinePerDay                string  `json:"fine_per_day"`
+	GraceDays                 int     `json:"grace_days"`
+	MaxFineCap                string  `json:"max_fine_cap"`
+	CapFineAtReplacementPrice bool    `json:"cap_fine_at_replacement_price"`
+	LateFeeUsesRentalCharge   bool    `json:"late_fee_uses_rental_charge"`
+	RentalCharge              string  `json:"rental_charge"`
+	ReplacementCost           string  `json:"replacement_cost"`
+	ProcessingFee             string  `json:"processing_fee"`
+	DueDateMode               string  `json:"due_date_mode"`
+	Label                     string  `json:"label"`
 }
 
 func (req *circulationRuleRequest) finePerDay() decimal.Decimal {
@@ -71,6 +74,76 @@ func (req *circulationRuleRequest) dueDateMode() cr.DueDateMode {
 		return cr.DueDateModeDAYS
 	}
 	return cr.DueDateMode(req.DueDateMode)
+}
+
+// validate rejects values the money and day fields cannot hold. An unparseable amount used
+// to fall back to zero silently, which turned a typo in the borrowing fee into "free".
+func (req *circulationRuleRequest) validate() string {
+	for name, v := range map[string]string{
+		"fine_per_day": req.FinePerDay, "max_fine_cap": req.MaxFineCap, "rental_charge": req.RentalCharge,
+		"replacement_cost": req.ReplacementCost, "processing_fee": req.ProcessingFee,
+	} {
+		if strings.TrimSpace(v) == "" {
+			continue
+		}
+		d, err := decimal.NewFromString(strings.TrimSpace(v))
+		if err != nil || d.IsNegative() {
+			return name + " must be a number of zero or more"
+		}
+	}
+	if req.LoanPeriodDays < 0 || req.LoanPeriodHours < 0 || req.MaxRenewals < 0 || req.GraceDays < 0 {
+		return "days, hours, renewals and grace days cannot be negative"
+	}
+	if !req.IsHourly && req.LoanPeriodDays == 0 {
+		return "loan period must be at least 1 day"
+	}
+	if req.IsHourly && req.LoanPeriodHours <= 0 {
+		return "an hourly rule needs a loan period in hours"
+	}
+	if req.DueDateMode != "" {
+		if err := cr.DueDateModeValidator(cr.DueDateMode(req.DueDateMode)); err != nil {
+			return "unknown due_date_mode"
+		}
+	}
+	if req.ItemFormat != nil && *req.ItemFormat != "" {
+		if err := cr.ItemFormatValidator(cr.ItemFormat(*req.ItemFormat)); err != nil {
+			return "unknown item_format"
+		}
+	}
+	return ""
+}
+
+// dimensionTaken reports whether another rule already covers the same branch, tier and
+// format. Two rules on one combination make the winner ambiguous, so it is rejected.
+func (h *CirculationRuleHandler) dimensionTaken(ctx context.Context, tenantID uuid.UUID, req *circulationRuleRequest, excludeID uuid.UUID) bool {
+	q := h.db.CirculationRule.Query().Where(cr.TenantIDEQ(tenantID))
+	if excludeID != uuid.Nil {
+		q = q.Where(cr.IDNEQ(excludeID))
+	}
+	if id, err := uuid.Parse(deref(req.BranchID)); err == nil {
+		q = q.Where(cr.BranchIDEQ(id))
+	} else {
+		q = q.Where(cr.BranchIDIsNil())
+	}
+	if id, err := uuid.Parse(deref(req.TierID)); err == nil {
+		q = q.Where(cr.TierIDEQ(id))
+	} else {
+		q = q.Where(cr.TierIDIsNil())
+	}
+	if f := deref(req.ItemFormat); f != "" {
+		q = q.Where(cr.ItemFormatEQ(cr.ItemFormat(f)))
+	} else {
+		q = q.Where(cr.ItemFormatIsNil())
+	}
+	taken, _ := q.Exist(ctx)
+	return taken
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 // List returns all circulation rules for the tenant, optionally filtered by branch_id.
@@ -109,6 +182,14 @@ func (h *CirculationRuleHandler) Create(w http.ResponseWriter, r *http.Request) 
 	if req.LoanPeriodDays <= 0 && !req.IsHourly {
 		req.LoanPeriodDays = 14
 	}
+	if msg := req.validate(); msg != "" {
+		respondError(w, http.StatusBadRequest, msg, "invalid_request")
+		return
+	}
+	if h.dimensionTaken(r.Context(), tenantID, &req, uuid.Nil) {
+		respondError(w, http.StatusConflict, "a rule already exists for this branch, tier and format", "rule_exists")
+		return
+	}
 
 	c := h.db.CirculationRule.Create().
 		SetTenantID(tenantID).
@@ -121,6 +202,7 @@ func (h *CirculationRuleHandler) Create(w http.ResponseWriter, r *http.Request) 
 		SetGraceDays(req.GraceDays).
 		SetMaxFineCap(req.maxFineCap()).
 		SetCapFineAtReplacementPrice(req.CapFineAtReplacementPrice).
+		SetLateFeeUsesRentalCharge(req.LateFeeUsesRentalCharge).
 		SetRentalCharge(req.rentalCharge()).
 		SetReplacementCost(req.replacementCost()).
 		SetProcessingFee(req.processingFee()).
@@ -148,7 +230,6 @@ func (h *CirculationRuleHandler) Create(w http.ResponseWriter, r *http.Request) 
 		respondError(w, http.StatusInternalServerError, err.Error(), "create_failed")
 		return
 	}
-	h.svc.InvalidateRuleCache(r.Context(), tenantID)
 	respondJSON(w, http.StatusCreated, row)
 }
 
@@ -171,6 +252,14 @@ func (h *CirculationRuleHandler) Update(w http.ResponseWriter, r *http.Request) 
 		respondError(w, http.StatusBadRequest, "bad body", "invalid_request")
 		return
 	}
+	if msg := req.validate(); msg != "" {
+		respondError(w, http.StatusBadRequest, msg, "invalid_request")
+		return
+	}
+	if h.dimensionTaken(r.Context(), tenantID, &req, id) {
+		respondError(w, http.StatusConflict, "a rule already exists for this branch, tier and format", "rule_exists")
+		return
+	}
 
 	u := h.db.CirculationRule.UpdateOneID(id).
 		SetLoanPeriodDays(req.LoanPeriodDays).
@@ -182,6 +271,7 @@ func (h *CirculationRuleHandler) Update(w http.ResponseWriter, r *http.Request) 
 		SetGraceDays(req.GraceDays).
 		SetMaxFineCap(req.maxFineCap()).
 		SetCapFineAtReplacementPrice(req.CapFineAtReplacementPrice).
+		SetLateFeeUsesRentalCharge(req.LateFeeUsesRentalCharge).
 		SetRentalCharge(req.rentalCharge()).
 		SetReplacementCost(req.replacementCost()).
 		SetProcessingFee(req.processingFee()).
@@ -215,7 +305,6 @@ func (h *CirculationRuleHandler) Update(w http.ResponseWriter, r *http.Request) 
 		respondError(w, http.StatusInternalServerError, err.Error(), "update_failed")
 		return
 	}
-	h.svc.InvalidateRuleCache(r.Context(), tenantID)
 	respondJSON(w, http.StatusOK, row)
 }
 
@@ -237,6 +326,5 @@ func (h *CirculationRuleHandler) Delete(w http.ResponseWriter, r *http.Request) 
 		respondError(w, http.StatusInternalServerError, err.Error(), "delete_failed")
 		return
 	}
-	h.svc.InvalidateRuleCache(r.Context(), tenantID)
 	respondJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }

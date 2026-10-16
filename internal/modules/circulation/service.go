@@ -1,6 +1,7 @@
-// Package circulation is the circulation rules engine: checkout, return, renew, in-house
-// reading, hold fulfillment on return, and overdue-fine accrual. Loan/policy resolution
-// precedence is copy → bib → tier → tenant default (tier is the implemented baseline).
+// Package circulation is the circulation rules engine: checkout (with the borrowing fee),
+// return, renew, in-house reading, hold fulfillment on return, and overdue-fine accrual.
+// Rules resolve branch + tier + format first, then fall back to the member tier's own
+// loan period, renewal cap and daily fine rate (see rule_resolver.go).
 package circulation
 
 import (
@@ -13,18 +14,19 @@ import (
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
-	"github.com/redis/go-redis/v9"
-
 	"github.com/bengobox/library-service/internal/ent"
 	"github.com/bengobox/library-service/internal/ent/bibrecord"
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
 	"github.com/bengobox/library-service/internal/ent/fine"
+	"github.com/bengobox/library-service/internal/ent/finepayment"
 	"github.com/bengobox/library-service/internal/ent/hold"
 	"github.com/bengobox/library-service/internal/ent/loan"
 	"github.com/bengobox/library-service/internal/ent/member"
 	"github.com/bengobox/library-service/internal/ent/membertier"
 	"github.com/bengobox/library-service/internal/ent/recallrequest"
 	"github.com/bengobox/library-service/internal/events"
+	"github.com/bengobox/library-service/internal/modules/calendar"
+	"github.com/bengobox/library-service/internal/modules/fines"
 )
 
 // Result bundles the outcome of a return (loan + any assessed fine + promoted hold).
@@ -34,96 +36,193 @@ type Result struct {
 	PromotedHld *ent.Hold `json:"promoted_hold,omitempty"`
 }
 
-// Service implements the circulation workflows.
-type Service struct {
-	db    *ent.Client
-	cache *redis.Client
-	log   *zap.Logger
+// FeePayment records how the librarian collected the borrowing fee at the desk. Leaving it
+// out leaves the fee unpaid on the member's account.
+type FeePayment struct {
+	Method    finepayment.Method
+	Reference string
 }
 
-// NewService builds the circulation service.
-func NewService(db *ent.Client, cache *redis.Client, log *zap.Logger) *Service {
-	return &Service{db: db, cache: cache, log: log}
+// CheckoutOptions carries the optional parts of a checkout.
+type CheckoutOptions struct {
+	InHouse bool
+	StaffID string
+	// ClientRef is a client-generated idempotency key: a replayed offline checkout returns
+	// the original loan instead of creating a second one.
+	ClientRef string
+	Payment   *FeePayment
+}
+
+// CheckoutOutcome is the loan plus the borrowing fee it generated (nil when the rule
+// charges none, or for in-house reading).
+type CheckoutOutcome struct {
+	Loan *ent.Loan
+	Fee  *ent.Fine
+}
+
+// Quote previews what a checkout would charge and when it falls due, so the desk can show
+// the borrowing fee before the librarian confirms it was collected.
+type Quote struct {
+	BorrowingFee  decimal.Decimal
+	LateFeePerDay decimal.Decimal
+	GraceDays     int
+	MaxFineCap    decimal.Decimal
+	DueAt         time.Time
+}
+
+// Service implements the circulation workflows.
+type Service struct {
+	db       *ent.Client
+	calendar *calendar.Calculator // nil = plain day counting
+	log      *zap.Logger
+}
+
+// NewService builds the circulation service. calc applies each rule's due-date mode against
+// branch opening hours and holidays; pass nil to count raw days.
+func NewService(db *ent.Client, calc *calendar.Calculator, log *zap.Logger) *Service {
+	return &Service{db: db, calendar: calc, log: log}
+}
+
+// dueDate is when a loan starting at from falls due under the rule: hourly rules add hours,
+// everything else goes through the calendar so closed days and holidays are honoured.
+func (s *Service) dueDate(ctx context.Context, tenantID, branchID uuid.UUID, from time.Time, rule *ResolvedRule) time.Time {
+	if rule.IsHourly && rule.LoanPeriodHours > 0 {
+		return from.Add(rule.LoanDuration())
+	}
+	if s.calendar == nil {
+		return from.AddDate(0, 0, rule.LoanPeriodDays)
+	}
+	return s.calendar.CalculateDueDate(ctx, tenantID, branchID, from, rule.LoanPeriodDays, calendar.Mode(rule.DueDateMode))
 }
 
 // Errors surfaced to the handler (mapped to 4xx).
 var (
-	ErrMemberNotActive  = errors.New("member is not active")
-	ErrMemberBlocked    = errors.New("member is blocked by outstanding fines")
-	ErrLoanLimit        = errors.New("member has reached their concurrent-loan limit")
-	ErrCopyUnavailable  = errors.New("copy is not available for checkout")
-	ErrNoActiveLoan     = errors.New("no active loan for that copy")
-	ErrLoanNotLostable  = errors.New("loan is not in a lostable state")
-	ErrRenewLimit       = errors.New("renewal limit reached")
-	ErrRenewHeld        = errors.New("cannot renew — another member is waiting")
-	ErrRenewRecalled    = errors.New("cannot renew — this item has been recalled")
-	ErrNoWaitingHolder  = errors.New("recall requires a waiter in the hold queue")
-	ErrAlreadyRecalled  = errors.New("this loan has already been recalled")
+	ErrMemberNotActive = errors.New("member is not active")
+	ErrMemberBlocked   = errors.New("member is blocked by outstanding fines")
+	ErrLoanLimit       = errors.New("member has reached their concurrent-loan limit")
+	ErrCopyUnavailable = errors.New("copy is not available for checkout")
+	ErrNoActiveLoan    = errors.New("no active loan for that copy")
+	ErrLoanNotLostable = errors.New("loan is not in a lostable state")
+	ErrRenewLimit      = errors.New("renewal limit reached")
+	ErrRenewHeld       = errors.New("cannot renew — another member is waiting")
+	ErrRenewRecalled   = errors.New("cannot renew — this item has been recalled")
+	ErrNoWaitingHolder = errors.New("recall requires a waiter in the hold queue")
+	ErrAlreadyRecalled = errors.New("this loan has already been recalled")
 )
 
-// Checkout lends a copy to a member. in_house marks a reference/reading-room session.
-// clientRef is an optional client-generated idempotency key: if a loan already exists with
-// it, the existing loan is returned (get-or-create) so a replayed offline checkout is
-// exactly-once.
-func (s *Service) Checkout(ctx context.Context, tenantID, memberID, copyID uuid.UUID, inHouse bool, staffID, clientRef string) (*ent.Loan, error) {
-	if clientRef != "" {
-		if existing, err := s.db.Loan.Query().
-			Where(loan.TenantID(tenantID), loan.ClientReference(clientRef)).First(ctx); err == nil {
-			return existing, nil // idempotent replay
-		}
+// checkoutContext is everything a checkout, quote or return needs about the member, the copy
+// and the circulation rule that applies to the pair.
+type checkoutContext struct {
+	member *ent.Member
+	tier   *ent.MemberTier
+	copy   *ent.BookCopy
+	rule   *ResolvedRule
+}
+
+// ruleFor resolves the rule for a member and copy, reading the title's format.
+func (s *Service) ruleFor(ctx context.Context, tenantID uuid.UUID, tier *ent.MemberTier, c *ent.BookCopy) *ResolvedRule {
+	format := ""
+	if bib, err := s.db.BibRecord.Query().Where(bibrecord.IDEQ(c.BibRecordID)).Only(ctx); err == nil {
+		format = string(bib.Format)
 	}
+	return s.ResolveRule(ctx, tenantID, c.BranchID, tier, format)
+}
+
+func (s *Service) loadCheckoutContext(ctx context.Context, tenantID, memberID, copyID uuid.UUID) (*checkoutContext, error) {
 	m, err := s.db.Member.Query().Where(member.IDEQ(memberID), member.TenantID(tenantID)).Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("member: %w", err)
-	}
-	if m.Status != member.StatusACTIVE {
-		return nil, ErrMemberNotActive
 	}
 	tier, err := s.db.MemberTier.Query().Where(membertier.IDEQ(m.TierID)).Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("tier: %w", err)
 	}
-	// Fine-block check.
-	if blocked, _ := s.fineBlocked(ctx, tenantID, memberID, tier); blocked {
-		return nil, ErrMemberBlocked
-	}
-	// Loan-limit check (in-house sessions do not count against the take-home limit).
-	if !inHouse {
-		active, _ := s.db.Loan.Query().Where(loan.TenantID(tenantID), loan.MemberID(memberID), loan.StatusEQ(loan.StatusACTIVE), loan.InHouse(false)).Count(ctx)
-		if active >= tier.MaxConcurrentLoans {
-			return nil, ErrLoanLimit
-		}
-	}
 	c, err := s.db.BookCopy.Query().Where(bookcopy.IDEQ(copyID), bookcopy.TenantID(tenantID)).Only(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("copy: %w", err)
 	}
-	readyHold := s.readyHoldFor(ctx, tenantID, c.BibRecordID, memberID)
-	if c.Status != bookcopy.StatusAVAILABLE && !(c.Status == bookcopy.StatusRESERVED && readyHold != nil) {
-		return nil, ErrCopyUnavailable
+	return &checkoutContext{member: m, tier: tier, copy: c, rule: s.ruleFor(ctx, tenantID, tier, c)}, nil
+}
+
+// QuoteCheckout previews the borrowing fee, late-fee terms and due date for lending a copy to
+// a member. It is read-only and applies the same rule resolution as Checkout.
+func (s *Service) QuoteCheckout(ctx context.Context, tenantID, memberID, copyID uuid.UUID, inHouse bool) (*Quote, error) {
+	cc, err := s.loadCheckoutContext(ctx, tenantID, memberID, copyID)
+	if err != nil {
+		return nil, err
 	}
-	if inHouse && c.IsReferenceOnly {
-		// reference-only copies are valid for in-house, fine
+	q := &Quote{DueAt: s.dueDate(ctx, tenantID, cc.copy.BranchID, time.Now(), cc.rule)}
+	if !inHouse {
+		q.BorrowingFee = cc.rule.BorrowingFee()
+		q.LateFeePerDay = cc.rule.LateRate(cc.tier.DailyFineRate)
+		q.GraceDays = cc.rule.GraceDays
+		q.MaxFineCap = cc.rule.MaxFineCap
+	}
+	return q, nil
+}
+
+// Checkout lends a copy to a member. in_house marks a reference/reading-room session.
+// A replayed ClientRef returns the original outcome (get-or-create) so an offline checkout
+// is exactly-once. When the matching rule charges a borrowing fee, an unpaid RENTAL fine is
+// raised in the same transaction as the loan; with opts.Payment it is settled immediately,
+// so the librarian marks the fee paid while checking the book out.
+func (s *Service) Checkout(ctx context.Context, tenantID, memberID, copyID uuid.UUID, opts CheckoutOptions) (*CheckoutOutcome, error) {
+	inHouse := opts.InHouse
+	if opts.ClientRef != "" {
+		if existing, err := s.db.Loan.Query().
+			Where(loan.TenantID(tenantID), loan.ClientReference(opts.ClientRef)).First(ctx); err == nil {
+			fee, _ := s.db.Fine.Query().
+				Where(fine.TenantID(tenantID), fine.LoanID(existing.ID), fine.ReasonEQ(fine.ReasonRENTAL)).First(ctx)
+			return &CheckoutOutcome{Loan: existing, Fee: fee}, nil // idempotent replay
+		}
+	}
+	cc, err := s.loadCheckoutContext(ctx, tenantID, memberID, copyID)
+	if err != nil {
+		return nil, err
+	}
+	m, tier, c, rule := cc.member, cc.tier, cc.copy, cc.rule
+	if m.Status != member.StatusACTIVE {
+		return nil, ErrMemberNotActive
+	}
+	// Fine-block check.
+	if blocked, _ := s.fineBlocked(ctx, tenantID, memberID, tier); blocked {
+		return nil, ErrMemberBlocked
+	}
+	// Loan-limit check (in-house sessions do not count against the take-home limit). Overdue
+	// loans still count: the member has not returned them.
+	if !inHouse {
+		active, _ := s.db.Loan.Query().Where(loan.TenantID(tenantID), loan.MemberID(memberID),
+			loan.StatusIn(loan.StatusACTIVE, loan.StatusOVERDUE), loan.InHouse(false)).Count(ctx)
+		if active >= tier.MaxConcurrentLoans {
+			return nil, ErrLoanLimit
+		}
+	}
+	readyHold := s.readyHoldFor(ctx, tenantID, c.BibRecordID, memberID)
+	if !copyLendable(c, readyHold) {
+		return nil, ErrCopyUnavailable
 	}
 	// Block checkout if this specific copy has a WAITING hold for a different member (item-level hold).
 	if blocked := s.copyHeldForOther(ctx, tenantID, copyID, memberID); blocked {
 		return nil, ErrCopyUnavailable
 	}
 
-	// Resolve the effective circulation rule for this (branch, tier, format) triple.
-	bib, bibErr := s.db.BibRecord.Query().Where(bibrecord.IDEQ(c.BibRecordID)).Only(ctx)
-	bibFormat := ""
-	if bibErr == nil {
-		bibFormat = string(bib.Format)
-	}
-	rule := s.ResolveRule(ctx, tenantID, c.BranchID, m.TierID, bibFormat)
-
 	now := time.Now()
-	due := now.Add(time.Duration(rule.LoanPeriodDays) * 24 * time.Hour)
+	due := s.dueDate(ctx, tenantID, c.BranchID, now, rule)
 
 	tx, err := s.db.Tx(ctx)
 	if err != nil {
 		return nil, err
+	}
+	// Lock the copy and re-check it inside the transaction: two desks (or a double click)
+	// must not both lend the same copy, and must never raise two borrowing fees for it.
+	locked, err := tx.BookCopy.Query().Where(bookcopy.IDEQ(copyID), bookcopy.TenantID(tenantID)).ForUpdate().Only(ctx)
+	if err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
+	if !copyLendable(locked, readyHold) {
+		_ = tx.Rollback()
+		return nil, ErrCopyUnavailable
 	}
 	newStatus := bookcopy.StatusON_LOAN
 	if inHouse {
@@ -133,32 +232,69 @@ func (s *Service) Checkout(ctx context.Context, tenantID, memberID, copyID uuid.
 		_ = tx.Rollback()
 		return nil, err
 	}
-	lc := tx.Loan.Create().
+	l, err := tx.Loan.Create().
 		SetTenantID(tenantID).SetCopyID(copyID).SetMemberID(memberID).SetBranchID(c.BranchID).
-		SetCheckoutAt(now).SetDueAt(due).SetInHouse(inHouse).SetCheckedOutBy(staffID).
-		SetClientReference(clientRef)
-	l, err := lc.Save(ctx)
+		SetCheckoutAt(now).SetDueAt(due).SetInHouse(inHouse).SetCheckedOutBy(opts.StaffID).
+		SetClientReference(opts.ClientRef).Save(ctx)
 	if err != nil {
 		_ = tx.Rollback()
 		return nil, err
 	}
 	if readyHold != nil {
-		_, _ = tx.Hold.UpdateOneID(readyHold.ID).SetStatus(hold.StatusFULFILLED).Save(ctx)
+		if _, err := tx.Hold.UpdateOneID(readyHold.ID).SetStatus(hold.StatusFULFILLED).Save(ctx); err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
 	}
-	// Rental charge: create RENTAL fine immediately if the rule specifies a flat fee.
-	if !inHouse && rule.RentalCharge.IsPositive() {
-		_, _ = tx.Fine.Create().
+
+	// Borrowing fee: charged per book when the rule sets one. It is part of the checkout
+	// transaction, so a failure here cancels the loan rather than lending the book for free.
+	var feeRow *ent.Fine
+	if !inHouse && rule.BorrowingFee().IsPositive() {
+		feeRow, err = tx.Fine.Create().
 			SetTenantID(tenantID).SetMemberID(memberID).SetLoanID(l.ID).
-			SetReason(fine.ReasonRENTAL).SetAmount(rule.RentalCharge).
-			SetDescription("Rental charge").SetAssessedAt(now).Save(ctx)
+			SetReason(fine.ReasonRENTAL).SetAmount(rule.BorrowingFee()).
+			SetDescription("Borrowing fee").SetAssessedAt(now).Save(ctx)
+		if err != nil {
+			_ = tx.Rollback()
+			return nil, err
+		}
+		if opts.Payment != nil {
+			applied, perr := fines.ApplyPayment(ctx, tx, tenantID, feeRow.ID, fines.PaymentInput{
+				Method: opts.Payment.Method, Reference: opts.Payment.Reference,
+				ReceivedBy: opts.StaffID, Note: "Collected at checkout",
+				IdempotencyKey: "checkout:" + l.ID.String(), At: now,
+			})
+			if perr != nil {
+				_ = tx.Rollback()
+				return nil, perr
+			}
+			feeRow = applied.Fine
+		}
 	}
-	_ = events.Publish(ctx, tx.OutboxEvent, tenantID, l.ID.String(), events.EventLoanCreated, map[string]any{
+
+	payload := map[string]any{
 		"loan_id": l.ID, "member_id": memberID, "copy_id": copyID, "due_at": due, "in_house": inHouse,
-	})
+	}
+	if feeRow != nil {
+		payload["fee_id"] = feeRow.ID
+		payload["fee_amount"] = feeRow.Amount.StringFixed(2)
+		payload["fee_paid"] = feeRow.Status == fine.StatusPAID
+	}
+	if err := events.Publish(ctx, tx.OutboxEvent, tenantID, l.ID.String(), events.EventLoanCreated, payload); err != nil {
+		_ = tx.Rollback()
+		return nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
-	return l, nil
+	return &CheckoutOutcome{Loan: l, Fee: feeRow}, nil
+}
+
+// copyLendable reports whether a copy can go out: available, or reserved for the member whose
+// hold is READY.
+func copyLendable(c *ent.BookCopy, readyHold *ent.Hold) bool {
+	return c.Status == bookcopy.StatusAVAILABLE || (c.Status == bookcopy.StatusRESERVED && readyHold != nil)
 }
 
 // MarkLost marks an active or overdue loan as LOST, sets the copy status to LOST, and
@@ -176,20 +312,11 @@ func (s *Service) MarkLost(ctx context.Context, tenantID, loanID uuid.UUID, staf
 		return ErrLoanNotLostable
 	}
 
-	m, err := s.db.Member.Query().Where(member.IDEQ(l.MemberID)).Only(ctx)
+	cc, err := s.loadCheckoutContext(ctx, tenantID, l.MemberID, l.CopyID)
 	if err != nil {
 		return err
 	}
-	c, err := s.db.BookCopy.Query().Where(bookcopy.IDEQ(l.CopyID), bookcopy.TenantID(tenantID)).Only(ctx)
-	if err != nil {
-		return err
-	}
-	bib, bibErr := s.db.BibRecord.Query().Where(bibrecord.IDEQ(c.BibRecordID)).Only(ctx)
-	bibFormat := ""
-	if bibErr == nil {
-		bibFormat = string(bib.Format)
-	}
-	rule := s.ResolveRule(ctx, tenantID, c.BranchID, m.TierID, bibFormat)
+	rule := cc.rule
 
 	now := time.Now()
 	tx, txErr := s.db.Tx(ctx)
@@ -207,16 +334,19 @@ func (s *Service) MarkLost(ctx context.Context, tenantID, loanID uuid.UUID, staf
 
 	replacementAmt := rule.ReplacementCost.Add(rule.ProcessingFee)
 	if replacementAmt.IsPositive() {
-		desc := fmt.Sprintf("Lost item — replacement cost + processing fee")
+		desc := "Lost item: replacement cost and processing fee"
 		if rule.CapFineAtReplacementPrice && rule.ReplacementCost.IsPositive() {
 			if replacementAmt.GreaterThan(rule.ReplacementCost) {
 				replacementAmt = rule.ReplacementCost
 			}
 		}
-		_, _ = tx.Fine.Create().
+		if _, err := tx.Fine.Create().
 			SetTenantID(tenantID).SetMemberID(l.MemberID).SetLoanID(loanID).
 			SetReason(fine.ReasonREPLACEMENT).SetAmount(replacementAmt).
-			SetDescription(desc).SetAssessedAt(now).Save(ctx)
+			SetDescription(desc).SetAssessedAt(now).Save(ctx); err != nil {
+			_ = tx.Rollback()
+			return err
+		}
 	}
 
 	_ = events.Publish(ctx, tx.OutboxEvent, tenantID, loanID.String(), events.EventLoanReturned, map[string]any{
@@ -240,14 +370,16 @@ func (s *Service) Return(ctx context.Context, tenantID, copyID uuid.UUID, staffI
 		return nil, err
 	}
 
-	// Resolve rule for grace-period and fine-cap logic in assessOverdueFine.
+	// Rule for grace period, daily rate and fine caps in assessOverdueFine.
+	var m *ent.Member
+	var tier *ent.MemberTier
 	var rule *ResolvedRule
-	if m, merr := s.db.Member.Query().Where(member.IDEQ(l.MemberID)).Only(ctx); merr == nil {
-		bibFormat := ""
-		if bib, berr := s.db.BibRecord.Query().Where(bibrecord.IDEQ(c.BibRecordID)).Only(ctx); berr == nil {
-			bibFormat = string(bib.Format)
+	if mem, merr := s.db.Member.Query().Where(member.IDEQ(l.MemberID)).Only(ctx); merr == nil {
+		m = mem
+		if t, terr := s.db.MemberTier.Query().Where(membertier.IDEQ(m.TierID)).Only(ctx); terr == nil {
+			tier = t
 		}
-		rule = s.ResolveRule(ctx, tenantID, c.BranchID, m.TierID, bibFormat)
+		rule = s.ruleFor(ctx, tenantID, tier, c)
 	}
 	if rule == nil {
 		rule = DefaultRule()
@@ -268,10 +400,13 @@ func (s *Service) Return(ctx context.Context, tenantID, copyID uuid.UUID, staffI
 	res := &Result{Loan: updatedLoan}
 
 	// Overdue fine (with grace period and cap from the resolved rule).
-	if now.After(l.DueAt) {
-		if f, ferr := s.assessOverdueFine(ctx, tx, tenantID, l, now, rule); ferr == nil && f != nil {
-			res.Fine = f
+	if now.After(l.DueAt) && m != nil {
+		f, ferr := s.assessOverdueFine(ctx, tx, tenantID, l, now, rule, m, tier)
+		if ferr != nil {
+			_ = tx.Rollback()
+			return nil, ferr
 		}
+		res.Fine = f
 	}
 
 	// Promote the next waiting hold — prefer item-level hold for this exact copy, then any bib-level hold.
@@ -306,7 +441,8 @@ func (s *Service) Return(ctx context.Context, tenantID, copyID uuid.UUID, staffI
 	return res, nil
 }
 
-// Renew extends an active loan, blocked by the renewal cap or a waiting hold.
+// Renew extends an active loan, blocked by the renewal cap or a waiting hold. The renewal
+// cap and the extension length come from the same rule that priced the original checkout.
 func (s *Service) Renew(ctx context.Context, tenantID, loanID uuid.UUID) (*ent.Loan, error) {
 	l, err := s.db.Loan.Query().Where(loan.IDEQ(loanID), loan.TenantID(tenantID), loan.StatusEQ(loan.StatusACTIVE)).Only(ctx)
 	if ent.IsNotFound(err) {
@@ -314,22 +450,14 @@ func (s *Service) Renew(ctx context.Context, tenantID, loanID uuid.UUID) (*ent.L
 	} else if err != nil {
 		return nil, err
 	}
-	m, err := s.db.Member.Query().Where(member.IDEQ(l.MemberID)).Only(ctx)
+	cc, err := s.loadCheckoutContext(ctx, tenantID, l.MemberID, l.CopyID)
 	if err != nil {
 		return nil, err
 	}
-	tier, err := s.db.MemberTier.Query().Where(membertier.IDEQ(m.TierID)).Only(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if l.RenewalsCount >= tier.MaxRenewals {
+	if l.RenewalsCount >= cc.rule.MaxRenewals {
 		return nil, ErrRenewLimit
 	}
-	c, err := s.db.BookCopy.Query().Where(bookcopy.IDEQ(l.CopyID)).Only(ctx)
-	if err != nil {
-		return nil, err
-	}
-	waiting, _ := s.db.Hold.Query().Where(hold.TenantID(tenantID), hold.BibRecordID(c.BibRecordID), hold.StatusEQ(hold.StatusWAITING)).Count(ctx)
+	waiting, _ := s.db.Hold.Query().Where(hold.TenantID(tenantID), hold.BibRecordID(cc.copy.BibRecordID), hold.StatusEQ(hold.StatusWAITING)).Count(ctx)
 	if waiting > 0 {
 		return nil, ErrRenewHeld
 	}
@@ -340,7 +468,7 @@ func (s *Service) Renew(ctx context.Context, tenantID, loanID uuid.UUID) (*ent.L
 	if recalled {
 		return nil, ErrRenewRecalled
 	}
-	newDue := l.DueAt.Add(time.Duration(tier.LoanPeriodDays) * 24 * time.Hour)
+	newDue := s.dueDate(ctx, tenantID, cc.copy.BranchID, l.DueAt, cc.rule)
 	updated, err := s.db.Loan.UpdateOneID(loanID).SetDueAt(newDue).AddRenewalsCount(1).Save(ctx)
 	if err != nil {
 		return nil, err
@@ -414,16 +542,9 @@ func (s *Service) Recall(ctx context.Context, tenantID, loanID uuid.UUID, reques
 }
 
 // assessOverdueFine creates an OVERDUE fine applying the rule's grace period and fine cap.
-func (s *Service) assessOverdueFine(ctx context.Context, tx *ent.Tx, tenantID uuid.UUID, l *ent.Loan, now time.Time, rule *ResolvedRule) (*ent.Fine, error) {
-	m, err := s.db.Member.Query().Where(member.IDEQ(l.MemberID)).Only(ctx)
-	if err != nil {
-		return nil, err
-	}
-	tier, err := s.db.MemberTier.Query().Where(membertier.IDEQ(m.TierID)).Only(ctx)
-	if err != nil {
-		return nil, err
-	}
-
+// Each late day is charged at the rule's late rate: its own fine_per_day, the borrowing fee
+// when the rule says so, or the member tier's daily rate.
+func (s *Service) assessOverdueFine(ctx context.Context, tx *ent.Tx, tenantID uuid.UUID, l *ent.Loan, now time.Time, rule *ResolvedRule, m *ent.Member, tier *ent.MemberTier) (*ent.Fine, error) {
 	rawDays := int(now.Sub(l.DueAt).Hours()/24) + 1
 	graceDays := rule.GraceDays
 	days := rawDays - graceDays
@@ -431,12 +552,12 @@ func (s *Service) assessOverdueFine(ctx context.Context, tx *ent.Tx, tenantID uu
 		return nil, nil
 	}
 
-	// Use the rule's per-day rate if configured, otherwise fall back to the tier rate.
-	dailyRate := rule.FinePerDay
-	if dailyRate.IsZero() {
-		dailyRate = tier.DailyFineRate
+	tierRate := decimal.Zero
+	if tier != nil {
+		tierRate = tier.DailyFineRate
 	}
-	if dailyRate.IsZero() {
+	dailyRate := rule.LateRate(tierRate)
+	if !dailyRate.IsPositive() {
 		return nil, nil
 	}
 
@@ -451,9 +572,9 @@ func (s *Service) assessOverdueFine(ctx context.Context, tx *ent.Tx, tenantID uu
 		amount = rule.ReplacementCost
 	}
 
-	desc := fmt.Sprintf("Overdue by %d day(s)", rawDays)
+	desc := fmt.Sprintf("Overdue by %d day(s) at %s per day", rawDays, dailyRate.StringFixed(2))
 	if graceDays > 0 {
-		desc = fmt.Sprintf("Overdue by %d day(s) (grace: %d day(s))", rawDays, graceDays)
+		desc = fmt.Sprintf("Overdue by %d day(s), %d day(s) grace, at %s per day", rawDays, graceDays, dailyRate.StringFixed(2))
 	}
 	f, err := tx.Fine.Create().
 		SetTenantID(tenantID).SetMemberID(l.MemberID).SetLoanID(l.ID).
@@ -470,19 +591,14 @@ func (s *Service) assessOverdueFine(ctx context.Context, tx *ent.Tx, tenantID uu
 }
 
 // fineBlocked reports whether the member's unpaid fines meet/exceed the tier block threshold.
+// The balance is one SUM query, not every fine row.
 func (s *Service) fineBlocked(ctx context.Context, tenantID, memberID uuid.UUID, tier *ent.MemberTier) (bool, error) {
 	if tier.MaxFineBeforeBlock.IsZero() {
 		return false, nil
 	}
-	rows, err := s.db.Fine.Query().
-		Where(fine.TenantID(tenantID), fine.MemberID(memberID), fine.StatusIn(fine.StatusUNPAID, fine.StatusPARTIAL)).
-		All(ctx)
+	outstanding, err := fines.Outstanding(ctx, s.db, tenantID, memberID)
 	if err != nil {
 		return false, err
-	}
-	outstanding := decimal.Zero
-	for _, f := range rows {
-		outstanding = outstanding.Add(f.Amount.Sub(f.AmountPaid))
 	}
 	return outstanding.GreaterThanOrEqual(tier.MaxFineBeforeBlock), nil
 }

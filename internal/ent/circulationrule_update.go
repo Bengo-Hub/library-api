@@ -264,6 +264,20 @@ func (_u *CirculationRuleUpdate) SetNillableCapFineAtReplacementPrice(v *bool) *
 	return _u
 }
 
+// SetLateFeeUsesRentalCharge sets the "late_fee_uses_rental_charge" field.
+func (_u *CirculationRuleUpdate) SetLateFeeUsesRentalCharge(v bool) *CirculationRuleUpdate {
+	_u.mutation.SetLateFeeUsesRentalCharge(v)
+	return _u
+}
+
+// SetNillableLateFeeUsesRentalCharge sets the "late_fee_uses_rental_charge" field if the given value is not nil.
+func (_u *CirculationRuleUpdate) SetNillableLateFeeUsesRentalCharge(v *bool) *CirculationRuleUpdate {
+	if v != nil {
+		_u.SetLateFeeUsesRentalCharge(*v)
+	}
+	return _u
+}
+
 // SetRentalCharge sets the "rental_charge" field.
 func (_u *CirculationRuleUpdate) SetRentalCharge(v decimal.Decimal) *CirculationRuleUpdate {
 	_u.mutation.SetRentalCharge(v)
@@ -470,6 +484,9 @@ func (_u *CirculationRuleUpdate) sqlSave(ctx context.Context) (_node int, err er
 	}
 	if value, ok := _u.mutation.CapFineAtReplacementPrice(); ok {
 		_spec.SetField(circulationrule.FieldCapFineAtReplacementPrice, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.LateFeeUsesRentalCharge(); ok {
+		_spec.SetField(circulationrule.FieldLateFeeUsesRentalCharge, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.RentalCharge(); ok {
 		_spec.SetField(circulationrule.FieldRentalCharge, field.TypeOther, value)
@@ -743,6 +760,20 @@ func (_u *CirculationRuleUpdateOne) SetNillableCapFineAtReplacementPrice(v *bool
 	return _u
 }
 
+// SetLateFeeUsesRentalCharge sets the "late_fee_uses_rental_charge" field.
+func (_u *CirculationRuleUpdateOne) SetLateFeeUsesRentalCharge(v bool) *CirculationRuleUpdateOne {
+	_u.mutation.SetLateFeeUsesRentalCharge(v)
+	return _u
+}
+
+// SetNillableLateFeeUsesRentalCharge sets the "late_fee_uses_rental_charge" field if the given value is not nil.
+func (_u *CirculationRuleUpdateOne) SetNillableLateFeeUsesRentalCharge(v *bool) *CirculationRuleUpdateOne {
+	if v != nil {
+		_u.SetLateFeeUsesRentalCharge(*v)
+	}
+	return _u
+}
+
 // SetRentalCharge sets the "rental_charge" field.
 func (_u *CirculationRuleUpdateOne) SetRentalCharge(v decimal.Decimal) *CirculationRuleUpdateOne {
 	_u.mutation.SetRentalCharge(v)
@@ -979,6 +1010,9 @@ func (_u *CirculationRuleUpdateOne) sqlSave(ctx context.Context) (_node *Circula
 	}
 	if value, ok := _u.mutation.CapFineAtReplacementPrice(); ok {
 		_spec.SetField(circulationrule.FieldCapFineAtReplacementPrice, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.LateFeeUsesRentalCharge(); ok {
+		_spec.SetField(circulationrule.FieldLateFeeUsesRentalCharge, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.RentalCharge(); ok {
 		_spec.SetField(circulationrule.FieldRentalCharge, field.TypeOther, value)

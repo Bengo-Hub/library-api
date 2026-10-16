@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
@@ -12,8 +15,10 @@ import (
 
 	"github.com/bengobox/library-service/internal/ent"
 	"github.com/bengobox/library-service/internal/ent/fine"
+	"github.com/bengobox/library-service/internal/ent/finepayment"
 	"github.com/bengobox/library-service/internal/ent/member"
 	"github.com/bengobox/library-service/internal/events"
+	"github.com/bengobox/library-service/internal/modules/fines"
 	"github.com/bengobox/library-service/internal/payref"
 	"github.com/bengobox/library-service/internal/platform/treasury"
 )
@@ -39,6 +44,7 @@ type fineResponse struct {
 	MemberID     string  `json:"member_id"`
 	MemberName   string  `json:"member_name,omitempty"`
 	MembershipNo string  `json:"membership_no,omitempty"`
+	LoanID       string  `json:"loan_id,omitempty"`
 	Type         string  `json:"type"`
 	Reason       string  `json:"reason,omitempty"`
 	Amount       float64 `json:"amount"`
@@ -65,8 +71,12 @@ func (h *FineHandler) buildFineResponses(r *http.Request, tenantID uuid.UUID, ro
 	out := make([]fineResponse, 0, len(rows))
 	for _, f := range rows {
 		bal := f.Amount.Sub(f.AmountPaid)
+		loanID := ""
+		if f.LoanID != nil {
+			loanID = f.LoanID.String()
+		}
 		out = append(out, fineResponse{
-			ID: f.ID.String(), MemberID: f.MemberID.String(), MemberName: members[f.MemberID].name,
+			ID: f.ID.String(), LoanID: loanID, MemberID: f.MemberID.String(), MemberName: members[f.MemberID].name,
 			MembershipNo: members[f.MemberID].no, Type: strings.ToLower(string(f.Reason)), Reason: f.Description,
 			Amount: f.Amount.InexactFloat64(), AmountPaid: f.AmountPaid.InexactFloat64(), Balance: bal.InexactFloat64(),
 			Status: fineStatusToWire(f.Status), AssessedAt: f.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
@@ -168,20 +178,160 @@ func (h *FineHandler) Waive(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "bad id", "invalid_request")
 		return
 	}
-	f, err := h.db.Fine.Query().Where(fine.IDEQ(id), fine.TenantID(tenantID)).Only(r.Context())
-	if ent.IsNotFound(err) {
-		respondError(w, http.StatusNotFound, "not found", "not_found")
-		return
-	} else if err != nil {
-		respondError(w, http.StatusInternalServerError, err.Error(), "get_failed")
-		return
-	}
-	row, err := h.db.Fine.UpdateOneID(f.ID).SetStatus(fine.StatusWAIVED).SetWaivedBy(UserIDFrom(r)).Save(r.Context())
+	// Lock the row so a waive cannot race a payment being recorded on the same fine.
+	tx, err := h.db.Tx(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "waive_failed")
 		return
 	}
+	f, err := tx.Fine.Query().Where(fine.IDEQ(id), fine.TenantID(tenantID)).ForUpdate().Only(r.Context())
+	if ent.IsNotFound(err) {
+		_ = tx.Rollback()
+		respondError(w, http.StatusNotFound, "not found", "not_found")
+		return
+	} else if err != nil {
+		_ = tx.Rollback()
+		respondError(w, http.StatusInternalServerError, err.Error(), "get_failed")
+		return
+	}
+	if f.Status == fine.StatusPAID || f.Status == fine.StatusWAIVED {
+		_ = tx.Rollback()
+		respondError(w, http.StatusConflict, "fine already settled", "already_settled")
+		return
+	}
+	row, err := tx.Fine.UpdateOneID(f.ID).SetStatus(fine.StatusWAIVED).SetWaivedBy(UserIDFrom(r)).Save(r.Context())
+	if err != nil {
+		_ = tx.Rollback()
+		respondError(w, http.StatusInternalServerError, err.Error(), "waive_failed")
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "waive_failed")
+		return
+	}
 	respondJSON(w, http.StatusOK, row)
+}
+
+type recordPaymentRequest struct {
+	// Amount may be left out to settle the whole balance; a smaller amount records a part payment.
+	Amount          json.Number `json:"amount"`
+	Method          string      `json:"method"`
+	Reference       string      `json:"reference"`
+	Note            string      `json:"note"`
+	ClientReference string      `json:"client_reference"`
+}
+
+// RecordPayment godoc
+// @Summary Record a payment taken at the desk (cash, M-Pesa, card, bank) against a fine or fee
+// @Description Settles the fine without treasury. A part payment leaves it PARTIAL.
+// @Tags Fines
+// @Router /{tenant}/library/fines/{id}/record-payment [post]
+func (h *FineHandler) RecordPayment(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := TenantUUID(r)
+	if !ok {
+		respondError(w, http.StatusUnauthorized, "missing tenant", "unauthorized")
+		return
+	}
+	id, err := ParseUUIDParam(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "bad id", "invalid_request")
+		return
+	}
+	var req recordPaymentRequest
+	if err := Decode(r, &req); err != nil {
+		respondError(w, http.StatusBadRequest, "bad body", "invalid_request")
+		return
+	}
+	method, ok := fines.ParseMethod(req.Method)
+	if !ok {
+		respondError(w, http.StatusBadRequest, "unknown payment method", "invalid_request")
+		return
+	}
+	amount := decimal.Zero
+	if s := strings.TrimSpace(req.Amount.String()); s != "" {
+		if amount, err = decimal.NewFromString(s); err != nil {
+			respondError(w, http.StatusBadRequest, "amount must be a number", "invalid_request")
+			return
+		}
+	}
+	in := fines.PaymentInput{
+		Amount: amount, Method: method, Reference: strings.TrimSpace(req.Reference),
+		Note: strings.TrimSpace(req.Note), ReceivedBy: UserIDFrom(r),
+	}
+	if req.ClientReference != "" {
+		in.IdempotencyKey = "desk:" + req.ClientReference
+	}
+
+	tx, err := h.db.Tx(r.Context())
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "payment_failed")
+		return
+	}
+	applied, err := fines.ApplyPayment(r.Context(), tx, tenantID, id, in)
+	if err != nil {
+		_ = tx.Rollback()
+		switch {
+		case ent.IsNotFound(err):
+			respondError(w, http.StatusNotFound, "not found", "not_found")
+		case errors.Is(err, fines.ErrSettled):
+			respondError(w, http.StatusConflict, err.Error(), "already_settled")
+		case errors.Is(err, fines.ErrInvalidAmount):
+			respondError(w, http.StatusBadRequest, err.Error(), "invalid_amount")
+		case errors.Is(err, fines.ErrOverpayment):
+			respondError(w, http.StatusConflict, err.Error(), "overpayment")
+		default:
+			respondError(w, http.StatusInternalServerError, err.Error(), "payment_failed")
+		}
+		return
+	}
+	if applied.Fine.ID != id {
+		_ = tx.Rollback()
+		respondError(w, http.StatusConflict, "client_reference was already used for another fine", "reference_reused")
+		return
+	}
+	if err := tx.Commit(); err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "payment_failed")
+		return
+	}
+	respondJSON(w, http.StatusOK, h.buildFineResponses(r, tenantID, []*ent.Fine{applied.Fine})[0])
+}
+
+type finePaymentResponse struct {
+	ID         string  `json:"id"`
+	Amount     float64 `json:"amount"`
+	Method     string  `json:"method"`
+	Reference  string  `json:"reference,omitempty"`
+	Note       string  `json:"note,omitempty"`
+	ReceivedBy string  `json:"received_by,omitempty"`
+	PaidAt     string  `json:"paid_at"`
+}
+
+// Payments godoc
+// @Summary List the payments recorded against a fine (receipt history)
+// @Tags Fines
+// @Router /{tenant}/library/fines/{id}/payments [get]
+func (h *FineHandler) Payments(w http.ResponseWriter, r *http.Request) {
+	tenantID, _ := TenantUUID(r)
+	id, err := ParseUUIDParam(chi.URLParam(r, "id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "bad id", "invalid_request")
+		return
+	}
+	rows, err := h.db.FinePayment.Query().
+		Where(finepayment.TenantID(tenantID), finepayment.FineID(id)).
+		Order(ent.Asc(finepayment.FieldPaidAt)).Limit(100).All(r.Context())
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
+		return
+	}
+	out := make([]finePaymentResponse, 0, len(rows))
+	for _, p := range rows {
+		out = append(out, finePaymentResponse{
+			ID: p.ID.String(), Amount: p.Amount.InexactFloat64(), Method: strings.ToLower(string(p.Method)),
+			Reference: p.Reference, Note: p.Note, ReceivedBy: p.ReceivedBy, PaidAt: p.PaidAt.Format(time.RFC3339),
+		})
+	}
+	respondJSON(w, http.StatusOK, out)
 }
 
 // payResponse carries the treasury initiate URL for the shared pay page.

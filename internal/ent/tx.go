@@ -48,6 +48,8 @@ type Tx struct {
 	EbookPurchase *EbookPurchaseClient
 	// Fine is the client for interacting with the Fine builders.
 	Fine *FineClient
+	// FinePayment is the client for interacting with the FinePayment builders.
+	FinePayment *FinePaymentClient
 	// Hold is the client for interacting with the Hold builders.
 	Hold *HoldClient
 	// LibraryHoliday is the client for interacting with the LibraryHoliday builders.
@@ -243,6 +245,7 @@ func (tx *Tx) init() {
 	tx.EbookLoan = NewEbookLoanClient(tx.config)
 	tx.EbookPurchase = NewEbookPurchaseClient(tx.config)
 	tx.Fine = NewFineClient(tx.config)
+	tx.FinePayment = NewFinePaymentClient(tx.config)
 	tx.Hold = NewHoldClient(tx.config)
 	tx.LibraryHoliday = NewLibraryHolidayClient(tx.config)
 	tx.LibraryRole = NewLibraryRoleClient(tx.config)

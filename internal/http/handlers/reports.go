@@ -3,23 +3,21 @@ package handlers
 import (
 	"context"
 	"net/http"
-	"sort"
 	"strconv"
 	"time"
 
 	sharedcache "github.com/Bengo-Hub/cache"
 	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/google/uuid"
-	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
 	"github.com/bengobox/library-service/internal/ent"
 	"github.com/bengobox/library-service/internal/ent/bibrecord"
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
-	"github.com/bengobox/library-service/internal/ent/fine"
 	"github.com/bengobox/library-service/internal/ent/hold"
 	"github.com/bengobox/library-service/internal/ent/loan"
 	"github.com/bengobox/library-service/internal/ent/member"
+	"github.com/bengobox/library-service/internal/modules/fines"
 )
 
 // ReportsHandler serves dashboard/summary endpoints.
@@ -65,12 +63,15 @@ func (h *ReportsHandler) Summary(w http.ResponseWriter, r *http.Request) {
 }
 
 // buildSummary computes the dashboard summary counts live (cache miss / cache disabled path).
+// A loan counts as out from checkout until return, so ACTIVE and OVERDUE both belong to it;
+// the hourly sweep moves late loans to OVERDUE and they must not drop off the dashboard.
 func (h *ReportsHandler) buildSummary(ctx context.Context, tenantID uuid.UUID) map[string]any {
 	now := time.Now()
 	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 
-	activeLoans, _ := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.StatusEQ(loan.StatusACTIVE)).Count(ctx)
-	overdue, _ := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.StatusEQ(loan.StatusACTIVE), loan.DueAtLT(now)).Count(ctx)
+	out := loan.StatusIn(loan.StatusACTIVE, loan.StatusOVERDUE)
+	activeLoans, _ := h.db.Loan.Query().Where(loan.TenantID(tenantID), out).Count(ctx)
+	overdue, _ := h.db.Loan.Query().Where(loan.TenantID(tenantID), out, loan.DueAtLT(now)).Count(ctx)
 	holdsReady, _ := h.db.Hold.Query().Where(hold.TenantID(tenantID), hold.StatusEQ(hold.StatusREADY)).Count(ctx)
 	holdsWaiting, _ := h.db.Hold.Query().Where(hold.TenantID(tenantID), hold.StatusEQ(hold.StatusWAITING)).Count(ctx)
 	totalMembers, _ := h.db.Member.Query().Where(member.TenantID(tenantID)).Count(ctx)
@@ -78,24 +79,12 @@ func (h *ReportsHandler) buildSummary(ctx context.Context, tenantID uuid.UUID) m
 	bibs, _ := h.db.BibRecord.Query().Where(bibrecord.TenantID(tenantID)).Count(ctx)
 	copies, _ := h.db.BookCopy.Query().Where(bookcopy.TenantID(tenantID)).Count(ctx)
 	available, _ := h.db.BookCopy.Query().Where(bookcopy.TenantID(tenantID), bookcopy.StatusEQ(bookcopy.StatusAVAILABLE)).Count(ctx)
-
-	// Total collection value = sum(acquisition_cost) across all copies, for audit/insurance use.
-	collectionValue := decimal.Zero
-	allCopies, _ := h.db.BookCopy.Query().Where(bookcopy.TenantID(tenantID)).All(ctx)
-	for _, c := range allCopies {
-		if c.AcquisitionCost != nil {
-			collectionValue = collectionValue.Add(*c.AcquisitionCost)
-		}
-	}
 	checkoutsToday, _ := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.CheckoutAtGTE(startOfDay)).Count(ctx)
 	returnsToday, _ := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.ReturnedAtGTE(startOfDay)).Count(ctx)
 
-	// Outstanding fines = sum(amount - amount_paid) for UNPAID/PARTIAL.
-	outstanding := decimal.Zero
-	unpaid, _ := h.db.Fine.Query().Where(fine.TenantID(tenantID), fine.StatusIn(fine.StatusUNPAID, fine.StatusPARTIAL)).All(ctx)
-	for _, f := range unpaid {
-		outstanding = outstanding.Add(f.Amount.Sub(f.AmountPaid))
-	}
+	// Money: collection value, what members still owe (fines and unpaid fees, net of part
+	// payments) and what was received today, all summed in SQL.
+	outstanding, _ := fines.Outstanding(ctx, h.db, tenantID, uuid.Nil)
 
 	return map[string]any{
 		"active_loans":      activeLoans,
@@ -107,74 +96,14 @@ func (h *ReportsHandler) buildSummary(ctx context.Context, tenantID uuid.UUID) m
 		"total_titles":      bibs,
 		"total_copies":      copies,
 		"available_copies":  available,
-		"collection_value":  collectionValue.InexactFloat64(),
+		"collection_value":  h.collectionValue(ctx, tenantID).InexactFloat64(),
 		"outstanding_fines": outstanding.InexactFloat64(),
+		"collected_today":   h.collectedSince(ctx, tenantID, startOfDay).InexactFloat64(),
 		"checkouts_today":   checkoutsToday,
 		"returns_today":     returnsToday,
 		"circulation_trend": h.circulationTrend(ctx, tenantID, 14),
-		"popular_titles":    h.popularTitles(ctx, tenantID, 30, 5),
+		"popular_titles":    h.popularTitles(ctx, tenantID, now.AddDate(0, 0, -30), 5),
 	}
-}
-
-// circulationTrend returns daily checkout/return counts for the last n days (oldest first).
-func (h *ReportsHandler) circulationTrend(ctx context.Context, tenantID uuid.UUID, days int) []map[string]any {
-	since := time.Now().AddDate(0, 0, -days)
-	loans, _ := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.CheckoutAtGTE(since)).All(ctx)
-	checkouts := map[string]int{}
-	returns := map[string]int{}
-	for _, l := range loans {
-		checkouts[l.CheckoutAt.Format("2006-01-02")]++
-		if l.ReturnedAt != nil {
-			returns[l.ReturnedAt.Format("2006-01-02")]++
-		}
-	}
-	out := make([]map[string]any, 0, days)
-	for i := days - 1; i >= 0; i-- {
-		d := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
-		out = append(out, map[string]any{"date": d, "checkouts": checkouts[d], "returns": returns[d]})
-	}
-	return out
-}
-
-// popularTitles returns the top-n most-borrowed titles over a recent window.
-func (h *ReportsHandler) popularTitles(ctx context.Context, tenantID uuid.UUID, days, limit int) []map[string]any {
-	since := time.Now().AddDate(0, 0, -days)
-	loans, _ := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.CheckoutAtGTE(since)).All(ctx)
-	bibCount := map[uuid.UUID]int{}
-	copyToBib := map[uuid.UUID]uuid.UUID{}
-	for _, l := range loans {
-		bib, ok := copyToBib[l.CopyID]
-		if !ok {
-			c, err := h.db.BookCopy.Get(ctx, l.CopyID)
-			if err != nil {
-				continue
-			}
-			bib = c.BibRecordID
-			copyToBib[l.CopyID] = bib
-		}
-		bibCount[bib]++
-	}
-	type tr struct {
-		id    uuid.UUID
-		loans int
-	}
-	ranked := make([]tr, 0, len(bibCount))
-	for id, n := range bibCount {
-		ranked = append(ranked, tr{id, n})
-	}
-	sort.Slice(ranked, func(i, j int) bool { return ranked[i].loans > ranked[j].loans })
-	if len(ranked) > limit {
-		ranked = ranked[:limit]
-	}
-	out := make([]map[string]any, 0, len(ranked))
-	for _, t := range ranked {
-		title := ""
-		if b, err := h.db.BibRecord.Get(ctx, t.id); err == nil {
-			title = b.Title
-		}
-		out = append(out, map[string]any{"id": t.id.String(), "title": title, "loans": t.loans})
-	}
-	return out
 }
 
 func daysParam(r *http.Request, def int) int {
@@ -192,7 +121,6 @@ func daysParam(r *http.Request, def int) int {
 // @Router /{tenant}/library/reports/popular [get]
 func (h *ReportsHandler) Popular(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := TenantUUID(r)
-	ctx := r.Context()
 	since := time.Now().AddDate(0, 0, -daysParam(r, 30))
 	limit := 10
 	if v := r.URL.Query().Get("limit"); v != "" {
@@ -200,41 +128,7 @@ func (h *ReportsHandler) Popular(w http.ResponseWriter, r *http.Request) {
 			limit = n
 		}
 	}
-	loans, _ := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.CheckoutAtGTE(since)).All(ctx)
-	bibCount := map[string]int{}
-	copyToBib := map[string]string{}
-	for _, l := range loans {
-		bib, ok := copyToBib[l.CopyID.String()]
-		if !ok {
-			c, err := h.db.BookCopy.Get(ctx, l.CopyID)
-			if err != nil {
-				continue
-			}
-			bib = c.BibRecordID.String()
-			copyToBib[l.CopyID.String()] = bib
-		}
-		bibCount[bib]++
-	}
-	type row struct {
-		ID    string `json:"id"`
-		Title string `json:"title"`
-		Loans int    `json:"loans"`
-	}
-	rows := make([]row, 0, len(bibCount))
-	for bib, n := range bibCount {
-		rows = append(rows, row{ID: bib, Loans: n})
-	}
-	sort.Slice(rows, func(i, j int) bool { return rows[i].Loans > rows[j].Loans })
-	if len(rows) > limit {
-		rows = rows[:limit]
-	}
-	for i := range rows {
-		if id, err := ParseUUIDParam(rows[i].ID); err == nil {
-			if b, err := h.db.BibRecord.Get(ctx, id); err == nil {
-				rows[i].Title = b.Title
-			}
-		}
-	}
+	rows := h.popularTitles(r.Context(), tenantID, since, limit)
 	// "limit" here is this report's own top-N cutoff (default 10, capped at 50 above), not
 	// generic offset pagination — reuse the shared envelope shape without reinterpreting it
 	// via sharedpagination.Parse (which has different defaults/caps).
@@ -247,29 +141,7 @@ func (h *ReportsHandler) Popular(w http.ResponseWriter, r *http.Request) {
 // @Router /{tenant}/library/reports/circulation [get]
 func (h *ReportsHandler) Circulation(w http.ResponseWriter, r *http.Request) {
 	tenantID, _ := TenantUUID(r)
-	ctx := r.Context()
-	days := daysParam(r, 30)
-	since := time.Now().AddDate(0, 0, -days)
-	loans, _ := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.CheckoutAtGTE(since)).All(ctx)
-
-	checkouts := map[string]int{}
-	returns := map[string]int{}
-	for _, l := range loans {
-		checkouts[l.CheckoutAt.Format("2006-01-02")]++
-		if l.ReturnedAt != nil {
-			returns[l.ReturnedAt.Format("2006-01-02")]++
-		}
-	}
-	type point struct {
-		Date      string `json:"date"`
-		Checkouts int    `json:"checkouts"`
-		Returns   int    `json:"returns"`
-	}
-	out := make([]point, 0, days)
-	for i := days - 1; i >= 0; i-- {
-		d := time.Now().AddDate(0, 0, -i).Format("2006-01-02")
-		out = append(out, point{Date: d, Checkouts: checkouts[d], Returns: returns[d]})
-	}
+	out := h.circulationTrend(r.Context(), tenantID, daysParam(r, 30))
 	respondJSON(w, http.StatusOK, sharedpagination.NewResponse(out, len(out), sharedpagination.Params{Limit: len(out), Offset: 0, Page: 1}))
 }
 

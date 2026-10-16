@@ -121,31 +121,46 @@ The rules engine lives in `internal/modules/circulation/service.go`.
 
 ### Policy precedence
 
-Loan/policy resolution precedence is **copy → bib → tier → tenant default**. The implemented baseline resolves from the member's **tier** (`MemberTier`: `loan_period_days`, `max_concurrent_loans`, `max_renewals`, `daily_fine_rate`, `max_fine_before_block`). `LoanPolicy` is the reusable policy backing per-copy (`BookCopy.loan_policy_id`) and per-bib (`BibRecord.default_loan_policy_id`) overrides.
+One resolver (`rule_resolver.go`) decides the terms for every checkout, renewal, return and lost item. It reads the tenant's `CirculationRule` rows that match the copy's branch, the member's tier and the title's format, in one indexed query, and the most specific match wins (branch outranks tier, tier outranks format; `null` means all). When no rule matches it falls back to the member's **tier** (`MemberTier`: `loan_period_days`, `max_renewals`, `daily_fine_rate`). The member limits that are not part of a rule (`max_concurrent_loans`, `max_fine_before_block`) always come from the tier. The older `LoanPolicy` table is not read by circulation.
+
+The rule carries the money terms as well as the loan terms:
+
+| Rule field | Used for |
+|------------|----------|
+| `rental_charge` | The borrowing fee, charged per book at checkout |
+| `fine_per_day`, `grace_days`, `max_fine_cap` | The late fee for each day a book is returned late |
+| `late_fee_uses_rental_charge` | When true each late day costs the borrowing fee, so one number drives both |
+| `replacement_cost`, `processing_fee` | The charge when a loan is marked lost |
+
+Due dates go through the `calendar` module, so closed days and holidays are honoured according to each rule's `due_date_mode`. Hourly rules add hours instead.
 
 ### Checkout
 
 1. Member must be `ACTIVE`.
-2. **Fine-block** check: outstanding (`amount − amount_paid`) across `UNPAID`/`PARTIAL` fines must be below the tier's `max_fine_before_block`.
-3. **Loan-limit** check: active take-home loans `< tier.max_concurrent_loans` (in-house sessions are exempt and do not count).
+2. **Fine-block** check: outstanding (`amount − amount_paid`, one SUM query) across `UNPAID`/`PARTIAL` fines and fees must be below the tier's `max_fine_before_block`.
+3. **Loan-limit** check: take-home loans still out (`ACTIVE` or `OVERDUE`) `< tier.max_concurrent_loans`. In-house sessions are exempt.
 4. Copy must be `AVAILABLE`, or `RESERVED` **only if** this member holds a READY hold on the bib.
-5. In a transaction: flip copy to `ON_LOAN` (or `IN_HOUSE` for reference sessions), create the `Loan` (due = now + `loan_period_days`), fulfill the member's READY hold if present, publish `library.loan.created`.
+5. In one transaction: lock the copy row and re-check it, flip it to `ON_LOAN` (or `IN_HOUSE` for reference sessions), create the `Loan` with the due date from the resolved rule, fulfill the member's READY hold, raise the **borrowing fee** and publish `library.loan.created`.
+
+**Borrowing fee.** When the resolved rule has a `rental_charge` and the loan is not in-house, a `RENTAL` fine is created in the same transaction. If the request carries `payment.collected`, the fee is settled in that transaction through `fines.ApplyPayment`, so the librarian marks it paid while checking out. Otherwise it stays `UNPAID` on the member's account and can be paid later from the Fines page. A failure raising the fee cancels the checkout. `GET /circulation/checkout-quote` previews the fee, late rate and due date without changing anything.
+
+**Payments.** Every settlement goes through `internal/modules/fines`: the desk, the checkout and the treasury consumer. `ApplyPayment` locks the fine row, writes a `fine_payments` ledger row, updates `amount_paid` and the status (`PARTIAL` or `PAID`), and publishes `library.fine.paid` once settled, when the member has an email on file. Desk payments need no treasury. Treasury stays the optional online route (`POST /fines/{id}/pay`).
 
 ### Return
 
 1. Find the `ACTIVE` loan for the copy (else `no_active_loan`).
 2. In a transaction: mark loan `RETURNED`.
-3. If overdue, assess an `OVERDUE` fine = `days_overdue × tier.daily_fine_rate` and publish `library.fine.assessed`.
+3. If overdue, assess an `OVERDUE` fine = `late days × late rate` and publish `library.fine.assessed`. Every started day counts, minus the rule's `grace_days`. The late rate is the rule's `fine_per_day`, or the borrowing fee when `late_fee_uses_rental_charge` is set, or the tier's `daily_fine_rate` when the rule has none. `max_fine_cap` and the replacement-price cap apply on top.
 4. **Hold promotion:** the next `WAITING` hold on the bib (ordered by `queue_position`, then `placed_at`) is promoted to `READY` with a 48h pickup expiry; the copy flips to `RESERVED` and `library.hold.ready` is published. If no hold waits, the copy returns to `AVAILABLE`.
 5. Publish `library.loan.returned`.
 
 ### Renew
 
-- Blocked by `tier.max_renewals` (`renew_limit`) or by any `WAITING` hold on the bib (`renew_held`). On success, `due_at += loan_period_days`, `renewals_count += 1`, publish `library.loan.renewed`.
+- Blocked by the resolved rule's `max_renewals` (`renew_limit`), by any `WAITING` hold on the bib (`renew_held`) or by a pending recall. On success the due date moves forward by one loan period under the same rule, `renewals_count += 1`, and `library.loan.renewed` is published.
 
 ### Overdue scheduler
 
-`StartOverdueScheduler` (default hourly) flips past-due `ACTIVE` take-home loans to `OVERDUE` and emits `library.loan.overdue`. It is **idempotent** (only non-OVERDUE loans are touched) so it is safe to run on every replica. Fine accrual itself happens at return time, not in the sweep.
+`StartOverdueScheduler` (default hourly) flips past-due `ACTIVE` take-home loans to `OVERDUE` and emits `library.loan.overdue`. Each pass works through the backlog in batches of 500 (up to 40 batches), and every batch flips its loans and queues their notices in one transaction, so a loan is never flipped without its event. It is **idempotent** (only `ACTIVE` loans are touched) and an hourly claim lets only one replica sweep. Fine accrual itself happens at return time, not in the sweep. Because the sweep moves loans to `OVERDUE`, every count of loans that are still out (dashboard, member list, copy list, member delete guard, loan limit) uses `ACTIVE` plus `OVERDUE`.
 
 ### CDL concurrency
 

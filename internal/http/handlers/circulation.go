@@ -14,9 +14,11 @@ import (
 	"github.com/bengobox/library-service/internal/ent"
 	"github.com/bengobox/library-service/internal/ent/bibrecord"
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
+	"github.com/bengobox/library-service/internal/ent/fine"
 	"github.com/bengobox/library-service/internal/ent/loan"
 	"github.com/bengobox/library-service/internal/ent/member"
 	"github.com/bengobox/library-service/internal/modules/circulation"
+	"github.com/bengobox/library-service/internal/modules/fines"
 )
 
 // loanResponse is the library-ui Loan contract (copy barcode + bib title + member resolved,
@@ -121,12 +123,39 @@ func NewCirculationHandler(db *ent.Client, svc *circulation.Service, log *zap.Lo
 	return &CirculationHandler{db: db, svc: svc, log: log}
 }
 
+// checkoutPayment is the librarian confirming the borrowing fee was collected at the desk.
+type checkoutPayment struct {
+	Collected bool   `json:"collected"`
+	Method    string `json:"method"`
+	Reference string `json:"reference"`
+}
+
 type checkoutRequest struct {
-	MemberID        string `json:"member_id"`
-	CopyID          string `json:"copy_id"`
-	CopyBarcode     string `json:"copy_barcode"`
-	InHouse         bool   `json:"in_house"`
-	ClientReference string `json:"client_reference"`
+	MemberID        string           `json:"member_id"`
+	CopyID          string           `json:"copy_id"`
+	CopyBarcode     string           `json:"copy_barcode"`
+	InHouse         bool             `json:"in_house"`
+	ClientReference string           `json:"client_reference"`
+	Payment         *checkoutPayment `json:"payment"`
+}
+
+// feeResponse describes the borrowing fee a checkout raised.
+type feeResponse struct {
+	FineID     string  `json:"fine_id"`
+	Amount     float64 `json:"amount"`
+	AmountPaid float64 `json:"amount_paid"`
+	Status     string  `json:"status"`
+	Paid       bool    `json:"paid"`
+}
+
+func newFeeResponse(f *ent.Fine) *feeResponse {
+	if f == nil {
+		return nil
+	}
+	return &feeResponse{
+		FineID: f.ID.String(), Amount: f.Amount.InexactFloat64(), AmountPaid: f.AmountPaid.InexactFloat64(),
+		Status: fineStatusToWire(f.Status), Paid: f.Status == fine.StatusPAID,
+	}
 }
 
 // Checkout godoc
@@ -154,13 +183,71 @@ func (h *CirculationHandler) Checkout(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "copy_id or copy_barcode is required", "invalid_request")
 		return
 	}
-	l, err := h.svc.Checkout(r.Context(), tenantID, memberID, copyID, req.InHouse, UserIDFrom(r), req.ClientReference)
+	opts := circulation.CheckoutOptions{InHouse: req.InHouse, StaffID: UserIDFrom(r), ClientRef: req.ClientReference}
+	if req.Payment != nil && req.Payment.Collected {
+		method, ok := fines.ParseMethod(req.Payment.Method)
+		if !ok {
+			respondError(w, http.StatusBadRequest, "unknown payment method", "invalid_request")
+			return
+		}
+		opts.Payment = &circulation.FeePayment{Method: method, Reference: strings.TrimSpace(req.Payment.Reference)}
+	}
+	out, err := h.svc.Checkout(r.Context(), tenantID, memberID, copyID, opts)
 	if err != nil {
 		h.writeCircErr(w, err)
 		return
 	}
-	// Shape: { loan } — the library-ui CheckoutResult reads res.loan.
-	respondJSON(w, http.StatusCreated, map[string]any{"loan": h.loanResponseOne(r, tenantID, l)})
+	// Shape: { loan, fee } — the library-ui CheckoutResult reads res.loan and res.fee.
+	body := map[string]any{"loan": h.loanResponseOne(r, tenantID, out.Loan)}
+	if fee := newFeeResponse(out.Fee); fee != nil {
+		body["fee"] = fee
+	}
+	respondJSON(w, http.StatusCreated, body)
+}
+
+type checkoutQuoteResponse struct {
+	BorrowingFee  float64 `json:"borrowing_fee"`
+	LateFeePerDay float64 `json:"late_fee_per_day"`
+	GraceDays     int     `json:"grace_days"`
+	MaxFineCap    float64 `json:"max_fine_cap"`
+	DueDate       string  `json:"due_date"`
+}
+
+// CheckoutQuote godoc
+// @Summary Preview the borrowing fee, late-fee terms and due date for a checkout
+// @Tags Circulation
+// @Router /{tenant}/library/circulation/checkout-quote [get]
+func (h *CirculationHandler) CheckoutQuote(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := TenantUUID(r)
+	if !ok {
+		respondError(w, http.StatusUnauthorized, "missing tenant", "unauthorized")
+		return
+	}
+	q := r.URL.Query()
+	memberID, err := uuid.Parse(q.Get("member_id"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "member_id is required", "invalid_request")
+		return
+	}
+	copyID, err := h.resolveCopyID(r, tenantID, q.Get("copy_id"), q.Get("copy_barcode"))
+	if err != nil {
+		respondError(w, http.StatusBadRequest, "copy_id or copy_barcode is required", "invalid_request")
+		return
+	}
+	quote, err := h.svc.QuoteCheckout(r.Context(), tenantID, memberID, copyID, q.Get("in_house") == "true")
+	if err != nil {
+		if ent.IsNotFound(err) {
+			respondError(w, http.StatusNotFound, "member or copy not found", "not_found")
+			return
+		}
+		h.writeCircErr(w, err)
+		return
+	}
+	respondJSON(w, http.StatusOK, checkoutQuoteResponse{
+		BorrowingFee: quote.BorrowingFee.InexactFloat64(), LateFeePerDay: quote.LateFeePerDay.InexactFloat64(),
+		GraceDays: quote.GraceDays, MaxFineCap: quote.MaxFineCap.InexactFloat64(),
+		DueDate: quote.DueAt.Format(time.RFC3339),
+	})
 }
 
 type returnRequest struct {
@@ -242,9 +329,10 @@ func (h *CirculationHandler) ListLoans(w http.ResponseWriter, r *http.Request) {
 	params := sharedpagination.Parse(r)
 	q := h.db.Loan.Query().Where(loan.TenantID(tenantID))
 	if s := r.URL.Query().Get("status"); s != "" {
-		// "overdue" is a derived view of ACTIVE loans past due, not a stored status.
+		// "overdue" is a derived view: loans still out and past due. The hourly sweep flips
+		// ACTIVE loans to OVERDUE, so both stored statuses belong in it.
 		if strings.EqualFold(s, "overdue") {
-			q = q.Where(loan.StatusEQ(loan.StatusACTIVE), loan.DueAtLT(time.Now()))
+			q = q.Where(loan.StatusIn(loan.StatusACTIVE, loan.StatusOVERDUE), loan.DueAtLT(time.Now()))
 		} else {
 			q = q.Where(loan.StatusEQ(loan.Status(strings.ToUpper(s))))
 		}
@@ -255,7 +343,7 @@ func (h *CirculationHandler) ListLoans(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if r.URL.Query().Get("overdue") == "true" {
-		q = q.Where(loan.StatusEQ(loan.StatusACTIVE), loan.DueAtLT(time.Now()))
+		q = q.Where(loan.StatusIn(loan.StatusACTIVE, loan.StatusOVERDUE), loan.DueAtLT(time.Now()))
 	}
 	total, _ := q.Clone().Count(r.Context())
 	rows, err := q.Order(ent.Desc(loan.FieldCheckoutAt)).Limit(params.Limit).Offset(params.Offset).All(r.Context())

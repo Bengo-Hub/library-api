@@ -6,6 +6,24 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+### Added
+- **Borrowing fee collected at checkout:** the circulation rule's `rental_charge` (per book) is raised as a fee when a book is checked out, and the librarian can mark it paid during checkout (`payment` on `POST /circulation/checkout`). `GET /circulation/checkout-quote` previews the fee, late rate and due date.
+- **Late fee tied to the borrowing fee:** new rule field `late_fee_uses_rental_charge` charges each late day at the borrowing fee.
+- **Desk payments without treasury:** `POST /fines/{id}/record-payment` and `GET /fines/{id}/payments`, backed by a new `fine_payments` ledger and `internal/modules/fines`. The treasury consumer writes to the same ledger. Dashboard summary gains `collected_today`.
+- Migration `20261016071236_add_fee_payments_and_late_fee_flag`: `circulation_rules.late_fee_uses_rental_charge`, the `fine_payments` table and two `fines` indexes.
+
+### Changed
+- One rule resolver for checkout, renew, return and lost items; a tier baseline applies when no rule matches (previously a fixed 14 days). Renewals now follow the rule instead of the tier. The Redis rule cache and its `KEYS` scan are gone.
+- Rule saves reject malformed or negative amounts and a second rule on the same branch, tier and format.
+- `outstanding_fines` on members is now the money owed (it was a count that the UI formatted as money).
+- Due dates honour `due_date_mode`, branch hours, holidays and hourly rules through the calendar module.
+- Dashboard, report and list queries are grouped in SQL and look names up only for the rows shown (summary, popular titles, circulation trend, item movement, member activity, fine ageing, member list).
+
+### Fixed
+- Loans the hourly sweep had marked `OVERDUE` dropped out of the dashboard overdue count, the overdue filter, the loan limit, the copy due dates and the member delete guard.
+- A fine could be waived after it was paid. A double click on checkout could lend one copy twice.
+- The circulation trend counted a return only when the loan was also checked out inside the window.
+
 ### Added (Phase 2, in progress)
 - **E-book one-time purchase + download:** `POST /ebooks/{id}/purchase` creates a treasury `ebook_sale` intent + a PENDING `EbookPurchase` (with a `download_token`); `GET /ebooks/{id}/download?token=` serves the file for a PAID purchase and increments `download_count`. `treasury.payment.succeeded` reconcile extended to `ebook_sale` → `EbookPurchase` PAID (`reconcilePurchase`).
 - **Swagger/OpenAPI:** Swagger UI at `/v1/docs` + spec at `/api/v1/openapi.json`; root `/` redirects to the docs.

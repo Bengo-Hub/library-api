@@ -426,6 +426,7 @@ var (
 		{Name: "grace_days", Type: field.TypeInt, Default: 0},
 		{Name: "max_fine_cap", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
 		{Name: "cap_fine_at_replacement_price", Type: field.TypeBool, Default: false},
+		{Name: "late_fee_uses_rental_charge", Type: field.TypeBool, Default: false},
 		{Name: "rental_charge", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
 		{Name: "replacement_cost", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
 		{Name: "processing_fee", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
@@ -704,6 +705,60 @@ var (
 				Name:    "fine_tenant_id_treasury_intent_id",
 				Unique:  false,
 				Columns: []*schema.Column{FinesColumns[3], FinesColumns[11]},
+			},
+			{
+				Name:    "fine_tenant_id_loan_id",
+				Unique:  false,
+				Columns: []*schema.Column{FinesColumns[3], FinesColumns[5]},
+			},
+			{
+				Name:    "fine_tenant_id_status_assessed_at",
+				Unique:  false,
+				Columns: []*schema.Column{FinesColumns[3], FinesColumns[10], FinesColumns[13]},
+			},
+		},
+	}
+	// FinePaymentsColumns holds the columns for the "fine_payments" table.
+	FinePaymentsColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeUUID},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "tenant_id", Type: field.TypeUUID},
+		{Name: "fine_id", Type: field.TypeUUID},
+		{Name: "member_id", Type: field.TypeUUID},
+		{Name: "amount", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(18,4)"}},
+		{Name: "method", Type: field.TypeEnum, Enums: []string{"CASH", "MPESA", "CARD", "BANK", "TREASURY", "OTHER"}, Default: "CASH"},
+		{Name: "reference", Type: field.TypeString, Nullable: true},
+		{Name: "note", Type: field.TypeString, Nullable: true},
+		{Name: "received_by", Type: field.TypeString, Nullable: true},
+		{Name: "paid_at", Type: field.TypeTime},
+		{Name: "idempotency_key", Type: field.TypeString, Nullable: true},
+	}
+	// FinePaymentsTable holds the schema information for the "fine_payments" table.
+	FinePaymentsTable = &schema.Table{
+		Name:       "fine_payments",
+		Columns:    FinePaymentsColumns,
+		PrimaryKey: []*schema.Column{FinePaymentsColumns[0]},
+		Indexes: []*schema.Index{
+			{
+				Name:    "finepayment_tenant_id",
+				Unique:  false,
+				Columns: []*schema.Column{FinePaymentsColumns[3]},
+			},
+			{
+				Name:    "finepayment_tenant_id_fine_id",
+				Unique:  false,
+				Columns: []*schema.Column{FinePaymentsColumns[3], FinePaymentsColumns[4]},
+			},
+			{
+				Name:    "finepayment_tenant_id_paid_at",
+				Unique:  false,
+				Columns: []*schema.Column{FinePaymentsColumns[3], FinePaymentsColumns[11]},
+			},
+			{
+				Name:    "finepayment_tenant_id_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{FinePaymentsColumns[3], FinePaymentsColumns[12]},
 			},
 		},
 	}
@@ -1556,6 +1611,7 @@ var (
 		EbookLoansTable,
 		EbookPurchasesTable,
 		FinesTable,
+		FinePaymentsTable,
 		HoldsTable,
 		LibraryHolidaysTable,
 		LibraryRolesTable,

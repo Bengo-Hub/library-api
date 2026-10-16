@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/shopspring/decimal"
 
+	"github.com/bengobox/library-service/internal/ent"
 	"github.com/bengobox/library-service/internal/ent/acquisitionfund"
 	"github.com/bengobox/library-service/internal/ent/bibrecord"
 	"github.com/bengobox/library-service/internal/ent/bookcopy"
@@ -48,13 +49,27 @@ func (h *ReportsHandler) MemberActivity(w http.ResponseWriter, r *http.Request) 
 	since := time.Now().AddDate(0, 0, -days)
 	limit := 20
 
-	loans, _ := h.db.Loan.Query().
-		Where(loan.TenantID(tenantID), loan.CheckoutAtGTE(since)).All(ctx)
-
-	counts := map[string]int{}
-	for _, l := range loans {
-		counts[l.MemberID.String()]++
+	var grouped []struct {
+		MemberID uuid.UUID `json:"member_id"`
+		Count    int       `json:"count"`
 	}
+	_ = h.db.Loan.Query().
+		Where(loan.TenantID(tenantID), loan.CheckoutAtGTE(since)).
+		GroupBy(loan.FieldMemberID).Aggregate(ent.Count()).Scan(ctx, &grouped)
+	sort.Slice(grouped, func(i, j int) bool {
+		if grouped[i].Count != grouped[j].Count {
+			return grouped[i].Count > grouped[j].Count
+		}
+		return grouped[i].MemberID.String() < grouped[j].MemberID.String()
+	})
+	if len(grouped) > limit {
+		grouped = grouped[:limit]
+	}
+	ids := make([]uuid.UUID, 0, len(grouped))
+	for _, g := range grouped {
+		ids = append(ids, g.MemberID)
+	}
+	refs := h.memberRefs(ctx, tenantID, ids)
 
 	type row struct {
 		MemberID     string `json:"member_id"`
@@ -62,21 +77,9 @@ func (h *ReportsHandler) MemberActivity(w http.ResponseWriter, r *http.Request) 
 		MembershipNo string `json:"membership_no"`
 		Loans        int    `json:"loans"`
 	}
-	rows := make([]row, 0, len(counts))
-	for mid, n := range counts {
-		r := row{MemberID: mid, Loans: n}
-		id, err := ParseUUIDParam(mid)
-		if err == nil {
-			if m, err := h.db.Member.Get(ctx, id); err == nil {
-				r.Name = m.DisplayName
-				r.MembershipNo = m.MembershipNo
-			}
-		}
-		rows = append(rows, r)
-	}
-	sort.Slice(rows, func(i, j int) bool { return rows[i].Loans > rows[j].Loans })
-	if len(rows) > limit {
-		rows = rows[:limit]
+	rows := make([]row, 0, len(grouped))
+	for _, g := range grouped {
+		rows = append(rows, row{MemberID: g.MemberID.String(), Name: refs[g.MemberID].Name, MembershipNo: refs[g.MemberID].No, Loans: g.Count})
 	}
 
 	if wantCSV(r) {
@@ -99,13 +102,13 @@ func (h *ReportsHandler) OverdueAging(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	now := time.Now()
 
-	loans, _ := h.db.Loan.Query().
-		Where(loan.TenantID(tenantID), loan.StatusIn(loan.StatusACTIVE, loan.StatusOVERDUE), loan.DueAtLT(now)).
-		All(ctx)
+	// Only the due dates are needed to bucket by age.
+	dues := h.loanTimes(ctx, h.db.Loan.Query().
+		Where(loan.TenantID(tenantID), loan.StatusIn(loan.StatusACTIVE, loan.StatusOVERDUE), loan.DueAtLT(now)), loan.FieldDueAt)
 
 	buckets := map[string]int{"0-7": 0, "8-14": 0, "15-30": 0, "31+": 0}
-	for _, l := range loans {
-		days := int(now.Sub(l.DueAt).Hours() / 24)
+	for _, due := range dues {
+		days := int(now.Sub(due).Hours() / 24)
 		switch {
 		case days <= 7:
 			buckets["0-7"]++
@@ -149,13 +152,39 @@ func (h *ReportsHandler) ItemMovement(w http.ResponseWriter, r *http.Request) {
 	days := daysParam(r, 90)
 	since := time.Now().AddDate(0, 0, -days)
 
-	loans, _ := h.db.Loan.Query().
-		Where(loan.TenantID(tenantID), loan.CheckoutAtGTE(since)).All(ctx)
-
-	counts := map[string]int{}
-	for _, l := range loans {
-		counts[l.CopyID.String()]++
+	type ranked struct {
+		id uuid.UUID
+		n  int
 	}
+	perCopy := h.loansPerCopy(ctx, tenantID, since)
+	top := make([]ranked, 0, len(perCopy))
+	for id, n := range perCopy {
+		top = append(top, ranked{id, n})
+	}
+	sort.Slice(top, func(i, j int) bool {
+		if top[i].n != top[j].n {
+			return top[i].n > top[j].n
+		}
+		return top[i].id.String() < top[j].id.String()
+	})
+	limit := 50
+	if len(top) > limit {
+		top = top[:limit]
+	}
+	// Barcodes and titles are looked up for the rows shown, not for every copy ever lent.
+	topIDs := make([]uuid.UUID, 0, len(top))
+	for _, t := range top {
+		topIDs = append(topIDs, t.id)
+	}
+	copyRows, _ := h.db.BookCopy.Query().Where(bookcopy.TenantID(tenantID), bookcopy.IDIn(topIDs...)).
+		Select(bookcopy.FieldID, bookcopy.FieldBarcode, bookcopy.FieldBibRecordID).All(ctx)
+	copyByID := make(map[uuid.UUID]*ent.BookCopy, len(copyRows))
+	bibIDs := make([]uuid.UUID, 0, len(copyRows))
+	for _, c := range copyRows {
+		copyByID[c.ID] = c
+		bibIDs = append(bibIDs, c.BibRecordID)
+	}
+	titles := h.bibTitles(ctx, tenantID, bibIDs)
 
 	type row struct {
 		CopyID    string `json:"copy_id"`
@@ -163,24 +192,14 @@ func (h *ReportsHandler) ItemMovement(w http.ResponseWriter, r *http.Request) {
 		Title     string `json:"title"`
 		Checkouts int    `json:"checkouts"`
 	}
-	rows := make([]row, 0, len(counts))
-	for cid, n := range counts {
-		r := row{CopyID: cid, Checkouts: n}
-		id, err := ParseUUIDParam(cid)
-		if err == nil {
-			if c, err := h.db.BookCopy.Get(ctx, id); err == nil {
-				r.Barcode = c.Barcode
-				if b, err := h.db.BibRecord.Get(ctx, c.BibRecordID); err == nil {
-					r.Title = b.Title
-				}
-			}
+	rows := make([]row, 0, len(top))
+	for _, t := range top {
+		r := row{CopyID: t.id.String(), Checkouts: t.n}
+		if c := copyByID[t.id]; c != nil {
+			r.Barcode = c.Barcode
+			r.Title = titles[c.BibRecordID]
 		}
 		rows = append(rows, r)
-	}
-	sort.Slice(rows, func(i, j int) bool { return rows[i].Checkouts > rows[j].Checkouts })
-	limit := 50
-	if len(rows) > limit {
-		rows = rows[:limit]
 	}
 
 	if wantCSV(r) {
@@ -203,9 +222,19 @@ func (h *ReportsHandler) FineAging(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	now := time.Now()
 
-	fines, _ := h.db.Fine.Query().
+	open, _ := h.db.Fine.Query().
 		Where(fine.TenantID(tenantID), fine.StatusIn(fine.StatusUNPAID, fine.StatusPARTIAL)).
+		Select(fine.FieldMemberID, fine.FieldAmount, fine.FieldAmountPaid, fine.FieldAssessedAt, fine.FieldCreatedAt).
 		All(ctx)
+	memberIDs := make([]uuid.UUID, 0, len(open))
+	seen := map[uuid.UUID]bool{}
+	for _, f := range open {
+		if !seen[f.MemberID] {
+			seen[f.MemberID] = true
+			memberIDs = append(memberIDs, f.MemberID)
+		}
+	}
+	refs := h.memberRefs(ctx, tenantID, memberIDs)
 
 	type fineRow struct {
 		MemberID     string  `json:"member_id"`
@@ -214,23 +243,17 @@ func (h *ReportsHandler) FineAging(w http.ResponseWriter, r *http.Request) {
 		DaysOld      int     `json:"days_old"`
 		Outstanding  float64 `json:"outstanding"`
 	}
-	rows := make([]fineRow, 0, len(fines))
-	for _, f := range fines {
-		age := 0
+	rows := make([]fineRow, 0, len(open))
+	for _, f := range open {
+		// Fees raised without an assessed date (membership charges) age from creation.
+		assessed := f.CreatedAt
 		if f.AssessedAt != nil {
-			age = int(now.Sub(*f.AssessedAt).Hours() / 24)
+			assessed = *f.AssessedAt
 		}
-		outstanding := f.Amount.Sub(f.AmountPaid).InexactFloat64()
-		r := fineRow{
-			MemberID:    f.MemberID.String(),
-			Outstanding: outstanding,
-			DaysOld:     age,
-		}
-		if m, err := h.db.Member.Get(ctx, f.MemberID); err == nil {
-			r.Name = m.DisplayName
-			r.MembershipNo = m.MembershipNo
-		}
-		rows = append(rows, r)
+		rows = append(rows, fineRow{
+			MemberID: f.MemberID.String(), Name: refs[f.MemberID].Name, MembershipNo: refs[f.MemberID].No,
+			DaysOld: int(now.Sub(assessed).Hours() / 24), Outstanding: f.Amount.Sub(f.AmountPaid).InexactFloat64(),
+		})
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].DaysOld > rows[j].DaysOld })
 

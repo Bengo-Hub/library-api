@@ -280,6 +280,7 @@ func New(d Deps) http.Handler {
 			// Circulation (checkout/return/renew/mark-lost) — feature gate + per-action permission gate.
 			lib.Group(func(c chi.Router) {
 				c.Use(libmw.RequireFeature("library_circulation"))
+				c.With(act("circulation", "checkout")).Get("/circulation/checkout-quote", d.Circulation.CheckoutQuote)
 				c.With(act("circulation", "checkout")).Post("/circulation/checkout", d.Circulation.Checkout)
 				c.With(act("circulation", "return")).Post("/circulation/return", d.Circulation.Return)
 				c.With(act("circulation", "renew")).Post("/circulation/renew/{loan_id}", d.Circulation.Renew)
@@ -304,6 +305,8 @@ func New(d Deps) http.Handler {
 				f.With(act("membership_fees", "add")).Post("/fines/membership", d.Fine.AssessMembershipFee)
 				f.With(act("fines", "waive")).Post("/fines/{id}/waive", d.Fine.Waive)
 				f.With(act("fines", "pay")).Post("/fines/{id}/pay", d.Fine.Pay)
+				f.With(act("fines", "pay")).Post("/fines/{id}/record-payment", d.Fine.RecordPayment)
+				f.With(view("fines")).Get("/fines/{id}/payments", d.Fine.Payments)
 			})
 
 			// E-books & controlled digital lending — feature gate + per-action permission gate.

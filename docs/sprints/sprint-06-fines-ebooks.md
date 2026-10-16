@@ -16,6 +16,9 @@ The money + digital-lending surfaces. Phase-1 e-books are read-in-browser only (
 ### Fines (`handlers/fines.go`)
 - [x] `GET /fines` — list with `?status=` / `?member_id=` filters → `listEnvelope`.
 - [x] `POST /fines/{id}/waive` — set WAIVED + `waived_by` (sensitive, audited).
+- [x] `POST /fines/{id}/record-payment` — record cash, M-Pesa, card or bank money taken at the desk, without treasury. Part payments leave the fine `PARTIAL`; a `client_reference` makes retries safe. Every payment is a `fine_payments` ledger row (`internal/modules/fines`), shared with checkout and the treasury consumer.
+- [x] `GET /fines/{id}/payments` — payment history for a fine.
+- [x] Waiving a fine that is already settled returns `409 already_settled`; waive and payment lock the fine row so they cannot race.
 - [x] `POST /fines/{id}/pay` — create a treasury intent (`reference_type=library_fine`) for the outstanding amount; store `treasury_intent_id`; publish `library.fine.assessed`; return `{intent_id, initiate_url, amount}`; guard already-settled (`already_settled`) + treasury-unwired (`treasury_unwired`).
 
 ### Membership fees

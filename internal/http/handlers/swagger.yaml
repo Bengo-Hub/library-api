@@ -342,7 +342,13 @@ paths:
   /{tenant}/library/circulation/checkout:
     post:
       responses: {}
-      summary: Check out a copy to a member (scan-driven)
+      summary: Check out a copy to a member (scan-driven); raises the borrowing fee and can mark it paid
+      tags:
+      - Circulation
+  /{tenant}/library/circulation/checkout-quote:
+    get:
+      responses: {}
+      summary: Preview the borrowing fee, late-fee terms and due date for a checkout
       tags:
       - Circulation
   /{tenant}/library/circulation/loans:
@@ -405,6 +411,18 @@ paths:
     get:
       responses: {}
       summary: List fines (filter by status/member)
+      tags:
+      - Fines
+  /{tenant}/library/fines/{id}/payments:
+    get:
+      responses: {}
+      summary: List the payments recorded against a fine (receipt history)
+      tags:
+      - Fines
+  /{tenant}/library/fines/{id}/record-payment:
+    post:
+      responses: {}
+      summary: Record a payment taken at the desk (cash, M-Pesa, card, bank) against a fine or fee
       tags:
       - Fines
   /{tenant}/library/fines/{id}/pay:

@@ -9,8 +9,8 @@ import (
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
-	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/google/uuid"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
@@ -38,18 +38,22 @@ func TestCheckoutReturnFlow(t *testing.T) {
 
 	tenantID := uuid.New()
 	// Fixtures.
-	br := must(client.Branch.Create().SetTenantID(tenantID).SetName("T").SetCode("T-"+short()).Save(ctx))
+	br := must(client.Branch.Create().SetTenantID(tenantID).SetName("T").SetCode("T-" + short()).Save(ctx))
 	tier := must(client.MemberTier.Create().SetTenantID(tenantID).SetName("Std").SetIsDefault(true).
 		SetMaxConcurrentLoans(2).SetLoanPeriodDays(14).SetMaxRenewals(1).
 		SetDailyFineRate(decimal.RequireFromString("10")).Save(ctx))
-	mem := must(client.Member.Create().SetTenantID(tenantID).SetMembershipNo("M-"+short()).SetTierID(tier.ID).SetDisplayName("Jane").Save(ctx))
+	mem := must(client.Member.Create().SetTenantID(tenantID).SetMembershipNo("M-" + short()).SetTierID(tier.ID).SetDisplayName("Jane").Save(ctx))
 	bib := must(client.BibRecord.Create().SetTenantID(tenantID).SetTitle("Dune").Save(ctx))
-	cp := must(client.BookCopy.Create().SetTenantID(tenantID).SetBibRecordID(bib.ID).SetBranchID(br.ID).SetBarcode("BC-"+short()).Save(ctx))
+	cp := must(client.BookCopy.Create().SetTenantID(tenantID).SetBibRecordID(bib.ID).SetBranchID(br.ID).SetBarcode("BC-" + short()).Save(ctx))
 
 	// Checkout.
-	l, err := svc.Checkout(ctx, tenantID, mem.ID, cp.ID, false, "staff-1", "")
+	out, err := svc.Checkout(ctx, tenantID, mem.ID, cp.ID, CheckoutOptions{StaffID: "staff-1"})
 	if err != nil {
 		t.Fatalf("checkout: %v", err)
+	}
+	l := out.Loan
+	if out.Fee != nil {
+		t.Fatalf("no rule charges a borrowing fee, got %s", out.Fee.Amount)
 	}
 	if got, _ := client.BookCopy.Query().Where(bookcopy.IDEQ(cp.ID)).Only(ctx); got.Status != bookcopy.StatusON_LOAN {
 		t.Fatalf("expected copy ON_LOAN, got %s", got.Status)

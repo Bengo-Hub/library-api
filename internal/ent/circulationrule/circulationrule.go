@@ -46,6 +46,8 @@ const (
 	FieldMaxFineCap = "max_fine_cap"
 	// FieldCapFineAtReplacementPrice holds the string denoting the cap_fine_at_replacement_price field in the database.
 	FieldCapFineAtReplacementPrice = "cap_fine_at_replacement_price"
+	// FieldLateFeeUsesRentalCharge holds the string denoting the late_fee_uses_rental_charge field in the database.
+	FieldLateFeeUsesRentalCharge = "late_fee_uses_rental_charge"
 	// FieldRentalCharge holds the string denoting the rental_charge field in the database.
 	FieldRentalCharge = "rental_charge"
 	// FieldReplacementCost holds the string denoting the replacement_cost field in the database.
@@ -78,6 +80,7 @@ var Columns = []string{
 	FieldGraceDays,
 	FieldMaxFineCap,
 	FieldCapFineAtReplacementPrice,
+	FieldLateFeeUsesRentalCharge,
 	FieldRentalCharge,
 	FieldReplacementCost,
 	FieldProcessingFee,
@@ -120,6 +123,8 @@ var (
 	DefaultMaxFineCap decimal.Decimal
 	// DefaultCapFineAtReplacementPrice holds the default value on creation for the "cap_fine_at_replacement_price" field.
 	DefaultCapFineAtReplacementPrice bool
+	// DefaultLateFeeUsesRentalCharge holds the default value on creation for the "late_fee_uses_rental_charge" field.
+	DefaultLateFeeUsesRentalCharge bool
 	// DefaultRentalCharge holds the default value on creation for the "rental_charge" field.
 	DefaultRentalCharge decimal.Decimal
 	// DefaultReplacementCost holds the default value on creation for the "replacement_cost" field.
@@ -264,6 +269,11 @@ func ByMaxFineCap(opts ...sql.OrderTermOption) OrderOption {
 // ByCapFineAtReplacementPrice orders the results by the cap_fine_at_replacement_price field.
 func ByCapFineAtReplacementPrice(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCapFineAtReplacementPrice, opts...).ToFunc()
+}
+
+// ByLateFeeUsesRentalCharge orders the results by the late_fee_uses_rental_charge field.
+func ByLateFeeUsesRentalCharge(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLateFeeUsesRentalCharge, opts...).ToFunc()
 }
 
 // ByRentalCharge orders the results by the rental_charge field.

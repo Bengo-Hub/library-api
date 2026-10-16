@@ -2,9 +2,11 @@ package circulation
 
 import (
 	"context"
-	"fmt"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
+	"go.uber.org/zap"
 
 	"github.com/bengobox/library-service/internal/ent"
 	cr "github.com/bengobox/library-service/internal/ent/circulationrule"
@@ -15,156 +17,111 @@ type ResolvedRule struct {
 	*ent.CirculationRule
 }
 
-// DefaultRule returns a safe fallback when no rule is configured.
+// DefaultRule returns a safe fallback when no rule is configured and no tier is known.
 func DefaultRule() *ResolvedRule {
 	r := &ent.CirculationRule{}
 	r.LoanPeriodDays = 14
 	r.MaxRenewals = 2
 	r.Holdable = true
-	r.GraceDays = 0
-	r.IsHourly = false
 	return &ResolvedRule{r}
 }
 
-// ResolveRule finds the most specific CirculationRule matching the given branch, tier,
-// and item format using Koha's 8-level specificity cascade (most specific → broadest).
-// Results are cached in Redis for 60 s; changes to rules must call InvalidateRuleCache.
-func (s *Service) ResolveRule(ctx context.Context, tenantID, branchID, tierID uuid.UUID, format string) *ResolvedRule {
-	if s.cache != nil {
-		if rule := s.ruleFromCache(ctx, tenantID, branchID, tierID, format); rule != nil {
-			return rule
-		}
+// RuleFromTier is the baseline used when no circulation rule matches: the member tier's own
+// loan period, renewal cap and daily fine rate. Tiers stay the simple way to configure a
+// library; the rule matrix only overrides them for specific branch, tier or format cases.
+func RuleFromTier(t *ent.MemberTier) *ResolvedRule {
+	r := DefaultRule()
+	if t == nil {
+		return r
 	}
-
-	rule := s.resolveRuleDB(ctx, tenantID, branchID, tierID, format)
-	if rule == nil {
-		return DefaultRule()
+	if t.LoanPeriodDays > 0 {
+		r.LoanPeriodDays = t.LoanPeriodDays
 	}
-
-	if s.cache != nil {
-		s.cacheRule(ctx, tenantID, branchID, tierID, format, rule)
-	}
-	return &ResolvedRule{rule}
+	r.MaxRenewals = t.MaxRenewals
+	r.FinePerDay = t.DailyFineRate
+	return r
 }
 
-// resolveRuleDB runs the 8-level specificity cascade against the database.
-func (s *Service) resolveRuleDB(ctx context.Context, tenantID, branchID, tierID uuid.UUID, format string) *ent.CirculationRule {
-	nilBranch := branchID == uuid.Nil
-	nilTier := tierID == uuid.Nil
-	nilFormat := format == ""
+// BorrowingFee is the fee charged per book at checkout.
+func (r *ResolvedRule) BorrowingFee() decimal.Decimal { return r.RentalCharge }
 
-	fmtVal := cr.ItemFormat(format)
-
-	type candidate struct {
-		branchPred func() bool // true = specific, false = all
-		tierPred   func() bool
-		formatPred func() bool
-		query      func() (*ent.CirculationRule, error)
+// LateRate is the charge for each day a book is returned late. A rule can tie it to the
+// borrowing fee, otherwise it uses the rule's own rate and then the tier's daily rate.
+func (r *ResolvedRule) LateRate(tierRate decimal.Decimal) decimal.Decimal {
+	switch {
+	case r.LateFeeUsesRentalCharge:
+		return r.RentalCharge
+	case r.FinePerDay.IsPositive():
+		return r.FinePerDay
+	default:
+		return tierRate
 	}
-
-	// Helpers to build branch / tier / format predicates for a query.
-	withBranch := func(specific bool) func(q *ent.CirculationRuleQuery) *ent.CirculationRuleQuery {
-		return func(q *ent.CirculationRuleQuery) *ent.CirculationRuleQuery {
-			if specific {
-				return q.Where(cr.BranchIDEQ(branchID))
-			}
-			return q.Where(cr.BranchIDIsNil())
-		}
-	}
-	withTier := func(specific bool) func(q *ent.CirculationRuleQuery) *ent.CirculationRuleQuery {
-		return func(q *ent.CirculationRuleQuery) *ent.CirculationRuleQuery {
-			if specific {
-				return q.Where(cr.TierIDEQ(tierID))
-			}
-			return q.Where(cr.TierIDIsNil())
-		}
-	}
-	withFormat := func(specific bool) func(q *ent.CirculationRuleQuery) *ent.CirculationRuleQuery {
-		return func(q *ent.CirculationRuleQuery) *ent.CirculationRuleQuery {
-			if specific {
-				return q.Where(cr.ItemFormatEQ(fmtVal))
-			}
-			return q.Where(cr.ItemFormatIsNil())
-		}
-	}
-
-	tryQuery := func(bSpecific, tSpecific, fSpecific bool) *ent.CirculationRule {
-		if bSpecific && nilBranch {
-			return nil
-		}
-		if tSpecific && nilTier {
-			return nil
-		}
-		if fSpecific && nilFormat {
-			return nil
-		}
-		q := s.db.CirculationRule.Query().Where(cr.TenantIDEQ(tenantID))
-		q = withBranch(bSpecific)(q)
-		q = withTier(tSpecific)(q)
-		q = withFormat(fSpecific)(q)
-		rule, err := q.First(ctx)
-		if err != nil {
-			return nil
-		}
-		return rule
-	}
-
-	// 8-level cascade: most specific (B+T+F) → least specific (nil+nil+nil).
-	levels := [8][3]bool{
-		{true, true, true},   // 1. branch + tier + format
-		{true, true, false},  // 2. branch + tier + all formats
-		{true, false, true},  // 3. branch + all tiers + format
-		{true, false, false}, // 4. branch + all tiers + all formats
-		{false, true, true},  // 5. default + tier + format
-		{false, true, false}, // 6. default + tier + all formats
-		{false, false, true}, // 7. default + all tiers + format
-		{false, false, false}, // 8. default + all tiers + all formats (global fallback)
-	}
-	for _, l := range levels {
-		if r := tryQuery(l[0], l[1], l[2]); r != nil {
-			return r
-		}
-	}
-	return nil
 }
 
-// InvalidateRuleCache clears the rule cache for a tenant when admin rules change.
-func (s *Service) InvalidateRuleCache(ctx context.Context, tenantID uuid.UUID) {
-	if s.cache == nil {
-		return
+// LoanDuration is how long a new loan runs under this rule.
+func (r *ResolvedRule) LoanDuration() time.Duration {
+	if r.IsHourly && r.LoanPeriodHours > 0 {
+		return time.Duration(r.LoanPeriodHours) * time.Hour
 	}
-	pattern := fmt.Sprintf("cirrule:%s:*", tenantID.String())
-	keys, err := s.cache.Keys(ctx, pattern).Result()
-	if err != nil || len(keys) == 0 {
-		return
-	}
-	_ = s.cache.Del(ctx, keys...).Err()
+	return time.Duration(r.LoanPeriodDays) * 24 * time.Hour
 }
 
-func ruleCacheKey(tenantID, branchID, tierID uuid.UUID, format string) string {
-	return fmt.Sprintf("cirrule:%s:%s:%s:%s", tenantID, branchID, tierID, format)
+// ResolveRule returns the most specific CirculationRule for the given branch, tier and item
+// format, falling back to the tier baseline when none matches. One indexed query fetches every
+// candidate and the most specific wins, so a checkout never pays for a multi-step cascade.
+func (s *Service) ResolveRule(ctx context.Context, tenantID, branchID uuid.UUID, tier *ent.MemberTier, format string) *ResolvedRule {
+	tierID := uuid.Nil
+	if tier != nil {
+		tierID = tier.ID
+	}
+	if rule := s.bestRule(ctx, tenantID, branchID, tierID, format); rule != nil {
+		return &ResolvedRule{rule}
+	}
+	return RuleFromTier(tier)
 }
 
-func (s *Service) ruleFromCache(ctx context.Context, tenantID, branchID, tierID uuid.UUID, format string) *ResolvedRule {
-	// Simple cache marker: store rule ID only; then fetch from DB for full struct.
-	// This avoids JSON serialisation of decimal types.
-	key := ruleCacheKey(tenantID, branchID, tierID, format)
-	idStr, err := s.cache.Get(ctx, key).Result()
+// bestRule scores each candidate by specificity. Branch outranks tier, and tier outranks
+// format, which reproduces the 8-level cascade from most specific (branch+tier+format) down
+// to the global default (all branches, all tiers, all formats).
+func (s *Service) bestRule(ctx context.Context, tenantID, branchID, tierID uuid.UUID, format string) *ent.CirculationRule {
+	q := s.db.CirculationRule.Query().Where(cr.TenantIDEQ(tenantID))
+	if branchID == uuid.Nil {
+		q = q.Where(cr.BranchIDIsNil())
+	} else {
+		q = q.Where(cr.Or(cr.BranchIDIsNil(), cr.BranchIDEQ(branchID)))
+	}
+	if tierID == uuid.Nil {
+		q = q.Where(cr.TierIDIsNil())
+	} else {
+		q = q.Where(cr.Or(cr.TierIDIsNil(), cr.TierIDEQ(tierID)))
+	}
+	if format == "" {
+		q = q.Where(cr.ItemFormatIsNil())
+	} else {
+		q = q.Where(cr.Or(cr.ItemFormatIsNil(), cr.ItemFormatEQ(cr.ItemFormat(format))))
+	}
+	rows, err := q.All(ctx)
 	if err != nil {
+		s.log.Warn("circulation rule lookup failed; using tier baseline", zap.Error(err))
 		return nil
 	}
-	id, err := uuid.Parse(idStr)
-	if err != nil {
-		return nil
+	var best *ent.CirculationRule
+	bestScore := -1
+	for _, r := range rows {
+		score := 0
+		if r.BranchID != nil {
+			score += 4
+		}
+		if r.TierID != nil {
+			score += 2
+		}
+		if r.ItemFormat != nil {
+			score++
+		}
+		// Duplicate dimensions are rejected on save; if legacy rows tie, the latest edit wins.
+		if score > bestScore || (score == bestScore && r.UpdatedAt.After(best.UpdatedAt)) {
+			best, bestScore = r, score
+		}
 	}
-	rule, err := s.db.CirculationRule.Get(ctx, id)
-	if err != nil {
-		return nil
-	}
-	return &ResolvedRule{rule}
-}
-
-func (s *Service) cacheRule(ctx context.Context, tenantID, branchID, tierID uuid.UUID, format string, rule *ent.CirculationRule) {
-	key := ruleCacheKey(tenantID, branchID, tierID, format)
-	_ = s.cache.Set(ctx, key, rule.ID.String(), 60*1e9).Err() // 60s TTL
+	return best
 }

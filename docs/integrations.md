@@ -56,6 +56,8 @@ Library charges (overdue/lost/damage **fines**, **membership fees**, and **e-boo
 
 **Reconcile path (NATS):** the `library-payment-reconcile` durable queue consumer subscribes to **`treasury.payment.succeeded`** and, switching on `reference_type`, flips the matching **fine** (`library_fine`), **membership fee** (`membership_fee`), or **e-book purchase** (`ebook_sale`) to **PAID** — matched by `treasury_intent_id`, else `reference_id`; idempotent on the intent id (already-PAID is a no-op). For fines it then publishes `library.fine.paid`.
 
+**Treasury is optional for fees and fines.** The librarian can record cash, M-Pesa, card or bank money taken at the desk (`POST /fines/{id}/record-payment`, or the payment option on checkout for the borrowing fee). Those payments are written to the `fine_payments` ledger and never call treasury. The same ledger receives `TREASURY` rows from the reconcile consumer, so the Fines page and the dashboard show one picture whichever route the money took. Receipts go out as the `library.fine.paid` email through notifications, only when the member has an email on file.
+
 **Env:** `TREASURY_SERVICE_URL` (default `booksapi.codevertexafrica.com`), `INTERNAL_SERVICE_KEY`.
 
 ---

@@ -30,6 +30,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/ebookloan"
 	"github.com/bengobox/library-service/internal/ent/ebookpurchase"
 	"github.com/bengobox/library-service/internal/ent/fine"
+	"github.com/bengobox/library-service/internal/ent/finepayment"
 	"github.com/bengobox/library-service/internal/ent/hold"
 	"github.com/bengobox/library-service/internal/ent/libraryholiday"
 	"github.com/bengobox/library-service/internal/ent/libraryrole"
@@ -85,6 +86,7 @@ const (
 	TypeEbookLoan              = "EbookLoan"
 	TypeEbookPurchase          = "EbookPurchase"
 	TypeFine                   = "Fine"
+	TypeFinePayment            = "FinePayment"
 	TypeHold                   = "Hold"
 	TypeLibraryHoliday         = "LibraryHoliday"
 	TypeLibraryRole            = "LibraryRole"
@@ -10694,6 +10696,7 @@ type CirculationRuleMutation struct {
 	addgrace_days                 *int
 	max_fine_cap                  *decimal.Decimal
 	cap_fine_at_replacement_price *bool
+	late_fee_uses_rental_charge   *bool
 	rental_charge                 *decimal.Decimal
 	replacement_cost              *decimal.Decimal
 	processing_fee                *decimal.Decimal
@@ -11468,6 +11471,42 @@ func (m *CirculationRuleMutation) ResetCapFineAtReplacementPrice() {
 	m.cap_fine_at_replacement_price = nil
 }
 
+// SetLateFeeUsesRentalCharge sets the "late_fee_uses_rental_charge" field.
+func (m *CirculationRuleMutation) SetLateFeeUsesRentalCharge(b bool) {
+	m.late_fee_uses_rental_charge = &b
+}
+
+// LateFeeUsesRentalCharge returns the value of the "late_fee_uses_rental_charge" field in the mutation.
+func (m *CirculationRuleMutation) LateFeeUsesRentalCharge() (r bool, exists bool) {
+	v := m.late_fee_uses_rental_charge
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLateFeeUsesRentalCharge returns the old "late_fee_uses_rental_charge" field's value of the CirculationRule entity.
+// If the CirculationRule object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CirculationRuleMutation) OldLateFeeUsesRentalCharge(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLateFeeUsesRentalCharge is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLateFeeUsesRentalCharge requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLateFeeUsesRentalCharge: %w", err)
+	}
+	return oldValue.LateFeeUsesRentalCharge, nil
+}
+
+// ResetLateFeeUsesRentalCharge resets all changes to the "late_fee_uses_rental_charge" field.
+func (m *CirculationRuleMutation) ResetLateFeeUsesRentalCharge() {
+	m.late_fee_uses_rental_charge = nil
+}
+
 // SetRentalCharge sets the "rental_charge" field.
 func (m *CirculationRuleMutation) SetRentalCharge(d decimal.Decimal) {
 	m.rental_charge = &d
@@ -11695,7 +11734,7 @@ func (m *CirculationRuleMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *CirculationRuleMutation) Fields() []string {
-	fields := make([]string, 0, 20)
+	fields := make([]string, 0, 21)
 	if m.created_at != nil {
 		fields = append(fields, circulationrule.FieldCreatedAt)
 	}
@@ -11740,6 +11779,9 @@ func (m *CirculationRuleMutation) Fields() []string {
 	}
 	if m.cap_fine_at_replacement_price != nil {
 		fields = append(fields, circulationrule.FieldCapFineAtReplacementPrice)
+	}
+	if m.late_fee_uses_rental_charge != nil {
+		fields = append(fields, circulationrule.FieldLateFeeUsesRentalCharge)
 	}
 	if m.rental_charge != nil {
 		fields = append(fields, circulationrule.FieldRentalCharge)
@@ -11794,6 +11836,8 @@ func (m *CirculationRuleMutation) Field(name string) (ent.Value, bool) {
 		return m.MaxFineCap()
 	case circulationrule.FieldCapFineAtReplacementPrice:
 		return m.CapFineAtReplacementPrice()
+	case circulationrule.FieldLateFeeUsesRentalCharge:
+		return m.LateFeeUsesRentalCharge()
 	case circulationrule.FieldRentalCharge:
 		return m.RentalCharge()
 	case circulationrule.FieldReplacementCost:
@@ -11843,6 +11887,8 @@ func (m *CirculationRuleMutation) OldField(ctx context.Context, name string) (en
 		return m.OldMaxFineCap(ctx)
 	case circulationrule.FieldCapFineAtReplacementPrice:
 		return m.OldCapFineAtReplacementPrice(ctx)
+	case circulationrule.FieldLateFeeUsesRentalCharge:
+		return m.OldLateFeeUsesRentalCharge(ctx)
 	case circulationrule.FieldRentalCharge:
 		return m.OldRentalCharge(ctx)
 	case circulationrule.FieldReplacementCost:
@@ -11966,6 +12012,13 @@ func (m *CirculationRuleMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCapFineAtReplacementPrice(v)
+		return nil
+	case circulationrule.FieldLateFeeUsesRentalCharge:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLateFeeUsesRentalCharge(v)
 		return nil
 	case circulationrule.FieldRentalCharge:
 		v, ok := value.(decimal.Decimal)
@@ -12173,6 +12226,9 @@ func (m *CirculationRuleMutation) ResetField(name string) error {
 		return nil
 	case circulationrule.FieldCapFineAtReplacementPrice:
 		m.ResetCapFineAtReplacementPrice()
+		return nil
+	case circulationrule.FieldLateFeeUsesRentalCharge:
+		m.ResetLateFeeUsesRentalCharge()
 		return nil
 	case circulationrule.FieldRentalCharge:
 		m.ResetRentalCharge()
@@ -19063,6 +19119,1011 @@ func (m *FineMutation) ClearEdge(name string) error {
 // It returns an error if the edge is not defined in the schema.
 func (m *FineMutation) ResetEdge(name string) error {
 	return fmt.Errorf("unknown Fine edge %s", name)
+}
+
+// FinePaymentMutation represents an operation that mutates the FinePayment nodes in the graph.
+type FinePaymentMutation struct {
+	config
+	op              Op
+	typ             string
+	id              *uuid.UUID
+	created_at      *time.Time
+	updated_at      *time.Time
+	tenant_id       *uuid.UUID
+	fine_id         *uuid.UUID
+	member_id       *uuid.UUID
+	amount          *decimal.Decimal
+	method          *finepayment.Method
+	reference       *string
+	note            *string
+	received_by     *string
+	paid_at         *time.Time
+	idempotency_key *string
+	clearedFields   map[string]struct{}
+	done            bool
+	oldValue        func(context.Context) (*FinePayment, error)
+	predicates      []predicate.FinePayment
+}
+
+var _ ent.Mutation = (*FinePaymentMutation)(nil)
+
+// finepaymentOption allows management of the mutation configuration using functional options.
+type finepaymentOption func(*FinePaymentMutation)
+
+// newFinePaymentMutation creates new mutation for the FinePayment entity.
+func newFinePaymentMutation(c config, op Op, opts ...finepaymentOption) *FinePaymentMutation {
+	m := &FinePaymentMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeFinePayment,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withFinePaymentID sets the ID field of the mutation.
+func withFinePaymentID(id uuid.UUID) finepaymentOption {
+	return func(m *FinePaymentMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *FinePayment
+		)
+		m.oldValue = func(ctx context.Context) (*FinePayment, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().FinePayment.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withFinePayment sets the old FinePayment of the mutation.
+func withFinePayment(node *FinePayment) finepaymentOption {
+	return func(m *FinePaymentMutation) {
+		m.oldValue = func(context.Context) (*FinePayment, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m FinePaymentMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m FinePaymentMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// SetID sets the value of the id field. Note that this
+// operation is only accepted on creation of FinePayment entities.
+func (m *FinePaymentMutation) SetID(id uuid.UUID) {
+	m.id = &id
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *FinePaymentMutation) ID() (id uuid.UUID, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *FinePaymentMutation) IDs(ctx context.Context) ([]uuid.UUID, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []uuid.UUID{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().FinePayment.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *FinePaymentMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *FinePaymentMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the FinePayment entity.
+// If the FinePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinePaymentMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *FinePaymentMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *FinePaymentMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *FinePaymentMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the FinePayment entity.
+// If the FinePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinePaymentMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *FinePaymentMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (m *FinePaymentMutation) SetTenantID(u uuid.UUID) {
+	m.tenant_id = &u
+}
+
+// TenantID returns the value of the "tenant_id" field in the mutation.
+func (m *FinePaymentMutation) TenantID() (r uuid.UUID, exists bool) {
+	v := m.tenant_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTenantID returns the old "tenant_id" field's value of the FinePayment entity.
+// If the FinePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinePaymentMutation) OldTenantID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTenantID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTenantID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTenantID: %w", err)
+	}
+	return oldValue.TenantID, nil
+}
+
+// ResetTenantID resets all changes to the "tenant_id" field.
+func (m *FinePaymentMutation) ResetTenantID() {
+	m.tenant_id = nil
+}
+
+// SetFineID sets the "fine_id" field.
+func (m *FinePaymentMutation) SetFineID(u uuid.UUID) {
+	m.fine_id = &u
+}
+
+// FineID returns the value of the "fine_id" field in the mutation.
+func (m *FinePaymentMutation) FineID() (r uuid.UUID, exists bool) {
+	v := m.fine_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFineID returns the old "fine_id" field's value of the FinePayment entity.
+// If the FinePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinePaymentMutation) OldFineID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFineID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFineID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFineID: %w", err)
+	}
+	return oldValue.FineID, nil
+}
+
+// ResetFineID resets all changes to the "fine_id" field.
+func (m *FinePaymentMutation) ResetFineID() {
+	m.fine_id = nil
+}
+
+// SetMemberID sets the "member_id" field.
+func (m *FinePaymentMutation) SetMemberID(u uuid.UUID) {
+	m.member_id = &u
+}
+
+// MemberID returns the value of the "member_id" field in the mutation.
+func (m *FinePaymentMutation) MemberID() (r uuid.UUID, exists bool) {
+	v := m.member_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMemberID returns the old "member_id" field's value of the FinePayment entity.
+// If the FinePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinePaymentMutation) OldMemberID(ctx context.Context) (v uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMemberID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMemberID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMemberID: %w", err)
+	}
+	return oldValue.MemberID, nil
+}
+
+// ResetMemberID resets all changes to the "member_id" field.
+func (m *FinePaymentMutation) ResetMemberID() {
+	m.member_id = nil
+}
+
+// SetAmount sets the "amount" field.
+func (m *FinePaymentMutation) SetAmount(d decimal.Decimal) {
+	m.amount = &d
+}
+
+// Amount returns the value of the "amount" field in the mutation.
+func (m *FinePaymentMutation) Amount() (r decimal.Decimal, exists bool) {
+	v := m.amount
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAmount returns the old "amount" field's value of the FinePayment entity.
+// If the FinePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinePaymentMutation) OldAmount(ctx context.Context) (v decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAmount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAmount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAmount: %w", err)
+	}
+	return oldValue.Amount, nil
+}
+
+// ResetAmount resets all changes to the "amount" field.
+func (m *FinePaymentMutation) ResetAmount() {
+	m.amount = nil
+}
+
+// SetMethod sets the "method" field.
+func (m *FinePaymentMutation) SetMethod(f finepayment.Method) {
+	m.method = &f
+}
+
+// Method returns the value of the "method" field in the mutation.
+func (m *FinePaymentMutation) Method() (r finepayment.Method, exists bool) {
+	v := m.method
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMethod returns the old "method" field's value of the FinePayment entity.
+// If the FinePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinePaymentMutation) OldMethod(ctx context.Context) (v finepayment.Method, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMethod is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMethod requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMethod: %w", err)
+	}
+	return oldValue.Method, nil
+}
+
+// ResetMethod resets all changes to the "method" field.
+func (m *FinePaymentMutation) ResetMethod() {
+	m.method = nil
+}
+
+// SetReference sets the "reference" field.
+func (m *FinePaymentMutation) SetReference(s string) {
+	m.reference = &s
+}
+
+// Reference returns the value of the "reference" field in the mutation.
+func (m *FinePaymentMutation) Reference() (r string, exists bool) {
+	v := m.reference
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReference returns the old "reference" field's value of the FinePayment entity.
+// If the FinePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinePaymentMutation) OldReference(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReference is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReference requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReference: %w", err)
+	}
+	return oldValue.Reference, nil
+}
+
+// ClearReference clears the value of the "reference" field.
+func (m *FinePaymentMutation) ClearReference() {
+	m.reference = nil
+	m.clearedFields[finepayment.FieldReference] = struct{}{}
+}
+
+// ReferenceCleared returns if the "reference" field was cleared in this mutation.
+func (m *FinePaymentMutation) ReferenceCleared() bool {
+	_, ok := m.clearedFields[finepayment.FieldReference]
+	return ok
+}
+
+// ResetReference resets all changes to the "reference" field.
+func (m *FinePaymentMutation) ResetReference() {
+	m.reference = nil
+	delete(m.clearedFields, finepayment.FieldReference)
+}
+
+// SetNote sets the "note" field.
+func (m *FinePaymentMutation) SetNote(s string) {
+	m.note = &s
+}
+
+// Note returns the value of the "note" field in the mutation.
+func (m *FinePaymentMutation) Note() (r string, exists bool) {
+	v := m.note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNote returns the old "note" field's value of the FinePayment entity.
+// If the FinePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinePaymentMutation) OldNote(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNote: %w", err)
+	}
+	return oldValue.Note, nil
+}
+
+// ClearNote clears the value of the "note" field.
+func (m *FinePaymentMutation) ClearNote() {
+	m.note = nil
+	m.clearedFields[finepayment.FieldNote] = struct{}{}
+}
+
+// NoteCleared returns if the "note" field was cleared in this mutation.
+func (m *FinePaymentMutation) NoteCleared() bool {
+	_, ok := m.clearedFields[finepayment.FieldNote]
+	return ok
+}
+
+// ResetNote resets all changes to the "note" field.
+func (m *FinePaymentMutation) ResetNote() {
+	m.note = nil
+	delete(m.clearedFields, finepayment.FieldNote)
+}
+
+// SetReceivedBy sets the "received_by" field.
+func (m *FinePaymentMutation) SetReceivedBy(s string) {
+	m.received_by = &s
+}
+
+// ReceivedBy returns the value of the "received_by" field in the mutation.
+func (m *FinePaymentMutation) ReceivedBy() (r string, exists bool) {
+	v := m.received_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReceivedBy returns the old "received_by" field's value of the FinePayment entity.
+// If the FinePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinePaymentMutation) OldReceivedBy(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReceivedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReceivedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReceivedBy: %w", err)
+	}
+	return oldValue.ReceivedBy, nil
+}
+
+// ClearReceivedBy clears the value of the "received_by" field.
+func (m *FinePaymentMutation) ClearReceivedBy() {
+	m.received_by = nil
+	m.clearedFields[finepayment.FieldReceivedBy] = struct{}{}
+}
+
+// ReceivedByCleared returns if the "received_by" field was cleared in this mutation.
+func (m *FinePaymentMutation) ReceivedByCleared() bool {
+	_, ok := m.clearedFields[finepayment.FieldReceivedBy]
+	return ok
+}
+
+// ResetReceivedBy resets all changes to the "received_by" field.
+func (m *FinePaymentMutation) ResetReceivedBy() {
+	m.received_by = nil
+	delete(m.clearedFields, finepayment.FieldReceivedBy)
+}
+
+// SetPaidAt sets the "paid_at" field.
+func (m *FinePaymentMutation) SetPaidAt(t time.Time) {
+	m.paid_at = &t
+}
+
+// PaidAt returns the value of the "paid_at" field in the mutation.
+func (m *FinePaymentMutation) PaidAt() (r time.Time, exists bool) {
+	v := m.paid_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPaidAt returns the old "paid_at" field's value of the FinePayment entity.
+// If the FinePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinePaymentMutation) OldPaidAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPaidAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPaidAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPaidAt: %w", err)
+	}
+	return oldValue.PaidAt, nil
+}
+
+// ResetPaidAt resets all changes to the "paid_at" field.
+func (m *FinePaymentMutation) ResetPaidAt() {
+	m.paid_at = nil
+}
+
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (m *FinePaymentMutation) SetIdempotencyKey(s string) {
+	m.idempotency_key = &s
+}
+
+// IdempotencyKey returns the value of the "idempotency_key" field in the mutation.
+func (m *FinePaymentMutation) IdempotencyKey() (r string, exists bool) {
+	v := m.idempotency_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIdempotencyKey returns the old "idempotency_key" field's value of the FinePayment entity.
+// If the FinePayment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *FinePaymentMutation) OldIdempotencyKey(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIdempotencyKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIdempotencyKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIdempotencyKey: %w", err)
+	}
+	return oldValue.IdempotencyKey, nil
+}
+
+// ClearIdempotencyKey clears the value of the "idempotency_key" field.
+func (m *FinePaymentMutation) ClearIdempotencyKey() {
+	m.idempotency_key = nil
+	m.clearedFields[finepayment.FieldIdempotencyKey] = struct{}{}
+}
+
+// IdempotencyKeyCleared returns if the "idempotency_key" field was cleared in this mutation.
+func (m *FinePaymentMutation) IdempotencyKeyCleared() bool {
+	_, ok := m.clearedFields[finepayment.FieldIdempotencyKey]
+	return ok
+}
+
+// ResetIdempotencyKey resets all changes to the "idempotency_key" field.
+func (m *FinePaymentMutation) ResetIdempotencyKey() {
+	m.idempotency_key = nil
+	delete(m.clearedFields, finepayment.FieldIdempotencyKey)
+}
+
+// Where appends a list predicates to the FinePaymentMutation builder.
+func (m *FinePaymentMutation) Where(ps ...predicate.FinePayment) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the FinePaymentMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *FinePaymentMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.FinePayment, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *FinePaymentMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *FinePaymentMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (FinePayment).
+func (m *FinePaymentMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *FinePaymentMutation) Fields() []string {
+	fields := make([]string, 0, 12)
+	if m.created_at != nil {
+		fields = append(fields, finepayment.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, finepayment.FieldUpdatedAt)
+	}
+	if m.tenant_id != nil {
+		fields = append(fields, finepayment.FieldTenantID)
+	}
+	if m.fine_id != nil {
+		fields = append(fields, finepayment.FieldFineID)
+	}
+	if m.member_id != nil {
+		fields = append(fields, finepayment.FieldMemberID)
+	}
+	if m.amount != nil {
+		fields = append(fields, finepayment.FieldAmount)
+	}
+	if m.method != nil {
+		fields = append(fields, finepayment.FieldMethod)
+	}
+	if m.reference != nil {
+		fields = append(fields, finepayment.FieldReference)
+	}
+	if m.note != nil {
+		fields = append(fields, finepayment.FieldNote)
+	}
+	if m.received_by != nil {
+		fields = append(fields, finepayment.FieldReceivedBy)
+	}
+	if m.paid_at != nil {
+		fields = append(fields, finepayment.FieldPaidAt)
+	}
+	if m.idempotency_key != nil {
+		fields = append(fields, finepayment.FieldIdempotencyKey)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *FinePaymentMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case finepayment.FieldCreatedAt:
+		return m.CreatedAt()
+	case finepayment.FieldUpdatedAt:
+		return m.UpdatedAt()
+	case finepayment.FieldTenantID:
+		return m.TenantID()
+	case finepayment.FieldFineID:
+		return m.FineID()
+	case finepayment.FieldMemberID:
+		return m.MemberID()
+	case finepayment.FieldAmount:
+		return m.Amount()
+	case finepayment.FieldMethod:
+		return m.Method()
+	case finepayment.FieldReference:
+		return m.Reference()
+	case finepayment.FieldNote:
+		return m.Note()
+	case finepayment.FieldReceivedBy:
+		return m.ReceivedBy()
+	case finepayment.FieldPaidAt:
+		return m.PaidAt()
+	case finepayment.FieldIdempotencyKey:
+		return m.IdempotencyKey()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *FinePaymentMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case finepayment.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case finepayment.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	case finepayment.FieldTenantID:
+		return m.OldTenantID(ctx)
+	case finepayment.FieldFineID:
+		return m.OldFineID(ctx)
+	case finepayment.FieldMemberID:
+		return m.OldMemberID(ctx)
+	case finepayment.FieldAmount:
+		return m.OldAmount(ctx)
+	case finepayment.FieldMethod:
+		return m.OldMethod(ctx)
+	case finepayment.FieldReference:
+		return m.OldReference(ctx)
+	case finepayment.FieldNote:
+		return m.OldNote(ctx)
+	case finepayment.FieldReceivedBy:
+		return m.OldReceivedBy(ctx)
+	case finepayment.FieldPaidAt:
+		return m.OldPaidAt(ctx)
+	case finepayment.FieldIdempotencyKey:
+		return m.OldIdempotencyKey(ctx)
+	}
+	return nil, fmt.Errorf("unknown FinePayment field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *FinePaymentMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case finepayment.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case finepayment.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	case finepayment.FieldTenantID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTenantID(v)
+		return nil
+	case finepayment.FieldFineID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFineID(v)
+		return nil
+	case finepayment.FieldMemberID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMemberID(v)
+		return nil
+	case finepayment.FieldAmount:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAmount(v)
+		return nil
+	case finepayment.FieldMethod:
+		v, ok := value.(finepayment.Method)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMethod(v)
+		return nil
+	case finepayment.FieldReference:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReference(v)
+		return nil
+	case finepayment.FieldNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNote(v)
+		return nil
+	case finepayment.FieldReceivedBy:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReceivedBy(v)
+		return nil
+	case finepayment.FieldPaidAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPaidAt(v)
+		return nil
+	case finepayment.FieldIdempotencyKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIdempotencyKey(v)
+		return nil
+	}
+	return fmt.Errorf("unknown FinePayment field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *FinePaymentMutation) AddedFields() []string {
+	return nil
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *FinePaymentMutation) AddedField(name string) (ent.Value, bool) {
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *FinePaymentMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown FinePayment numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *FinePaymentMutation) ClearedFields() []string {
+	var fields []string
+	if m.FieldCleared(finepayment.FieldReference) {
+		fields = append(fields, finepayment.FieldReference)
+	}
+	if m.FieldCleared(finepayment.FieldNote) {
+		fields = append(fields, finepayment.FieldNote)
+	}
+	if m.FieldCleared(finepayment.FieldReceivedBy) {
+		fields = append(fields, finepayment.FieldReceivedBy)
+	}
+	if m.FieldCleared(finepayment.FieldIdempotencyKey) {
+		fields = append(fields, finepayment.FieldIdempotencyKey)
+	}
+	return fields
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *FinePaymentMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *FinePaymentMutation) ClearField(name string) error {
+	switch name {
+	case finepayment.FieldReference:
+		m.ClearReference()
+		return nil
+	case finepayment.FieldNote:
+		m.ClearNote()
+		return nil
+	case finepayment.FieldReceivedBy:
+		m.ClearReceivedBy()
+		return nil
+	case finepayment.FieldIdempotencyKey:
+		m.ClearIdempotencyKey()
+		return nil
+	}
+	return fmt.Errorf("unknown FinePayment nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *FinePaymentMutation) ResetField(name string) error {
+	switch name {
+	case finepayment.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case finepayment.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	case finepayment.FieldTenantID:
+		m.ResetTenantID()
+		return nil
+	case finepayment.FieldFineID:
+		m.ResetFineID()
+		return nil
+	case finepayment.FieldMemberID:
+		m.ResetMemberID()
+		return nil
+	case finepayment.FieldAmount:
+		m.ResetAmount()
+		return nil
+	case finepayment.FieldMethod:
+		m.ResetMethod()
+		return nil
+	case finepayment.FieldReference:
+		m.ResetReference()
+		return nil
+	case finepayment.FieldNote:
+		m.ResetNote()
+		return nil
+	case finepayment.FieldReceivedBy:
+		m.ResetReceivedBy()
+		return nil
+	case finepayment.FieldPaidAt:
+		m.ResetPaidAt()
+		return nil
+	case finepayment.FieldIdempotencyKey:
+		m.ResetIdempotencyKey()
+		return nil
+	}
+	return fmt.Errorf("unknown FinePayment field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *FinePaymentMutation) AddedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *FinePaymentMutation) AddedIDs(name string) []ent.Value {
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *FinePaymentMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *FinePaymentMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *FinePaymentMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 0)
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *FinePaymentMutation) EdgeCleared(name string) bool {
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *FinePaymentMutation) ClearEdge(name string) error {
+	return fmt.Errorf("unknown FinePayment unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *FinePaymentMutation) ResetEdge(name string) error {
+	return fmt.Errorf("unknown FinePayment edge %s", name)
 }
 
 // HoldMutation represents an operation that mutates the Hold nodes in the graph.

@@ -38,7 +38,10 @@ func (CirculationRule) Fields() []ent.Field {
 		moneyField("max_fine_cap"),
 		field.Bool("cap_fine_at_replacement_price").Default(false),
 
-		// Item financial parameters (wired in Task 9).
+		field.Bool("late_fee_uses_rental_charge").Default(false).
+			Comment("When true each overdue day is charged at rental_charge instead of fine_per_day"),
+
+		// Item financial parameters. rental_charge is the borrowing fee charged per book at checkout.
 		moneyField("rental_charge"),
 		moneyField("replacement_cost"),
 		moneyField("processing_fee"),

@@ -1,4 +1,4 @@
-h1:lIVvmJcZJdmP3WcggBQiS4NeYesXVKYsUK6S9Eu/bzM=
+h1:fVSGGW6S9c/8ijqBgqIhEjqSGxUMJSr2HD4zEtxN1xk=
 20260626135020_init_library_schema.sql h1:Qt4ItOd+TbONDhHhmgV6+XcuPB/EbtPXH1b5OUdLz3Q=
 20260626163557_add_copy_transfer.sql h1:csII0mqoLACvht1WebGl/+CT42KWS1eyzkD19xQi500=
 20260626165654_add_stock_count.sql h1:ktPdhWDJXz/8BaBapl4At37Ty3HIgZP0qPXViAbtSxI=
@@ -13,3 +13,4 @@ h1:lIVvmJcZJdmP3WcggBQiS4NeYesXVKYsUK6S9Eu/bzM=
 20260701162158_add_acquisitions_notif_prefs_recalls.sql h1:SBF5LCVXta3LYnUyZWXMDxgmV1JDGjpG4O8KY6JMjm4=
 20260701165410_add_serials.sql h1:jUB7tGDbDAt0gSFDUhMIi8Iuh1bl2CaJIMueFrtvOG0=
 20260817113139_add_stocktake_valuation.sql h1:BUcp61hnuB2mS+1ij9htXRzgKDjN4LSXysFWuTKX19M=
+20261016071236_add_fee_payments_and_late_fee_flag.sql h1:Vnq9nSE7gBR9PSkk2C1gd3weYg/2L6SV0fqZIo9es+E=

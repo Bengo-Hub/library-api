@@ -23,6 +23,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/ebookloan"
 	"github.com/bengobox/library-service/internal/ent/ebookpurchase"
 	"github.com/bengobox/library-service/internal/ent/fine"
+	"github.com/bengobox/library-service/internal/ent/finepayment"
 	"github.com/bengobox/library-service/internal/ent/hold"
 	"github.com/bengobox/library-service/internal/ent/libraryholiday"
 	"github.com/bengobox/library-service/internal/ent/libraryrole"
@@ -404,16 +405,20 @@ func init() {
 	circulationruleDescCapFineAtReplacementPrice := circulationruleFields[11].Descriptor()
 	// circulationrule.DefaultCapFineAtReplacementPrice holds the default value on creation for the cap_fine_at_replacement_price field.
 	circulationrule.DefaultCapFineAtReplacementPrice = circulationruleDescCapFineAtReplacementPrice.Default.(bool)
+	// circulationruleDescLateFeeUsesRentalCharge is the schema descriptor for late_fee_uses_rental_charge field.
+	circulationruleDescLateFeeUsesRentalCharge := circulationruleFields[12].Descriptor()
+	// circulationrule.DefaultLateFeeUsesRentalCharge holds the default value on creation for the late_fee_uses_rental_charge field.
+	circulationrule.DefaultLateFeeUsesRentalCharge = circulationruleDescLateFeeUsesRentalCharge.Default.(bool)
 	// circulationruleDescRentalCharge is the schema descriptor for rental_charge field.
-	circulationruleDescRentalCharge := circulationruleFields[12].Descriptor()
+	circulationruleDescRentalCharge := circulationruleFields[13].Descriptor()
 	// circulationrule.DefaultRentalCharge holds the default value on creation for the rental_charge field.
 	circulationrule.DefaultRentalCharge = circulationruleDescRentalCharge.Default.(decimal.Decimal)
 	// circulationruleDescReplacementCost is the schema descriptor for replacement_cost field.
-	circulationruleDescReplacementCost := circulationruleFields[13].Descriptor()
+	circulationruleDescReplacementCost := circulationruleFields[14].Descriptor()
 	// circulationrule.DefaultReplacementCost holds the default value on creation for the replacement_cost field.
 	circulationrule.DefaultReplacementCost = circulationruleDescReplacementCost.Default.(decimal.Decimal)
 	// circulationruleDescProcessingFee is the schema descriptor for processing_fee field.
-	circulationruleDescProcessingFee := circulationruleFields[14].Descriptor()
+	circulationruleDescProcessingFee := circulationruleFields[15].Descriptor()
 	// circulationrule.DefaultProcessingFee holds the default value on creation for the processing_fee field.
 	circulationrule.DefaultProcessingFee = circulationruleDescProcessingFee.Default.(decimal.Decimal)
 	// circulationruleDescID is the schema descriptor for id field.
@@ -613,6 +618,33 @@ func init() {
 	fineDescID := fineMixinFields0[0].Descriptor()
 	// fine.DefaultID holds the default value on creation for the id field.
 	fine.DefaultID = fineDescID.Default.(func() uuid.UUID)
+	finepaymentMixin := schema.FinePayment{}.Mixin()
+	finepaymentMixinFields0 := finepaymentMixin[0].Fields()
+	_ = finepaymentMixinFields0
+	finepaymentFields := schema.FinePayment{}.Fields()
+	_ = finepaymentFields
+	// finepaymentDescCreatedAt is the schema descriptor for created_at field.
+	finepaymentDescCreatedAt := finepaymentMixinFields0[1].Descriptor()
+	// finepayment.DefaultCreatedAt holds the default value on creation for the created_at field.
+	finepayment.DefaultCreatedAt = finepaymentDescCreatedAt.Default.(func() time.Time)
+	// finepaymentDescUpdatedAt is the schema descriptor for updated_at field.
+	finepaymentDescUpdatedAt := finepaymentMixinFields0[2].Descriptor()
+	// finepayment.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	finepayment.DefaultUpdatedAt = finepaymentDescUpdatedAt.Default.(func() time.Time)
+	// finepayment.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	finepayment.UpdateDefaultUpdatedAt = finepaymentDescUpdatedAt.UpdateDefault.(func() time.Time)
+	// finepaymentDescAmount is the schema descriptor for amount field.
+	finepaymentDescAmount := finepaymentFields[2].Descriptor()
+	// finepayment.DefaultAmount holds the default value on creation for the amount field.
+	finepayment.DefaultAmount = finepaymentDescAmount.Default.(decimal.Decimal)
+	// finepaymentDescPaidAt is the schema descriptor for paid_at field.
+	finepaymentDescPaidAt := finepaymentFields[7].Descriptor()
+	// finepayment.DefaultPaidAt holds the default value on creation for the paid_at field.
+	finepayment.DefaultPaidAt = finepaymentDescPaidAt.Default.(func() time.Time)
+	// finepaymentDescID is the schema descriptor for id field.
+	finepaymentDescID := finepaymentMixinFields0[0].Descriptor()
+	// finepayment.DefaultID holds the default value on creation for the id field.
+	finepayment.DefaultID = finepaymentDescID.Default.(func() uuid.UUID)
 	holdMixin := schema.Hold{}.Mixin()
 	holdMixinFields0 := holdMixin[0].Fields()
 	_ = holdMixinFields0

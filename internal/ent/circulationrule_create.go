@@ -227,6 +227,20 @@ func (_c *CirculationRuleCreate) SetNillableCapFineAtReplacementPrice(v *bool) *
 	return _c
 }
 
+// SetLateFeeUsesRentalCharge sets the "late_fee_uses_rental_charge" field.
+func (_c *CirculationRuleCreate) SetLateFeeUsesRentalCharge(v bool) *CirculationRuleCreate {
+	_c.mutation.SetLateFeeUsesRentalCharge(v)
+	return _c
+}
+
+// SetNillableLateFeeUsesRentalCharge sets the "late_fee_uses_rental_charge" field if the given value is not nil.
+func (_c *CirculationRuleCreate) SetNillableLateFeeUsesRentalCharge(v *bool) *CirculationRuleCreate {
+	if v != nil {
+		_c.SetLateFeeUsesRentalCharge(*v)
+	}
+	return _c
+}
+
 // SetRentalCharge sets the "rental_charge" field.
 func (_c *CirculationRuleCreate) SetRentalCharge(v decimal.Decimal) *CirculationRuleCreate {
 	_c.mutation.SetRentalCharge(v)
@@ -390,6 +404,10 @@ func (_c *CirculationRuleCreate) defaults() {
 		v := circulationrule.DefaultCapFineAtReplacementPrice
 		_c.mutation.SetCapFineAtReplacementPrice(v)
 	}
+	if _, ok := _c.mutation.LateFeeUsesRentalCharge(); !ok {
+		v := circulationrule.DefaultLateFeeUsesRentalCharge
+		_c.mutation.SetLateFeeUsesRentalCharge(v)
+	}
 	if _, ok := _c.mutation.RentalCharge(); !ok {
 		v := circulationrule.DefaultRentalCharge
 		_c.mutation.SetRentalCharge(v)
@@ -454,6 +472,9 @@ func (_c *CirculationRuleCreate) check() error {
 	}
 	if _, ok := _c.mutation.CapFineAtReplacementPrice(); !ok {
 		return &ValidationError{Name: "cap_fine_at_replacement_price", err: errors.New(`ent: missing required field "CirculationRule.cap_fine_at_replacement_price"`)}
+	}
+	if _, ok := _c.mutation.LateFeeUsesRentalCharge(); !ok {
+		return &ValidationError{Name: "late_fee_uses_rental_charge", err: errors.New(`ent: missing required field "CirculationRule.late_fee_uses_rental_charge"`)}
 	}
 	if _, ok := _c.mutation.RentalCharge(); !ok {
 		return &ValidationError{Name: "rental_charge", err: errors.New(`ent: missing required field "CirculationRule.rental_charge"`)}
@@ -567,6 +588,10 @@ func (_c *CirculationRuleCreate) createSpec() (*CirculationRule, *sqlgraph.Creat
 	if value, ok := _c.mutation.CapFineAtReplacementPrice(); ok {
 		_spec.SetField(circulationrule.FieldCapFineAtReplacementPrice, field.TypeBool, value)
 		_node.CapFineAtReplacementPrice = value
+	}
+	if value, ok := _c.mutation.LateFeeUsesRentalCharge(); ok {
+		_spec.SetField(circulationrule.FieldLateFeeUsesRentalCharge, field.TypeBool, value)
+		_node.LateFeeUsesRentalCharge = value
 	}
 	if value, ok := _c.mutation.RentalCharge(); ok {
 		_spec.SetField(circulationrule.FieldRentalCharge, field.TypeOther, value)
@@ -847,6 +872,18 @@ func (u *CirculationRuleUpsert) SetCapFineAtReplacementPrice(v bool) *Circulatio
 // UpdateCapFineAtReplacementPrice sets the "cap_fine_at_replacement_price" field to the value that was provided on create.
 func (u *CirculationRuleUpsert) UpdateCapFineAtReplacementPrice() *CirculationRuleUpsert {
 	u.SetExcluded(circulationrule.FieldCapFineAtReplacementPrice)
+	return u
+}
+
+// SetLateFeeUsesRentalCharge sets the "late_fee_uses_rental_charge" field.
+func (u *CirculationRuleUpsert) SetLateFeeUsesRentalCharge(v bool) *CirculationRuleUpsert {
+	u.Set(circulationrule.FieldLateFeeUsesRentalCharge, v)
+	return u
+}
+
+// UpdateLateFeeUsesRentalCharge sets the "late_fee_uses_rental_charge" field to the value that was provided on create.
+func (u *CirculationRuleUpsert) UpdateLateFeeUsesRentalCharge() *CirculationRuleUpsert {
+	u.SetExcluded(circulationrule.FieldLateFeeUsesRentalCharge)
 	return u
 }
 
@@ -1209,6 +1246,20 @@ func (u *CirculationRuleUpsertOne) SetCapFineAtReplacementPrice(v bool) *Circula
 func (u *CirculationRuleUpsertOne) UpdateCapFineAtReplacementPrice() *CirculationRuleUpsertOne {
 	return u.Update(func(s *CirculationRuleUpsert) {
 		s.UpdateCapFineAtReplacementPrice()
+	})
+}
+
+// SetLateFeeUsesRentalCharge sets the "late_fee_uses_rental_charge" field.
+func (u *CirculationRuleUpsertOne) SetLateFeeUsesRentalCharge(v bool) *CirculationRuleUpsertOne {
+	return u.Update(func(s *CirculationRuleUpsert) {
+		s.SetLateFeeUsesRentalCharge(v)
+	})
+}
+
+// UpdateLateFeeUsesRentalCharge sets the "late_fee_uses_rental_charge" field to the value that was provided on create.
+func (u *CirculationRuleUpsertOne) UpdateLateFeeUsesRentalCharge() *CirculationRuleUpsertOne {
+	return u.Update(func(s *CirculationRuleUpsert) {
+		s.UpdateLateFeeUsesRentalCharge()
 	})
 }
 
@@ -1749,6 +1800,20 @@ func (u *CirculationRuleUpsertBulk) SetCapFineAtReplacementPrice(v bool) *Circul
 func (u *CirculationRuleUpsertBulk) UpdateCapFineAtReplacementPrice() *CirculationRuleUpsertBulk {
 	return u.Update(func(s *CirculationRuleUpsert) {
 		s.UpdateCapFineAtReplacementPrice()
+	})
+}
+
+// SetLateFeeUsesRentalCharge sets the "late_fee_uses_rental_charge" field.
+func (u *CirculationRuleUpsertBulk) SetLateFeeUsesRentalCharge(v bool) *CirculationRuleUpsertBulk {
+	return u.Update(func(s *CirculationRuleUpsert) {
+		s.SetLateFeeUsesRentalCharge(v)
+	})
+}
+
+// UpdateLateFeeUsesRentalCharge sets the "late_fee_uses_rental_charge" field to the value that was provided on create.
+func (u *CirculationRuleUpsertBulk) UpdateLateFeeUsesRentalCharge() *CirculationRuleUpsertBulk {
+	return u.Update(func(s *CirculationRuleUpsert) {
+		s.UpdateLateFeeUsesRentalCharge()
 	})
 }
 

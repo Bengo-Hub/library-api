@@ -7,6 +7,7 @@ package consumers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	eventslib "github.com/Bengo-Hub/shared-events"
@@ -18,9 +19,9 @@ import (
 	"github.com/bengobox/library-service/internal/ent/acquisitioninvoice"
 	"github.com/bengobox/library-service/internal/ent/ebookpurchase"
 	"github.com/bengobox/library-service/internal/ent/fine"
-	"github.com/bengobox/library-service/internal/ent/member"
+	"github.com/bengobox/library-service/internal/ent/finepayment"
 	"github.com/bengobox/library-service/internal/ent/membershipfee"
-	"github.com/bengobox/library-service/internal/events"
+	"github.com/bengobox/library-service/internal/modules/fines"
 )
 
 // PaymentConsumer reconciles treasury payment events.
@@ -184,21 +185,32 @@ func (c *PaymentConsumer) reconcileFine(ctx context.Context, intentID, reference
 	if err != nil {
 		return nil // not ours / not found — ignore
 	}
-	if f.Status == fine.StatusPAID {
+	if f.Status == fine.StatusPAID || f.Status == fine.StatusWAIVED {
 		return nil // idempotent
 	}
-	if _, err := c.db.Fine.UpdateOneID(f.ID).
-		SetStatus(fine.StatusPAID).SetAmountPaid(f.Amount).SetPaidAt(time.Now()).Save(ctx); err != nil {
+	// The treasury settlement pays whatever is still outstanding. The intent id keys the
+	// ledger row, so a redelivered event cannot record the payment twice.
+	tx, err := c.db.Tx(ctx)
+	if err != nil {
 		return err // transient — Nak + retry
 	}
-	payload := map[string]any{
-		"fine_id": f.ID, "intent_id": intentID, "amount": f.Amount.String(),
+	key := "treasury:" + intentID
+	if intentID == "" {
+		key = "treasury-fine:" + f.ID.String()
 	}
-	if mem, merr := c.db.Member.Query().Where(member.IDEQ(f.MemberID)).Only(ctx); merr == nil {
-		payload["email"] = mem.ContactEmail
-		payload["name"] = mem.DisplayName
+	if _, err := fines.ApplyPayment(ctx, tx, f.TenantID, f.ID, fines.PaymentInput{
+		Method: finepayment.MethodTREASURY, Reference: intentID, IdempotencyKey: key,
+		Note: "Settled through treasury",
+	}); err != nil {
+		_ = tx.Rollback()
+		if errors.Is(err, fines.ErrSettled) {
+			return nil // settled by the desk while the online payment was in flight
+		}
+		return err // transient — Nak + retry
 	}
-	_ = events.Publish(ctx, c.db.OutboxEvent, f.TenantID, f.ID.String(), events.EventFinePaid, payload)
+	if err := tx.Commit(); err != nil {
+		return err
+	}
 	c.log.Info("fine reconciled to PAID", zap.String("fine", f.ID.String()))
 	return nil
 }

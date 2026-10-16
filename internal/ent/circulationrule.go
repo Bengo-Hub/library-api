@@ -49,6 +49,8 @@ type CirculationRule struct {
 	MaxFineCap decimal.Decimal `json:"max_fine_cap,omitempty"`
 	// CapFineAtReplacementPrice holds the value of the "cap_fine_at_replacement_price" field.
 	CapFineAtReplacementPrice bool `json:"cap_fine_at_replacement_price,omitempty"`
+	// When true each overdue day is charged at rental_charge instead of fine_per_day
+	LateFeeUsesRentalCharge bool `json:"late_fee_uses_rental_charge,omitempty"`
 	// RentalCharge holds the value of the "rental_charge" field.
 	RentalCharge decimal.Decimal `json:"rental_charge,omitempty"`
 	// ReplacementCost holds the value of the "replacement_cost" field.
@@ -71,7 +73,7 @@ func (*CirculationRule) scanValues(columns []string) ([]any, error) {
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		case circulationrule.FieldFinePerDay, circulationrule.FieldMaxFineCap, circulationrule.FieldRentalCharge, circulationrule.FieldReplacementCost, circulationrule.FieldProcessingFee:
 			values[i] = new(decimal.Decimal)
-		case circulationrule.FieldIsHourly, circulationrule.FieldHoldable, circulationrule.FieldCapFineAtReplacementPrice:
+		case circulationrule.FieldIsHourly, circulationrule.FieldHoldable, circulationrule.FieldCapFineAtReplacementPrice, circulationrule.FieldLateFeeUsesRentalCharge:
 			values[i] = new(sql.NullBool)
 		case circulationrule.FieldLoanPeriodDays, circulationrule.FieldLoanPeriodHours, circulationrule.FieldMaxRenewals, circulationrule.FieldGraceDays:
 			values[i] = new(sql.NullInt64)
@@ -195,6 +197,12 @@ func (_m *CirculationRule) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.CapFineAtReplacementPrice = value.Bool
 			}
+		case circulationrule.FieldLateFeeUsesRentalCharge:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field late_fee_uses_rental_charge", values[i])
+			} else if value.Valid {
+				_m.LateFeeUsesRentalCharge = value.Bool
+			}
 		case circulationrule.FieldRentalCharge:
 			if value, ok := values[i].(*decimal.Decimal); !ok {
 				return fmt.Errorf("unexpected type %T for field rental_charge", values[i])
@@ -311,6 +319,9 @@ func (_m *CirculationRule) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("cap_fine_at_replacement_price=")
 	builder.WriteString(fmt.Sprintf("%v", _m.CapFineAtReplacementPrice))
+	builder.WriteString(", ")
+	builder.WriteString("late_fee_uses_rental_charge=")
+	builder.WriteString(fmt.Sprintf("%v", _m.LateFeeUsesRentalCharge))
 	builder.WriteString(", ")
 	builder.WriteString("rental_charge=")
 	builder.WriteString(fmt.Sprintf("%v", _m.RentalCharge))

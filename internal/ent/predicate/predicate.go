@@ -60,6 +60,9 @@ type EbookPurchase func(*sql.Selector)
 // Fine is the predicate function for fine builders.
 type Fine func(*sql.Selector)
 
+// FinePayment is the predicate function for finepayment builders.
+type FinePayment func(*sql.Selector)
+
 // Hold is the predicate function for hold builders.
 type Hold func(*sql.Selector)
 

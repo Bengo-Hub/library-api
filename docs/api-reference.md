@@ -93,10 +93,13 @@ All routes pass through `RequireAuth` → JIT heal → mutations-only subscripti
 
 | Method | Path | Purpose | Key fields |
 |--------|------|---------|------------|
-| POST | `/circulation/checkout` | Check out a copy to a member (scan-driven) | `member_id`*, `copy_id` **or** `copy_barcode`, `in_house` → `201` `ent.Loan` |
+| GET | `/circulation/checkout-quote` | Preview the borrowing fee, late fee per day, grace days and due date for a member and copy. Read only, changes nothing | `?member_id=`*, `?copy_id=` **or** `?copy_barcode=`, `?in_house=true` → `{ borrowing_fee, late_fee_per_day, grace_days, max_fine_cap, due_date }` |
+| POST | `/circulation/checkout` | Check out a copy to a member (scan-driven). Raises the borrowing fee when the matching rule charges one | `member_id`*, `copy_id` **or** `copy_barcode`, `in_house`, `client_reference`, `payment` → `201` `{ loan, fee? }` |
 | POST | `/circulation/return` | Check a copy back in | `copy_id` **or** `copy_barcode` → `{ loan, fine?, promoted_hold? }` |
 | POST | `/circulation/renew/{loan_id}` | Renew an active loan | → updated `ent.Loan` |
 | GET | `/circulation/loans` | List loans | `?status=`, `?member_id=`, `?overdue=true`, paging → `listEnvelope` |
+
+**Borrowing fee at checkout.** The fee comes from the matching circulation rule (`rental_charge`, per book). It is created in the same transaction as the loan, so a failure cancels the checkout. To mark it paid while checking out, send `payment: { "collected": true, "method": "cash|mpesa|card|bank|other", "reference": "..." }`. Without `payment` the fee stays UNPAID on the member's account. `fee` in the response carries `{ fine_id, amount, amount_paid, status, paid }`. In-house reading never charges a fee. A repeated `client_reference` returns the original loan and fee and records no second payment.
 
 **Circulation error codes (409/404):** `member_not_active`, `member_blocked`, `loan_limit`, `copy_unavailable`, `no_active_loan`, `renew_limit`, `renew_held`.
 
@@ -119,8 +122,24 @@ All routes pass through `RequireAuth` → JIT heal → mutations-only subscripti
 | GET | `/fines` | List fines | `?status=`, `?member_id=` → `listEnvelope` |
 | POST | `/fines/{id}/waive` | Waive a fine (sensitive — audited; sets `waived_by`) | → updated `ent.Fine` |
 | POST | `/fines/{id}/pay` | Create a treasury payment intent for the outstanding amount | → `{ intent_id, initiate_url, amount }` |
+| POST | `/fines/{id}/record-payment` | Record money taken at the desk (cash, M-Pesa, card, bank). Needs no treasury. Omit `amount` to settle the whole balance, send less for a part payment | `amount`, `method`, `reference`, `note`, `client_reference` → the updated fine |
+| GET | `/fines/{id}/payments` | Payments recorded against a fine, oldest first | → `[{ id, amount, method, reference, note, received_by, paid_at }]` |
 
-> The pay endpoint creates a treasury intent (`reference_type=library_fine`), stores `treasury_intent_id`, and publishes `library.fine.assessed`. The actual flip to PAID happens asynchronously when the `treasury.payment.succeeded` consumer fires.
+Waiving a fine that is already PAID or WAIVED returns `409 already_settled`. Recording a payment returns `409 already_settled` for a settled fine, `409 overpayment` for more than the balance and `400 invalid_amount` for zero or negative amounts. `client_reference` makes a retry safe: the same key returns the first result.
+
+> The pay endpoint creates a treasury intent (`reference_type=library_fine`), stores `treasury_intent_id`, and publishes `library.fine.assessed`. The actual flip to PAID happens asynchronously when the `treasury.payment.succeeded` consumer fires. Payments recorded at the desk never touch treasury and are the route for libraries that do not use it.
+
+## Circulation rules (`/admin/circulation-rules`)
+
+A rule sets the loan period, renewals and money terms for a branch, patron tier and item format. `null` for a dimension means all. The most specific match wins (branch outranks tier, tier outranks format). With no matching rule the member tier's own loan period, renewal cap and daily fine rate apply. Two rules cannot share the same branch, tier and format (`409 rule_exists`), and amounts must be numbers of zero or more.
+
+| Field | Meaning |
+|-------|---------|
+| `rental_charge` | Borrowing fee charged per book at checkout. For example 20 for an adult tier and 10 for a junior tier |
+| `fine_per_day` | Late fee for each day a book is returned late |
+| `late_fee_uses_rental_charge` | When true, each late day is charged at the borrowing fee and `fine_per_day` is ignored |
+| `grace_days`, `max_fine_cap`, `cap_fine_at_replacement_price` | Grace period and caps applied to the late fee |
+| `loan_period_days`, `is_hourly`, `loan_period_hours`, `due_date_mode` | Loan length. The due date honours branch opening hours and holidays through the calendar module |
 
 ---
 

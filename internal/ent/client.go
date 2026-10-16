@@ -33,6 +33,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/ebookloan"
 	"github.com/bengobox/library-service/internal/ent/ebookpurchase"
 	"github.com/bengobox/library-service/internal/ent/fine"
+	"github.com/bengobox/library-service/internal/ent/finepayment"
 	"github.com/bengobox/library-service/internal/ent/hold"
 	"github.com/bengobox/library-service/internal/ent/libraryholiday"
 	"github.com/bengobox/library-service/internal/ent/libraryrole"
@@ -99,6 +100,8 @@ type Client struct {
 	EbookPurchase *EbookPurchaseClient
 	// Fine is the client for interacting with the Fine builders.
 	Fine *FineClient
+	// FinePayment is the client for interacting with the FinePayment builders.
+	FinePayment *FinePaymentClient
 	// Hold is the client for interacting with the Hold builders.
 	Hold *HoldClient
 	// LibraryHoliday is the client for interacting with the LibraryHoliday builders.
@@ -174,6 +177,7 @@ func (c *Client) init() {
 	c.EbookLoan = NewEbookLoanClient(c.config)
 	c.EbookPurchase = NewEbookPurchaseClient(c.config)
 	c.Fine = NewFineClient(c.config)
+	c.FinePayment = NewFinePaymentClient(c.config)
 	c.Hold = NewHoldClient(c.config)
 	c.LibraryHoliday = NewLibraryHolidayClient(c.config)
 	c.LibraryRole = NewLibraryRoleClient(c.config)
@@ -307,6 +311,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		EbookLoan:              NewEbookLoanClient(cfg),
 		EbookPurchase:          NewEbookPurchaseClient(cfg),
 		Fine:                   NewFineClient(cfg),
+		FinePayment:            NewFinePaymentClient(cfg),
 		Hold:                   NewHoldClient(cfg),
 		LibraryHoliday:         NewLibraryHolidayClient(cfg),
 		LibraryRole:            NewLibraryRoleClient(cfg),
@@ -367,6 +372,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		EbookLoan:              NewEbookLoanClient(cfg),
 		EbookPurchase:          NewEbookPurchaseClient(cfg),
 		Fine:                   NewFineClient(cfg),
+		FinePayment:            NewFinePaymentClient(cfg),
 		Hold:                   NewHoldClient(cfg),
 		LibraryHoliday:         NewLibraryHolidayClient(cfg),
 		LibraryRole:            NewLibraryRoleClient(cfg),
@@ -422,12 +428,12 @@ func (c *Client) Use(hooks ...Hook) {
 		c.AcquisitionBudget, c.AcquisitionFund, c.AcquisitionInvoice, c.AuditLog,
 		c.Author, c.AuthorizedValue, c.BibRecord, c.BookCopy, c.Branch, c.CatalogTerm,
 		c.CirculationRule, c.Collection, c.CopyTransfer, c.DocumentSequence, c.Ebook,
-		c.EbookLoan, c.EbookPurchase, c.Fine, c.Hold, c.LibraryHoliday, c.LibraryRole,
-		c.LibraryUser, c.Loan, c.LoanPolicy, c.Member, c.MemberNotificationPref,
-		c.MemberTier, c.MembershipFee, c.OutboxEvent, c.Publisher, c.PurchaseOrder,
-		c.PurchaseOrderLine, c.RecallRequest, c.SerialIssue, c.SerialRoutingList,
-		c.SerialSubscription, c.ServiceConfig, c.StockCount, c.Subject, c.Tenant,
-		c.Vendor,
+		c.EbookLoan, c.EbookPurchase, c.Fine, c.FinePayment, c.Hold, c.LibraryHoliday,
+		c.LibraryRole, c.LibraryUser, c.Loan, c.LoanPolicy, c.Member,
+		c.MemberNotificationPref, c.MemberTier, c.MembershipFee, c.OutboxEvent,
+		c.Publisher, c.PurchaseOrder, c.PurchaseOrderLine, c.RecallRequest,
+		c.SerialIssue, c.SerialRoutingList, c.SerialSubscription, c.ServiceConfig,
+		c.StockCount, c.Subject, c.Tenant, c.Vendor,
 	} {
 		n.Use(hooks...)
 	}
@@ -440,12 +446,12 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.AcquisitionBudget, c.AcquisitionFund, c.AcquisitionInvoice, c.AuditLog,
 		c.Author, c.AuthorizedValue, c.BibRecord, c.BookCopy, c.Branch, c.CatalogTerm,
 		c.CirculationRule, c.Collection, c.CopyTransfer, c.DocumentSequence, c.Ebook,
-		c.EbookLoan, c.EbookPurchase, c.Fine, c.Hold, c.LibraryHoliday, c.LibraryRole,
-		c.LibraryUser, c.Loan, c.LoanPolicy, c.Member, c.MemberNotificationPref,
-		c.MemberTier, c.MembershipFee, c.OutboxEvent, c.Publisher, c.PurchaseOrder,
-		c.PurchaseOrderLine, c.RecallRequest, c.SerialIssue, c.SerialRoutingList,
-		c.SerialSubscription, c.ServiceConfig, c.StockCount, c.Subject, c.Tenant,
-		c.Vendor,
+		c.EbookLoan, c.EbookPurchase, c.Fine, c.FinePayment, c.Hold, c.LibraryHoliday,
+		c.LibraryRole, c.LibraryUser, c.Loan, c.LoanPolicy, c.Member,
+		c.MemberNotificationPref, c.MemberTier, c.MembershipFee, c.OutboxEvent,
+		c.Publisher, c.PurchaseOrder, c.PurchaseOrderLine, c.RecallRequest,
+		c.SerialIssue, c.SerialRoutingList, c.SerialSubscription, c.ServiceConfig,
+		c.StockCount, c.Subject, c.Tenant, c.Vendor,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -490,6 +496,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.EbookPurchase.mutate(ctx, m)
 	case *FineMutation:
 		return c.Fine.mutate(ctx, m)
+	case *FinePaymentMutation:
+		return c.FinePayment.mutate(ctx, m)
 	case *HoldMutation:
 		return c.Hold.mutate(ctx, m)
 	case *LibraryHolidayMutation:
@@ -2932,6 +2940,139 @@ func (c *FineClient) mutate(ctx context.Context, m *FineMutation) (Value, error)
 		return (&FineDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Fine mutation op: %q", m.Op())
+	}
+}
+
+// FinePaymentClient is a client for the FinePayment schema.
+type FinePaymentClient struct {
+	config
+}
+
+// NewFinePaymentClient returns a client for the FinePayment from the given config.
+func NewFinePaymentClient(c config) *FinePaymentClient {
+	return &FinePaymentClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `finepayment.Hooks(f(g(h())))`.
+func (c *FinePaymentClient) Use(hooks ...Hook) {
+	c.hooks.FinePayment = append(c.hooks.FinePayment, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `finepayment.Intercept(f(g(h())))`.
+func (c *FinePaymentClient) Intercept(interceptors ...Interceptor) {
+	c.inters.FinePayment = append(c.inters.FinePayment, interceptors...)
+}
+
+// Create returns a builder for creating a FinePayment entity.
+func (c *FinePaymentClient) Create() *FinePaymentCreate {
+	mutation := newFinePaymentMutation(c.config, OpCreate)
+	return &FinePaymentCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of FinePayment entities.
+func (c *FinePaymentClient) CreateBulk(builders ...*FinePaymentCreate) *FinePaymentCreateBulk {
+	return &FinePaymentCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *FinePaymentClient) MapCreateBulk(slice any, setFunc func(*FinePaymentCreate, int)) *FinePaymentCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &FinePaymentCreateBulk{err: fmt.Errorf("calling to FinePaymentClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*FinePaymentCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &FinePaymentCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for FinePayment.
+func (c *FinePaymentClient) Update() *FinePaymentUpdate {
+	mutation := newFinePaymentMutation(c.config, OpUpdate)
+	return &FinePaymentUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *FinePaymentClient) UpdateOne(_m *FinePayment) *FinePaymentUpdateOne {
+	mutation := newFinePaymentMutation(c.config, OpUpdateOne, withFinePayment(_m))
+	return &FinePaymentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *FinePaymentClient) UpdateOneID(id uuid.UUID) *FinePaymentUpdateOne {
+	mutation := newFinePaymentMutation(c.config, OpUpdateOne, withFinePaymentID(id))
+	return &FinePaymentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for FinePayment.
+func (c *FinePaymentClient) Delete() *FinePaymentDelete {
+	mutation := newFinePaymentMutation(c.config, OpDelete)
+	return &FinePaymentDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *FinePaymentClient) DeleteOne(_m *FinePayment) *FinePaymentDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *FinePaymentClient) DeleteOneID(id uuid.UUID) *FinePaymentDeleteOne {
+	builder := c.Delete().Where(finepayment.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &FinePaymentDeleteOne{builder}
+}
+
+// Query returns a query builder for FinePayment.
+func (c *FinePaymentClient) Query() *FinePaymentQuery {
+	return &FinePaymentQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeFinePayment},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a FinePayment entity by its id.
+func (c *FinePaymentClient) Get(ctx context.Context, id uuid.UUID) (*FinePayment, error) {
+	return c.Query().Where(finepayment.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *FinePaymentClient) GetX(ctx context.Context, id uuid.UUID) *FinePayment {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *FinePaymentClient) Hooks() []Hook {
+	return c.hooks.FinePayment
+}
+
+// Interceptors returns the client interceptors.
+func (c *FinePaymentClient) Interceptors() []Interceptor {
+	return c.inters.FinePayment
+}
+
+func (c *FinePaymentClient) mutate(ctx context.Context, m *FinePaymentMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&FinePaymentCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&FinePaymentUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&FinePaymentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&FinePaymentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown FinePayment mutation op: %q", m.Op())
 	}
 }
 
@@ -6000,20 +6141,20 @@ type (
 		AcquisitionBudget, AcquisitionFund, AcquisitionInvoice, AuditLog, Author,
 		AuthorizedValue, BibRecord, BookCopy, Branch, CatalogTerm, CirculationRule,
 		Collection, CopyTransfer, DocumentSequence, Ebook, EbookLoan, EbookPurchase,
-		Fine, Hold, LibraryHoliday, LibraryRole, LibraryUser, Loan, LoanPolicy, Member,
-		MemberNotificationPref, MemberTier, MembershipFee, OutboxEvent, Publisher,
-		PurchaseOrder, PurchaseOrderLine, RecallRequest, SerialIssue,
-		SerialRoutingList, SerialSubscription, ServiceConfig, StockCount, Subject,
-		Tenant, Vendor []ent.Hook
+		Fine, FinePayment, Hold, LibraryHoliday, LibraryRole, LibraryUser, Loan,
+		LoanPolicy, Member, MemberNotificationPref, MemberTier, MembershipFee,
+		OutboxEvent, Publisher, PurchaseOrder, PurchaseOrderLine, RecallRequest,
+		SerialIssue, SerialRoutingList, SerialSubscription, ServiceConfig, StockCount,
+		Subject, Tenant, Vendor []ent.Hook
 	}
 	inters struct {
 		AcquisitionBudget, AcquisitionFund, AcquisitionInvoice, AuditLog, Author,
 		AuthorizedValue, BibRecord, BookCopy, Branch, CatalogTerm, CirculationRule,
 		Collection, CopyTransfer, DocumentSequence, Ebook, EbookLoan, EbookPurchase,
-		Fine, Hold, LibraryHoliday, LibraryRole, LibraryUser, Loan, LoanPolicy, Member,
-		MemberNotificationPref, MemberTier, MembershipFee, OutboxEvent, Publisher,
-		PurchaseOrder, PurchaseOrderLine, RecallRequest, SerialIssue,
-		SerialRoutingList, SerialSubscription, ServiceConfig, StockCount, Subject,
-		Tenant, Vendor []ent.Interceptor
+		Fine, FinePayment, Hold, LibraryHoliday, LibraryRole, LibraryUser, Loan,
+		LoanPolicy, Member, MemberNotificationPref, MemberTier, MembershipFee,
+		OutboxEvent, Publisher, PurchaseOrder, PurchaseOrderLine, RecallRequest,
+		SerialIssue, SerialRoutingList, SerialSubscription, ServiceConfig, StockCount,
+		Subject, Tenant, Vendor []ent.Interceptor
 	}
 )

@@ -202,7 +202,7 @@ func New(ctx context.Context) (*App, error) {
 
 	// Domain services + handlers.
 	calendarCalc := calendar.NewCalculator(ormClient, redisClient, log)
-	circulationSvc := circulation.NewService(ormClient, redisClient, log)
+	circulationSvc := circulation.NewService(ormClient, calendarCalc, log)
 	membershipSvc := membership.NewService(ormClient, log)
 	secretStore := secrets.NewStore(ormClient, log)
 	deps := router.Deps{

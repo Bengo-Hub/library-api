@@ -39,5 +39,7 @@ func (Fine) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("tenant_id", "member_id", "status"),
 		index.Fields("tenant_id", "treasury_intent_id"),
+		index.Fields("tenant_id", "loan_id"),
+		index.Fields("tenant_id", "status", "assessed_at"),
 	}
 }

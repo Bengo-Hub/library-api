@@ -36,8 +36,19 @@ The core staff workflow. All state transitions run inside Ent transactions and p
 ### Overdue scheduler (`internal/modules/circulation/scheduler.go`)
 - [x] `StartOverdueScheduler` (hourly) flips past-due ACTIVE take-home loans → OVERDUE + emits `library.loan.overdue`; idempotent (only non-OVERDUE touched) → safe on every replica; batch limit 500.
 
+### Borrowing fee at checkout (October 2026)
+- [x] The matching circulation rule's `rental_charge` is raised as a `RENTAL` fine in the checkout transaction. In-house reading is free.
+- [x] The librarian marks it paid during checkout (`payment.collected`, method, reference), or leaves it on the member's account.
+- [x] `GET /circulation/checkout-quote` previews the fee, late rate and due date.
+- [x] Rule field `late_fee_uses_rental_charge` charges each late day at the borrowing fee, so one number drives both. Example: adult tier 20, junior tier 10.
+- [x] One rule resolver (`rule_resolver.go`): a single query ranks branch, tier and format matches, and a tier baseline applies when no rule matches. Renewals use the same rule as checkout.
+- [x] Due dates use the calendar module (closed days, holidays, hourly rules).
+- [x] Loan limit, dashboard, member list, copy list and the member delete guard count `OVERDUE` loans as still out. The overdue sweep works in transactional batches.
+- [x] The copy row is locked during checkout, so a double click or two desks cannot lend the same copy or charge the fee twice.
+
 ### Tests
 - [x] `circulation/service_test.go` — checkout/return/renew + hold-promotion coverage.
+- [x] `circulation/borrowing_fee_test.go` — fee quote, fee paid at checkout, replay safety, part payments, late fee at the borrowing fee, loan limit with overdue loans, rule resolution.
 
 ---
 

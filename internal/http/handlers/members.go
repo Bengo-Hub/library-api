@@ -19,6 +19,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/member"
 	"github.com/bengobox/library-service/internal/ent/membertier"
 	"github.com/bengobox/library-service/internal/events"
+	"github.com/bengobox/library-service/internal/modules/fines"
 	"github.com/bengobox/library-service/internal/modules/refdata"
 	"github.com/bengobox/library-service/internal/modules/sequence"
 	"github.com/bengobox/library-service/internal/platform/marketflow"
@@ -68,8 +69,8 @@ func (req memberRequest) name() string {
 	}
 	return strings.TrimSpace(strings.TrimSpace(req.FirstName) + " " + strings.TrimSpace(req.LastName))
 }
-func (req memberRequest) email() string { return firstNonEmpty(req.Email, req.ContactEmail) }
-func (req memberRequest) phone() string { return firstNonEmpty(req.Phone, req.ContactPhone) }
+func (req memberRequest) email() string   { return firstNonEmpty(req.Email, req.ContactEmail) }
+func (req memberRequest) phone() string   { return firstNonEmpty(req.Phone, req.ContactPhone) }
 func (req memberRequest) ssoUser() string { return firstNonEmpty(req.SSOUserID, req.UserID) }
 func (req memberRequest) crm() string     { return firstNonEmpty(req.CRMCustomer, req.CRMContactID) }
 func (req memberRequest) branch() string  { return firstNonEmpty(req.BranchID, req.HomeBranchID) }
@@ -95,7 +96,7 @@ type memberResponse struct {
 	JoinedAt         *string `json:"joined_at,omitempty"`
 	ExpiresAt        *string `json:"expires_at,omitempty"`
 	ActiveLoans      int     `json:"active_loans"`
-	OutstandingFines int     `json:"outstanding_fines"`
+	OutstandingFines float64 `json:"outstanding_fines"` // money owed: fines and unpaid fees, net of part payments
 	CreatedAt        string  `json:"created_at,omitempty"`
 }
 
@@ -111,13 +112,13 @@ func splitName(full string) (first, last string) {
 	return parts[0], parts[1]
 }
 
-func (h *MemberHandler) toMemberResponse(r *http.Request, m *ent.Member, tierName string, loans, fines int) memberResponse {
+func (h *MemberHandler) toMemberResponse(r *http.Request, m *ent.Member, tierName string, loans int, owed float64) memberResponse {
 	first, last := splitName(m.DisplayName)
 	resp := memberResponse{
 		ID: m.ID.String(), MembershipNo: m.MembershipNo, FirstName: first, LastName: last,
 		FullName: m.DisplayName, Email: m.ContactEmail, Phone: m.ContactPhone,
 		TierID: m.TierID.String(), TierName: tierName, Status: strings.ToLower(string(m.Status)),
-		Address: m.Address, Notes: m.Notes, ActiveLoans: loans, OutstandingFines: fines,
+		Address: m.Address, Notes: m.Notes, ActiveLoans: loans, OutstandingFines: owed,
 		CreatedAt: m.CreatedAt.Format("2006-01-02T15:04:05Z07:00"),
 	}
 	if m.UserID != nil {
@@ -149,11 +150,29 @@ func (h *MemberHandler) buildMemberResponses(r *http.Request, tenantID uuid.UUID
 	for _, t := range tiers {
 		tierNames[t.ID] = t.Name
 	}
+	// Two grouped queries for the whole page instead of two counts per member.
+	ids := make([]uuid.UUID, 0, len(rows))
+	for _, m := range rows {
+		ids = append(ids, m.ID)
+	}
+	loansBy := map[uuid.UUID]int{}
+	if len(ids) > 0 {
+		var counts []struct {
+			MemberID uuid.UUID `json:"member_id"`
+			Count    int       `json:"count"`
+		}
+		if err := h.db.Loan.Query().
+			Where(loan.TenantID(tenantID), loan.MemberIDIn(ids...), loan.StatusIn(loan.StatusACTIVE, loan.StatusOVERDUE)).
+			GroupBy(loan.FieldMemberID).Aggregate(ent.Count()).Scan(ctx, &counts); err == nil {
+			for _, c := range counts {
+				loansBy[c.MemberID] = c.Count
+			}
+		}
+	}
+	owed, _ := fines.OutstandingByMember(ctx, h.db, tenantID, ids)
 	out := make([]memberResponse, 0, len(rows))
 	for _, m := range rows {
-		loans, _ := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.MemberID(m.ID), loan.StatusEQ(loan.StatusACTIVE)).Count(ctx)
-		fines, _ := h.db.Fine.Query().Where(fine.TenantID(tenantID), fine.MemberID(m.ID), fine.StatusEQ(fine.StatusUNPAID)).Count(ctx)
-		out = append(out, h.toMemberResponse(r, m, tierNames[m.TierID], loans, fines))
+		out = append(out, h.toMemberResponse(r, m, tierNames[m.TierID], loansBy[m.ID], owed[m.ID].InexactFloat64()))
 	}
 	return out
 }
@@ -364,7 +383,7 @@ func (h *MemberHandler) DeleteMember(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusNotFound, "not found", "not_found")
 		return
 	}
-	if n, _ := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.MemberID(id), loan.StatusEQ(loan.StatusACTIVE)).Count(ctx); n > 0 {
+	if n, _ := h.db.Loan.Query().Where(loan.TenantID(tenantID), loan.MemberID(id), loan.StatusIn(loan.StatusACTIVE, loan.StatusOVERDUE)).Count(ctx); n > 0 {
 		respondError(w, http.StatusConflict, "member has active loans — return them first", "has_active_loans")
 		return
 	}

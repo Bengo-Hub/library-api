@@ -123,10 +123,14 @@ On renew:     due_at += loan_period_days (blocked by max_renewals or a WAITING h
 | Table | Key Columns | Description |
 |-------|-------------|-------------|
 | `fines` | `id`, `tenant_id`, `member_id`, `loan_id?`, `reason` (enum), `description`, `amount` (money), `amount_paid` (money), `status` (enum), `treasury_intent_id`, `waived_by`, `assessed_at?`, `paid_at?` | Charge against a member. Settled via a treasury payment intent; `treasury.payment.succeeded` flips status → PAID (idempotent on intent id). Indexes: `(tenant_id, member_id, status)`, `(tenant_id, treasury_intent_id)`. |
+| `fine_payments` | `id`, `tenant_id`, `fine_id`, `member_id`, `amount` (money), `method` (enum), `reference?`, `note?`, `received_by?`, `paid_at`, `idempotency_key?` | The payment ledger. One row per payment received against a fine or fee, so part payments, the method and who took the money are all recorded. `fines.amount_paid` is the sum of these rows. Indexes: `(tenant_id, fine_id)`, `(tenant_id, paid_at)`, unique `(tenant_id, idempotency_key)` (NULLs allowed). |
+| `circulation_rules` | `id`, `tenant_id`, `branch_id?`, `tier_id?`, `item_format?`, `loan_period_days`, `is_hourly`, `loan_period_hours`, `max_renewals`, `holdable`, `fine_per_day`, `late_fee_uses_rental_charge`, `grace_days`, `max_fine_cap`, `cap_fine_at_replacement_price`, `rental_charge`, `replacement_cost`, `processing_fee`, `due_date_mode`, `label?` | Branch, tier and format matrix of loan and money terms. `rental_charge` is the borrowing fee per book charged at checkout. When `late_fee_uses_rental_charge` is true each late day costs the same amount. |
 | `membership_fees` | `id`, `tenant_id`, `member_id`, `period_start`, `period_end`, `amount` (money), `status` (enum), `treasury_intent_id`, `paid_at?` | Periodic membership charge (e.g. annual), settled via treasury intent. |
 
-- **`fines.reason`**: `OVERDUE`, `LOST`, `DAMAGE`, `MEMBERSHIP`, `OTHER`.
+- **`fines.reason`**: `OVERDUE`, `LOST`, `DAMAGE`, `MEMBERSHIP`, `RENTAL` (the borrowing fee), `REPLACEMENT`, `OTHER`.
 - **`fines.status`**: `UNPAID`, `PARTIAL`, `PAID`, `WAIVED`.
+- **`fine_payments.method`**: `CASH`, `MPESA`, `CARD`, `BANK`, `TREASURY`, `OTHER`. `TREASURY` rows are written by the payment consumer.
+- Indexes on `fines` also include `(tenant_id, loan_id)` for finding a loan's borrowing fee and `(tenant_id, status, assessed_at)` for ageing reports.
 - **`membership_fees.status`**: `PENDING`, `PAID`, `WAIVED`, `CANCELLED`.
 
 ---
