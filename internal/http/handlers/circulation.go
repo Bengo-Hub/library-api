@@ -9,6 +9,7 @@ import (
 	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/shopspring/decimal"
 	"go.uber.org/zap"
 
 	"github.com/bengobox/library-service/internal/ent"
@@ -183,8 +184,8 @@ func (h *CirculationHandler) Checkout(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "copy_id or copy_barcode is required", "invalid_request")
 		return
 	}
-	opts := circulation.CheckoutOptions{InHouse: req.InHouse, StaffID: UserIDFrom(r), ClientRef: req.ClientReference}
-	if req.Payment != nil && req.Payment.Collected {
+	opts := circulation.CheckoutOptions{InHouse: req.InHouse, StaffID: UserIDFrom(r), ClientRef: req.ClientReference, SkipFee: !FeesEnabled(r)}
+	if req.Payment != nil && req.Payment.Collected && !opts.SkipFee {
 		method, ok := fines.ParseMethod(req.Payment.Method)
 		if !ok {
 			respondError(w, http.StatusBadRequest, "unknown payment method", "invalid_request")
@@ -242,6 +243,9 @@ func (h *CirculationHandler) CheckoutQuote(w http.ResponseWriter, r *http.Reques
 		}
 		h.writeCircErr(w, err)
 		return
+	}
+	if !FeesEnabled(r) {
+		quote.BorrowingFee = decimal.Zero // no fines feature on the plan: no fee is raised
 	}
 	respondJSON(w, http.StatusOK, checkoutQuoteResponse{
 		BorrowingFee: quote.BorrowingFee.InexactFloat64(), LateFeePerDay: quote.LateFeePerDay.InexactFloat64(),
@@ -446,6 +450,8 @@ func (h *CirculationHandler) writeCircErr(w http.ResponseWriter, err error) {
 		respondError(w, http.StatusNotFound, err.Error(), "no_active_loan")
 	case errors.Is(err, circulation.ErrLoanNotLostable):
 		respondError(w, http.StatusConflict, err.Error(), "loan_not_lostable")
+	case errors.Is(err, circulation.ErrRenewOverdue):
+		respondError(w, http.StatusConflict, err.Error(), "renew_overdue")
 	case errors.Is(err, circulation.ErrRenewRecalled):
 		respondError(w, http.StatusConflict, err.Error(), "renew_recalled")
 	case errors.Is(err, circulation.ErrNoWaitingHolder):

@@ -212,6 +212,14 @@ func (h *FineHandler) Waive(w http.ResponseWriter, r *http.Request) {
 	respondJSON(w, http.StatusOK, row)
 }
 
+// Options godoc
+// @Summary What the Fines page may offer (treasury online payment is opt-in)
+// @Tags Fines
+// @Router /{tenant}/library/fines/options [get]
+func (h *FineHandler) Options(w http.ResponseWriter, r *http.Request) {
+	respondJSON(w, http.StatusOK, map[string]any{"treasury_enabled": h.treasury != nil})
+}
+
 type recordPaymentRequest struct {
 	// Amount may be left out to settle the whole balance; a smaller amount records a part payment.
 	Amount          json.Number `json:"amount"`
@@ -365,7 +373,7 @@ func (h *FineHandler) Pay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if h.treasury == nil {
-		respondError(w, http.StatusServiceUnavailable, "payments unavailable", "treasury_unwired")
+		respondError(w, http.StatusServiceUnavailable, "online payment is not enabled, record the payment at the desk instead", "treasury_unwired")
 		return
 	}
 	outstanding := f.Amount.Sub(f.AmountPaid)

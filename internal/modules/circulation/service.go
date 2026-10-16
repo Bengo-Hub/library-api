@@ -51,6 +51,8 @@ type CheckoutOptions struct {
 	// the original loan instead of creating a second one.
 	ClientRef string
 	Payment   *FeePayment
+	// SkipFee lends without raising a borrowing fee (tenants whose plan has no fines feature).
+	SkipFee bool
 }
 
 // CheckoutOutcome is the loan plus the borrowing fee it generated (nil when the rule
@@ -103,6 +105,7 @@ var (
 	ErrCopyUnavailable = errors.New("copy is not available for checkout")
 	ErrNoActiveLoan    = errors.New("no active loan for that copy")
 	ErrLoanNotLostable = errors.New("loan is not in a lostable state")
+	ErrRenewOverdue    = errors.New("cannot renew an overdue loan, return it first")
 	ErrRenewLimit      = errors.New("renewal limit reached")
 	ErrRenewHeld       = errors.New("cannot renew — another member is waiting")
 	ErrRenewRecalled   = errors.New("cannot renew — this item has been recalled")
@@ -250,7 +253,7 @@ func (s *Service) Checkout(ctx context.Context, tenantID, memberID, copyID uuid.
 	// Borrowing fee: charged per book when the rule sets one. It is part of the checkout
 	// transaction, so a failure here cancels the loan rather than lending the book for free.
 	var feeRow *ent.Fine
-	if !inHouse && rule.BorrowingFee().IsPositive() {
+	if !inHouse && !opts.SkipFee && rule.BorrowingFee().IsPositive() {
 		feeRow, err = tx.Fine.Create().
 			SetTenantID(tenantID).SetMemberID(memberID).SetLoanID(l.ID).
 			SetReason(fine.ReasonRENTAL).SetAmount(rule.BorrowingFee()).
@@ -453,6 +456,11 @@ func (s *Service) Renew(ctx context.Context, tenantID, loanID uuid.UUID) (*ent.L
 	cc, err := s.loadCheckoutContext(ctx, tenantID, l.MemberID, l.CopyID)
 	if err != nil {
 		return nil, err
+	}
+	// A loan past its due date must be returned first, whether or not the hourly sweep has
+	// marked it OVERDUE yet.
+	if l.DueAt.Before(time.Now()) {
+		return nil, ErrRenewOverdue
 	}
 	if l.RenewalsCount >= cc.rule.MaxRenewals {
 		return nil, ErrRenewLimit

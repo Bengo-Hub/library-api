@@ -251,7 +251,7 @@ func (h *PatronPortalHandler) MyPayFine(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if h.treasury == nil {
-		respondError(w, http.StatusServiceUnavailable, "payments unavailable", "treasury_unwired")
+		respondError(w, http.StatusServiceUnavailable, "online payment is not enabled for this library", "treasury_unwired")
 		return
 	}
 	outstanding := f.Amount.Sub(f.AmountPaid)

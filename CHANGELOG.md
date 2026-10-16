@@ -13,6 +13,8 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 - Migration `20261016071236_add_fee_payments_and_late_fee_flag`: `circulation_rules.late_fee_uses_rental_charge`, the `fine_payments` table and two `fines` indexes.
 
 ### Changed
+- Treasury integration is opt-in through `TREASURY_ENABLED` (default off): no client, intents, reconcile consumer or acquisition invoices unless it is set. `GET /fines/options` reports the state so the UI hides "Pay online".
+- Borrowing fees are only raised for tenants whose plan includes `library_fines`. Renewing a loan past its due date is refused (`renew_overdue`) whether or not the sweep has marked it yet.
 - One rule resolver for checkout, renew, return and lost items; a tier baseline applies when no rule matches (previously a fixed 14 days). Renewals now follow the rule instead of the tier. The Redis rule cache and its `KEYS` scan are gone.
 - Rule saves reject malformed or negative amounts and a second rule on the same branch, tier and format.
 - `outstanding_fines` on members is now the money owed (it was a count that the UI formatted as money).

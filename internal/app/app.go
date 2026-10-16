@@ -192,7 +192,12 @@ func New(ctx context.Context) (*App, error) {
 	}()
 
 	// S2S clients.
-	treasuryClient := treasury.NewClient(cfg.Services.TreasuryURL, cfg.Auth.APIKey, 0)
+	// Treasury is opt-in (TREASURY_ENABLED). A nil client makes every handler answer
+	// "treasury_unwired" and skip treasury calls, so desk payments are the only route.
+	var treasuryClient *treasury.Client
+	if cfg.Services.TreasuryEnabled {
+		treasuryClient = treasury.NewClient(cfg.Services.TreasuryURL, cfg.Auth.APIKey, 0)
+	}
 	marketflowClient := marketflow.NewClient(cfg.Services.MarketflowURL, cfg.Auth.APIKey, log)
 	subsClient := subscriptions.NewClient(subscriptions.Config{
 		ServiceURL:     cfg.Subscriptions.ServiceURL,
@@ -278,7 +283,7 @@ func New(ctx context.Context) (*App, error) {
 		membership:              membershipSvc,
 		patronCategoryScheduler: membership.NewPatronCategoryScheduler(ormClient, log),
 		serialIssueScheduler:    handlers.NewSerialIssueScheduler(ormClient, log),
-		paymentConsumer:         consumers.NewPaymentConsumer(ormClient, log),
+		paymentConsumer:         newPaymentConsumer(cfg.Services.TreasuryEnabled, ormClient, log),
 		authConsumer:            authConsumer,
 	}, nil
 }
@@ -362,4 +367,12 @@ func (a *App) Close() {
 		_ = a.orm.Close()
 	}
 	_ = a.log.Sync()
+}
+
+// newPaymentConsumer returns the treasury reconcile consumer only when treasury is enabled.
+func newPaymentConsumer(enabled bool, db *ent.Client, log *zap.Logger) *consumers.PaymentConsumer {
+	if !enabled {
+		return nil
+	}
+	return consumers.NewPaymentConsumer(db, log)
 }

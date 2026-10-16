@@ -78,3 +78,14 @@ func paginateSlice[T any](items []T, p sharedpagination.Params) (page []T, total
 	}
 	return items[start:end], total
 }
+
+// FeesEnabled reports whether the tenant's plan includes library_fines. Borrowing fees are
+// part of that feature, so a tenant without it never has a fee raised at checkout. Requests
+// without claims (service calls) are not gated, like the feature middleware.
+func FeesEnabled(r *http.Request) bool {
+	claims, ok := ClaimsFrom(r)
+	if !ok || claims == nil {
+		return true
+	}
+	return claims.FeatureEnabled("library_fines")
+}

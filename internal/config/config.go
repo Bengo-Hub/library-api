@@ -109,6 +109,10 @@ type ServicesConfig struct {
 	// TreasuryURL is the treasury-api base — fines, e-book sales and membership fees
 	// are charged via treasury payment intents (S2S).
 	TreasuryURL string `envconfig:"TREASURY_SERVICE_URL" default:"https://booksapi.codevertexafrica.com"`
+	// TreasuryEnabled switches the treasury integration on. It is off unless set explicitly:
+	// without it there are no payment intents, no treasury reconcile consumer, and fees and
+	// fines are settled at the desk only.
+	TreasuryEnabled bool `envconfig:"TREASURY_ENABLED" default:"false"`
 	// NotificationsURL is the notifications-api base — REST fallback when an outbox
 	// event path is not used.
 	NotificationsURL string `envconfig:"NOTIFICATIONS_SERVICE_URL" default:"https://notificationsapi.codevertexafrica.com"`

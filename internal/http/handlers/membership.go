@@ -93,7 +93,7 @@ func (h *MembershipHandler) Pay(w http.ResponseWriter, r *http.Request) {
 
 func (h *MembershipHandler) startPayment(w http.ResponseWriter, r *http.Request, fee *ent.MembershipFee) {
 	if h.treasury == nil {
-		respondError(w, http.StatusServiceUnavailable, "payments unavailable", "treasury_unwired")
+		respondError(w, http.StatusServiceUnavailable, "online payment is not enabled for this library", "treasury_unwired")
 		return
 	}
 	// treasury's S2S endpoint keys the path on the tenant UUID (not slug).
