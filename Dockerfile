@@ -22,7 +22,6 @@ COPY --from=builder /out/library-migrate /usr/local/bin/library-migrate
 COPY --from=builder /out/library-seed /usr/local/bin/library-seed
 COPY --from=builder /out/library-prune-users /usr/local/bin/library-prune-users
 COPY internal/ent/migrate/migrations ./internal/ent/migrate/migrations
-COPY media/ ./media/
 COPY scripts/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 RUN mkdir -p ./config/certs

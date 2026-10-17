@@ -19,7 +19,6 @@ type Config struct {
 	Events        EventsConfig
 	Telemetry     TelemetryConfig
 	Auth          AuthConfig
-	Media         MediaConfig
 	Services      ServicesConfig
 	Backup        BackupConfig
 	Subscriptions SubscriptionsConfig
@@ -40,14 +39,6 @@ type BackupConfig struct {
 	ScheduleEnabled bool   `envconfig:"BACKUP_SCHEDULE_ENABLED" default:"true"`
 	ScheduleHour    int    `envconfig:"BACKUP_SCHEDULE_HOUR" default:"2"`
 	RetentionDays   int    `envconfig:"BACKUP_RETENTION_DAYS" default:"4"`
-}
-
-// MediaConfig points at the per-tenant media root (cover images) and the e-book
-// file store. Both live on a PVC; URLs are stored relative and resolved at read.
-type MediaConfig struct {
-	Root      string `envconfig:"MEDIA_ROOT" default:"./media"`
-	URLBase   string `envconfig:"MEDIA_URL_BASE" default:""`
-	EbookRoot string `envconfig:"EBOOK_ROOT" default:"./media/ebooks"`
 }
 
 type AppConfig struct {

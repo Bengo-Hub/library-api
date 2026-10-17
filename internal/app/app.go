@@ -19,6 +19,7 @@ import (
 	"go.uber.org/zap"
 
 	sharedcache "github.com/Bengo-Hub/cache"
+	"github.com/Bengo-Hub/httpware/objectstore"
 	authclient "github.com/Bengo-Hub/shared-auth-client"
 	eventslib "github.com/Bengo-Hub/shared-events"
 
@@ -210,18 +211,26 @@ func New(ctx context.Context) (*App, error) {
 	circulationSvc := circulation.NewService(ormClient, calendarCalc, log)
 	membershipSvc := membership.NewService(ormClient, log)
 	secretStore := secrets.NewStore(ormClient, log)
+	// Covers (public) and e-book files (private, streamed through the API after the loan check)
+	// on the shared object storage (httpware/objectstore). Local development keeps them under
+	// MEDIA_ROOT.
+	handlers.RegisterMediaTypes()
+	mediaStore, err := objectstore.New("library", objectstore.FromEnv())
+	if err != nil {
+		return nil, fmt.Errorf("object storage: %w", err)
+	}
 	deps := router.Deps{
 		Limiter:          ratelimit.NewLimiter(redisClient, log, "library"),
 		Log:              log,
 		Health:           healthHandler,
 		Auth:             handlers.NewAuthHandler(rbacService, log),
-		Catalog:          handlers.NewCatalogHandler(ormClient, secretStore, cfg.Media.Root, cacheAside, log),
+		Catalog:          handlers.NewCatalogHandler(ormClient, secretStore, mediaStore, cacheAside, log),
 		Branch:           handlers.NewBranchHandler(ormClient, log),
 		Member:           handlers.NewMemberHandler(ormClient, marketflowClient, log),
 		Circulation:      handlers.NewCirculationHandler(ormClient, circulationSvc, log),
 		Hold:             handlers.NewHoldHandler(ormClient, log),
 		Fine:             handlers.NewFineHandler(ormClient, treasuryClient, log),
-		Ebook:            handlers.NewEbookHandler(ormClient, treasuryClient, cfg.Media.EbookRoot, log),
+		Ebook:            handlers.NewEbookHandler(ormClient, treasuryClient, mediaStore, log),
 		Reports:          handlers.NewReportsHandler(ormClient, cacheAside, log),
 		RBACHandler:      handlers.NewRBACHandler(rbacService, log),
 		Membership:       handlers.NewMembershipHandler(ormClient, membershipSvc, treasuryClient, log),
@@ -236,7 +245,7 @@ func New(ctx context.Context) (*App, error) {
 		PatronPortal:     handlers.NewPatronPortalHandler(ormClient, circulationSvc, treasuryClient, log),
 		RBAC:             rbacService,
 		AllowedOrigins:   cfg.HTTP.AllowedOrigins,
-		MediaRoot:        cfg.Media.Root,
+		MediaFiles:       mediaStore.MediaHandler(),
 	}
 
 	// auth-service JWT validator (JWKS) + optional S2S API key.

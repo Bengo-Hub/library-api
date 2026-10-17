@@ -55,7 +55,7 @@ Default port is `4010` (`HTTP_PORT`). Production: `https://libraryapi.codevertex
 
 ## Environment
 
-Configuration is via env vars (see `internal/config/config.go`). Common keys: `POSTGRES_URL`, `REDIS_ADDR`, `EVENTS_NATS_URL`, `NATS_STREAM=library`, `AUTH_JWKS_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `INTERNAL_SERVICE_KEY`, `TREASURY_SERVICE_URL`, `NOTIFICATIONS_SERVICE_URL`, `SUBSCRIPTIONS_SERVICE_URL`, `MEDIA_ROOT`, `EBOOK_ROOT`, `HTTP_ALLOWED_ORIGINS`.
+Configuration is via env vars (see `internal/config/config.go`). Common keys: `POSTGRES_URL`, `REDIS_ADDR`, `EVENTS_NATS_URL`, `NATS_STREAM=library`, `AUTH_JWKS_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `INTERNAL_SERVICE_KEY`, `TREASURY_SERVICE_URL`, `NOTIFICATIONS_SERVICE_URL`, `SUBSCRIPTIONS_SERVICE_URL`, `HTTP_ALLOWED_ORIGINS`. Covers and e-book files use the shared object storage (`OBJECT_STORAGE_*`, see httpware/objectstore); set `MEDIA_ROOT` to keep them on disk in local development.
 
 > **Never commit secrets.** Use K8s secrets / env at runtime and placeholders (`<REPLACE_ME>`, `${{ secrets.NAME }}`) in any tracked file.
 

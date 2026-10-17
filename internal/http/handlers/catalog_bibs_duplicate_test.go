@@ -32,7 +32,7 @@ func testCatalogHandler(t *testing.T) (*CatalogHandler, *ent.Client) {
 	}
 	client := ent.NewClient(ent.Driver(entsql.OpenDB(dialect.Postgres, sqlDB)))
 	t.Cleanup(func() { client.Close(); sqlDB.Close() })
-	return NewCatalogHandler(client, nil, "", nil, zap.NewNop()), client
+	return NewCatalogHandler(client, nil, nil, nil, zap.NewNop()), client
 }
 
 // TestFindDuplicateBibs exercises the exact bug reported: the catalog silently allowed the same

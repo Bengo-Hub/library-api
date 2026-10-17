@@ -1,32 +1,20 @@
 package handlers
 
 import (
-	"fmt"
-	"io"
-	"mime"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 
-	"github.com/disintegration/imaging"
+	"github.com/Bengo-Hub/httpware/objectstore"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/bengobox/library-service/internal/ent/bibrecord"
 )
 
-// maxCoverBytes caps an uploaded cover image (8 MB).
-const maxCoverBytes = 8 << 20
-
-// coverThumbWidth is the max width (px) of the generated grid/list thumbnail; height scales
-// proportionally. Catalog grid cards previously served the full-resolution original (up to 8 MB)
-// for every thumbnail, which is the main driver of slow catalog page loads.
-const coverThumbWidth = 320
-
 // UploadCover godoc
 // @Summary Upload a bib cover image (front or back) to the media store
-// @Description multipart/form-data field "file"; query ?side=front|back (default front)
+// @Description multipart/form-data field "file" (JPEG, PNG, WebP or GIF, up to 8 MB); query ?side=front|back (default front)
 // @Tags Catalog
 // @Accept multipart/form-data
 // @Produce json
@@ -34,7 +22,7 @@ const coverThumbWidth = 320
 // @Param side query string false "front|back"
 // @Router /{tenant}/library/catalog/bibs/{id}/cover [post]
 func (h *CatalogHandler) UploadCover(w http.ResponseWriter, r *http.Request) {
-	if h.mediaRoot == "" {
+	if !h.media.Enabled() {
 		respondError(w, http.StatusServiceUnavailable, "media storage not configured", "media_disabled")
 		return
 	}
@@ -59,124 +47,63 @@ func (h *CatalogHandler) UploadCover(w http.ResponseWriter, r *http.Request) {
 		side = "front"
 	}
 
-	if err := r.ParseMultipartForm(maxCoverBytes); err != nil {
-		respondError(w, http.StatusBadRequest, "invalid upload", "invalid_request")
-		return
-	}
-	file, header, err := r.FormFile("file")
+	// Size limit and type checked from the bytes; JPEG and PNG re-encoded (EXIF removed).
+	up, err := objectstore.ReadUpload(w, r, "file", objectstore.TypeCovers)
 	if err != nil {
-		respondError(w, http.StatusBadRequest, "file is required", "invalid_request")
+		if objectstore.IsUploadError(err) {
+			respondError(w, http.StatusBadRequest, err.Error(), "invalid_request")
+			return
+		}
+		respondError(w, http.StatusInternalServerError, "could not read the upload", "store_failed")
 		return
 	}
-	defer file.Close()
-
-	ext := coverExt(header.Filename, header.Header.Get("Content-Type"))
-	if ext == "" {
-		respondError(w, http.StatusBadRequest, "unsupported image type (use jpg/png/webp/gif)", "invalid_request")
-		return
-	}
-
-	dir := filepath.Join(h.mediaRoot, "covers", tenantID.String())
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		h.log.Error("mkdir cover dir failed", zap.Error(err))
-		respondError(w, http.StatusInternalServerError, "could not store image", "store_failed")
-		return
-	}
-	fname := fmt.Sprintf("%s_%s%s", bib.ID.String(), side, ext)
-	dst, err := os.Create(filepath.Join(dir, fname))
+	owner := objectstore.Owner{TenantID: tenantID.String()}
+	name := uuid.NewString()
+	key, err := h.media.Key(owner, objectstore.TypeCovers, bib.ID.String(), name+up.Ext)
 	if err != nil {
-		h.log.Error("create cover file failed", zap.Error(err))
 		respondError(w, http.StatusInternalServerError, "could not store image", "store_failed")
 		return
 	}
-	if _, err := io.Copy(dst, io.LimitReader(file, maxCoverBytes)); err != nil {
-		dst.Close()
-		respondError(w, http.StatusInternalServerError, "could not store image", "store_failed")
+	if err := h.media.Put(r.Context(), key, up.Data, up.ContentType); err != nil {
+		h.log.Error("store cover failed", zap.Error(err))
+		respondError(w, http.StatusBadGateway, "could not store image", "store_failed")
 		return
 	}
-	dst.Close()
 
 	// Best-effort thumbnail for grid/list views; the full-resolution original stays available for
-	// the cover preview modal / detail page. A failure here (e.g. unsupported source format for
-	// re-encoding) is not fatal to the upload — callers fall back to the original if no thumb URL.
-	thumbFname := fmt.Sprintf("%s_%s_thumb%s", bib.ID.String(), side, ext)
-	if err := writeCoverThumbnail(filepath.Join(dir, fname), filepath.Join(dir, thumbFname)); err != nil {
-		h.log.Warn("cover thumbnail generation failed", zap.Error(err), zap.String("bib_id", bib.ID.String()))
-		thumbFname = ""
-	}
-
-	// Absolute URL so the UI <img> (on the UI host) can load it from the API/media host directly.
-	base := fmt.Sprintf("%s/media/covers/%s", publicBaseURL(r), tenantID.String())
-	url := base + "/" + fname
+	// the cover preview modal and detail page. The UI falls back to the original without one.
 	thumbURL := ""
-	if thumbFname != "" {
-		thumbURL = base + "/" + thumbFname
+	if thumb, err := coverThumbnail(up.Data, up.Ext); err == nil {
+		if err := h.media.Put(r.Context(), thumbRef(key), thumb, up.ContentType); err == nil {
+			thumbURL = h.media.URL(thumbRef(key))
+		}
+	} else {
+		h.log.Debug("cover thumbnail skipped", zap.Error(err), zap.String("bib_id", bib.ID.String()))
 	}
 
+	url := h.media.URL(key)
+	old := bib.CoverImageURL
 	upd := h.db.BibRecord.UpdateOneID(bib.ID)
 	if side == "back" {
+		old = bib.CoverBackImageURL
 		upd.SetCoverBackImageURL(url)
 	} else {
 		upd.SetCoverImageURL(url)
 	}
 	if _, err := upd.Save(r.Context()); err != nil {
+		_ = h.media.Delete(r.Context(), key)
+		_ = h.media.Delete(r.Context(), thumbRef(key))
 		respondError(w, http.StatusInternalServerError, err.Error(), "update_failed")
 		return
 	}
+	// The replaced cover and its thumbnail are deleted (only this service's own files; an Open
+	// Library link is just replaced).
+	if h.media.Owned(old) {
+		for _, ref := range []string{old, thumbRef(h.media.Normalize(old))} {
+			if err := h.media.Delete(r.Context(), ref); err != nil {
+				h.log.Warn("replaced cover not deleted from storage", zap.String("ref", ref), zap.Error(err))
+			}
+		}
+	}
 	respondJSON(w, http.StatusOK, map[string]any{"cover_url": url, "cover_thumb_url": thumbURL, "side": side})
-}
-
-// writeCoverThumbnail decodes the just-saved original at srcPath and writes a proportionally
-// resized copy (coverThumbWidth px wide) to dstPath. Format is inferred from dstPath's extension;
-// webp sources fail here (imaging has no webp encoder) and the caller treats that as best-effort.
-func writeCoverThumbnail(srcPath, dstPath string) error {
-	src, err := imaging.Open(srcPath)
-	if err != nil {
-		return err
-	}
-	thumb := imaging.Resize(src, coverThumbWidth, 0, imaging.Lanczos)
-	return imaging.Save(thumb, dstPath)
-}
-
-// coverExt returns a safe image extension from the filename or content-type, "" if unsupported.
-func coverExt(filename, contentType string) string {
-	allowed := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true, ".gif": true}
-	if e := strings.ToLower(filepath.Ext(filename)); allowed[e] {
-		if e == ".jpeg" {
-			return ".jpg"
-		}
-		return e
-	}
-	switch contentType {
-	case "image/jpeg":
-		return ".jpg"
-	case "image/png":
-		return ".png"
-	case "image/webp":
-		return ".webp"
-	case "image/gif":
-		return ".gif"
-	}
-	if exts, _ := mime.ExtensionsByType(contentType); len(exts) > 0 && allowed[exts[0]] {
-		return exts[0]
-	}
-	return ""
-}
-
-// publicBaseURL builds the externally reachable scheme://host for media URLs, honoring the
-// ingress's X-Forwarded-Proto (TLS terminates at the ingress, so r.TLS is usually nil).
-func publicBaseURL(r *http.Request) string {
-	scheme := r.Header.Get("X-Forwarded-Proto")
-	if scheme == "" {
-		if r.TLS != nil {
-			scheme = "https"
-		} else {
-			scheme = "https" // production default behind the TLS ingress
-		}
-	}
-	host := r.Header.Get("X-Forwarded-Host")
-	if host == "" {
-		host = r.Host
-	}
-	return scheme + "://" + host
 }

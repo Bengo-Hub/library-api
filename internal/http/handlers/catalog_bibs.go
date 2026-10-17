@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	sharedcache "github.com/Bengo-Hub/cache"
+	"github.com/Bengo-Hub/httpware/objectstore"
 	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -26,17 +27,17 @@ import (
 
 // CatalogHandler serves bibliographic + copy endpoints.
 type CatalogHandler struct {
-	db        *ent.Client
-	secrets   *secrets.Store     // platform secret store; supplies the optional ISBNdb key for lookups
-	mediaRoot string             // on-disk media root (cover uploads); "" disables uploads
-	cache     *sharedcache.Aside // may be nil (Redis unconfigured) — callers fall back to a live fetch
-	log       *zap.Logger
+	db      *ent.Client
+	secrets *secrets.Store     // platform secret store; supplies the optional ISBNdb key for lookups
+	media   *objectstore.Store // shared object storage (cover uploads); unconfigured disables uploads
+	cache   *sharedcache.Aside // may be nil (Redis unconfigured) — callers fall back to a live fetch
+	log     *zap.Logger
 }
 
 // NewCatalogHandler builds the catalog handler. secretStore may be nil (ISBNdb enrichment off);
-// mediaRoot may be "" (cover upload disabled); cache may be nil (Redis unconfigured).
-func NewCatalogHandler(db *ent.Client, secretStore *secrets.Store, mediaRoot string, cache *sharedcache.Aside, log *zap.Logger) *CatalogHandler {
-	return &CatalogHandler{db: db, secrets: secretStore, mediaRoot: mediaRoot, cache: cache, log: log}
+// media may be unconfigured (cover upload disabled); cache may be nil (Redis unconfigured).
+func NewCatalogHandler(db *ent.Client, secretStore *secrets.Store, media *objectstore.Store, cache *sharedcache.Aside, log *zap.Logger) *CatalogHandler {
+	return &CatalogHandler{db: db, secrets: secretStore, media: media, cache: cache, log: log}
 }
 
 // bibRequest is the create/update payload for a bibliographic record.

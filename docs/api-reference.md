@@ -29,7 +29,7 @@ All routes pass through `RequireAuth` → JIT heal → mutations-only subscripti
 | GET | `/v1/docs`, `/v1/docs/*` | Swagger UI |
 | GET | `/api/v1/openapi.json` | OpenAPI spec |
 | GET | `/` | Redirects to `/v1/docs/` |
-| GET | `/media/*` | Static media file server (cover images, e-book files) when `MEDIA_ROOT` set |
+| GET | `/media/*` | Shared object storage handler: serves `MEDIA_ROOT` in local development and redirects public cover keys to their R2 link. E-book files are never served here |
 
 ---
 
@@ -148,12 +148,13 @@ A rule sets the loan period, renewals and money terms for a branch, patron tier 
 | Method | Path | Purpose | Key fields |
 |--------|------|---------|------------|
 | GET | `/ebooks` | List e-books | → `listEnvelope` |
-| POST | `/ebooks` | Register an e-book record (file uploaded to the media PVC) | `bib_record_id`*, `file_url`*, `format`, `lending_model`, `max_concurrent_loans`, `loan_duration_days` |
+| POST | `/ebooks/files` | Upload an e-book file to the private bucket (PDF, EPUB or MP3, up to 100 MB; type checked from the bytes) | multipart `file` → `{ file_url, format, size }` (`file_url` is the stored key) |
+| POST | `/ebooks` | Register an e-book record | `bib_record_id`*, `file_url`* (a key answered by `/ebooks/files` for this tenant), `format`, `lending_model`, `max_concurrent_loans`, `loan_duration_days` |
 | POST | `/ebooks/{id}/lend` | Borrow (Controlled Digital Lending — concurrency-limited) | `member_id`* → `{ loan_id, access_token, expires_at }`; `409 cdl_limit` when all copies lent |
-| GET | `/ebooks/{id}/read` | Open a token-gated reading session | `?token=` → `{ file_url, format, watermark, last_read_position, expires_at }` |
+| GET | `/ebooks/{id}/read` | Stream the file for an active loan (token-gated, Range supported so readers can seek) | `?token=` → file bytes; `X-Library-Watermark` and `X-Library-Format` headers |
 | POST | `/ebooks/loans/{id}/position` | Persist reading progress | `position` (JSON) → `{ saved: true }` |
 | POST | `/ebooks/{id}/purchase` | Buy an e-book outright — creates a treasury `ebook_sale` intent | `member_id` → `{ purchase_id, intent_id, initiate_url, amount }`; `409 not_purchasable` |
-| GET | `/ebooks/{id}/download` | Download a purchased e-book (requires a PAID purchase) | `?token=` → `{ file_url, format, download_count }`; `403 not_paid` |
+| GET | `/ebooks/{id}/download` | Download a purchased e-book (requires a PAID purchase) | `?token=` → file bytes as an attachment; `403 not_paid` |
 
 ---
 

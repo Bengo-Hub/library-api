@@ -3,11 +3,13 @@ package handlers
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"net/http"
-	"os"
-	"path/filepath"
+	"path"
+	"strings"
 	"time"
 
+	"github.com/Bengo-Hub/httpware/objectstore"
 	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -24,15 +26,61 @@ import (
 // EbookHandler serves the digital shelf, controlled-digital-lending, and (Phase 2)
 // one-time purchase + secured download endpoints.
 type EbookHandler struct {
-	db        *ent.Client
-	treasury  *treasury.Client
-	ebookRoot string
-	log       *zap.Logger
+	db       *ent.Client
+	treasury *treasury.Client
+	media    *objectstore.Store // e-book files (private keys, streamed to readers)
+	log      *zap.Logger
 }
 
 // NewEbookHandler builds the ebook handler.
-func NewEbookHandler(db *ent.Client, treasuryClient *treasury.Client, ebookRoot string, log *zap.Logger) *EbookHandler {
-	return &EbookHandler{db: db, treasury: treasuryClient, ebookRoot: ebookRoot, log: log}
+func NewEbookHandler(db *ent.Client, treasuryClient *treasury.Client, media *objectstore.Store, log *zap.Logger) *EbookHandler {
+	return &EbookHandler{db: db, treasury: treasuryClient, media: media, log: log}
+}
+
+// UploadFile godoc
+// @Summary Upload an e-book file (PDF, EPUB or MP3, up to 100 MB) to the private media store
+// @Description multipart/form-data field "file". Answers the stored key; send it as file_url when creating the e-book.
+// @Tags Ebooks
+// @Accept multipart/form-data
+// @Produce json
+// @Router /{tenant}/library/ebooks/files [post]
+func (h *EbookHandler) UploadFile(w http.ResponseWriter, r *http.Request) {
+	tenantID, ok := TenantUUID(r)
+	if !ok {
+		respondError(w, http.StatusUnauthorized, "missing tenant", "unauthorized")
+		return
+	}
+	if !h.media.Enabled() {
+		respondError(w, http.StatusServiceUnavailable, "media storage not configured", "media_disabled")
+		return
+	}
+	up, err := objectstore.ReadUpload(w, r, "file", objectstore.TypeEbooks)
+	if err != nil {
+		if objectstore.IsUploadError(err) {
+			respondError(w, http.StatusBadRequest, err.Error(), "invalid_request")
+			return
+		}
+		respondError(w, http.StatusInternalServerError, "could not read the upload", "store_failed")
+		return
+	}
+	key, err := h.media.NewKey(objectstore.Owner{TenantID: tenantID.String()}, objectstore.TypeEbooks, up.Ext)
+	if err != nil {
+		respondError(w, http.StatusInternalServerError, "could not store the file", "store_failed")
+		return
+	}
+	if err := h.media.Put(r.Context(), key, up.Data, up.ContentType); err != nil {
+		h.log.Error("store ebook failed", zap.Error(err))
+		respondError(w, http.StatusBadGateway, "could not store the file", "store_failed")
+		return
+	}
+	format := ebook.FormatPDF
+	switch up.ContentType {
+	case "application/epub+zip":
+		format = ebook.FormatEPUB
+	case "audio/mpeg":
+		format = ebook.FormatAUDIO
+	}
+	respondJSON(w, http.StatusCreated, map[string]any{"file_url": key, "format": format, "size": len(up.Data)})
 }
 
 // List godoc
@@ -61,7 +109,7 @@ type ebookRequest struct {
 	LoanDurationDays   int    `json:"loan_duration_days"`
 }
 
-// Create registers an e-book record (file uploaded separately to the media PVC).
+// Create registers an e-book record. file_url is the key answered by POST /ebooks/files.
 // @Router /{tenant}/library/ebooks [post]
 func (h *EbookHandler) Create(w http.ResponseWriter, r *http.Request) {
 	tenantID, ok := TenantUUID(r)
@@ -79,7 +127,13 @@ func (h *EbookHandler) Create(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "bad bib_record_id", "invalid_request")
 		return
 	}
-	c := h.db.Ebook.Create().SetTenantID(tenantID).SetBibRecordID(bibID).SetFileURL(req.FileURL)
+	// Only a file this tenant uploaded to the library store is accepted.
+	fileKey := h.media.Normalize(req.FileURL)
+	if !h.media.Owned(fileKey) || !strings.HasPrefix(fileKey, "library/"+tenantID.String()+"/"+objectstore.TypeEbooks+"/") {
+		respondError(w, http.StatusBadRequest, "upload the file with POST /ebooks/files and send the key it answers", "invalid_request")
+		return
+	}
+	c := h.db.Ebook.Create().SetTenantID(tenantID).SetBibRecordID(bibID).SetFileURL(fileKey)
 	if req.Format != "" {
 		c.SetFormat(ebook.Format(req.Format))
 	}
@@ -240,13 +294,10 @@ func randomToken() string {
 	return hex.EncodeToString(b)
 }
 
-// streamEbookFile streams an e-book's bytes from EBOOK_ROOT with range support (so the
-// in-browser PDF/EPUB reader can seek). The relative file path is sanitized to prevent
-// directory traversal outside the e-book root.
+// streamEbookFile streams an e-book's bytes from the private media store with range support (so
+// the in-browser PDF/EPUB reader and the audio player can seek). Callers check the loan or
+// purchase first; the file itself is never public.
 func (h *EbookHandler) streamEbookFile(w http.ResponseWriter, r *http.Request, eb *ent.Ebook, attachment bool) {
-	rel := filepath.Clean("/" + eb.FileURL) // leading slash + Clean strips any ../ escape
-	full := filepath.Join(h.ebookRoot, rel)
-
 	ct := "application/pdf"
 	switch eb.Format {
 	case ebook.FormatEPUB:
@@ -254,23 +305,28 @@ func (h *EbookHandler) streamEbookFile(w http.ResponseWriter, r *http.Request, e
 	case ebook.FormatAUDIO:
 		ct = "audio/mpeg"
 	}
-	w.Header().Set("Content-Type", ct)
 	if attachment {
-		w.Header().Set("Content-Disposition", `attachment; filename="ebook-`+eb.ID.String()+`"`)
+		w.Header().Set("Content-Disposition", `attachment; filename="ebook-`+eb.ID.String()+path.Ext(eb.FileURL)+`"`)
 	}
-
-	f, err := os.Open(full)
-	if err != nil {
+	// Only this service's own keys are served, so a crafted file_url cannot reach another
+	// service's files or an arbitrary URL.
+	if !h.media.Owned(eb.FileURL) {
 		respondError(w, http.StatusNotFound, "file not available", "file_missing")
 		return
 	}
-	defer f.Close()
-	info, statErr := f.Stat()
-	if statErr != nil {
-		respondError(w, http.StatusInternalServerError, "stat failed", "file_error")
-		return
+	if err := h.media.Serve(w, r, eb.FileURL, ct); err != nil {
+		if errors.Is(err, objectstore.ErrNotFound) {
+			respondError(w, http.StatusNotFound, "file not available", "file_missing")
+			return
+		}
+		// Serve sets Accept-Ranges as it starts writing; without it nothing went out yet.
+		if w.Header().Get("Accept-Ranges") == "" {
+			h.log.Error("ebook stream failed", zap.Error(err), zap.String("ebook_id", eb.ID.String()))
+			respondError(w, http.StatusBadGateway, "file not available", "file_error")
+			return
+		}
+		h.log.Debug("ebook stream ended early", zap.Error(err), zap.String("ebook_id", eb.ID.String()))
 	}
-	http.ServeContent(w, r, filepath.Base(full), info.ModTime(), f)
 }
 
 // resolveMemberID returns the explicit member id when supplied, else resolves the member

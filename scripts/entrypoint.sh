@@ -36,10 +36,6 @@ echo "Running seed (idempotent)"
 echo "=========================================="
 POSTGRES_URL="$MIGRATE_URL" /usr/local/bin/library-seed || echo "Seed completed with warnings (non-fatal)"
 
-echo "Preparing media + e-book directories on the persistent volume..."
-mkdir -p "${MEDIA_ROOT:-/data/media}/images"
-mkdir -p "${EBOOK_ROOT:-/data/media/ebooks}"
-
 echo ""
 echo "=========================================="
 echo "Starting Library-API server"

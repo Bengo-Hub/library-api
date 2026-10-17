@@ -228,7 +228,7 @@ E-book lending (`ebooks.go`) takes a `ForUpdate()` row lock on the `ebook` row, 
 | Treasury | `TREASURY_SERVICE_URL` | `booksapi.codevertexafrica.com` |
 | Notifications | `NOTIFICATIONS_SERVICE_URL` | `notificationsapi.codevertexafrica.com` |
 | Subscriptions | `SUBSCRIPTIONS_SERVICE_URL` | `pricingapi.codevertexafrica.com` |
-| Media / E-books | `MEDIA_ROOT`, `MEDIA_URL_BASE`, `EBOOK_ROOT` | per-tenant PVC |
+| Media / E-books | `OBJECT_STORAGE_*` from the `object-storage` Secret (httpware/objectstore); `MEDIA_ROOT` only for local development | R2: covers public at `library/<tenant>/covers/<bib>/`, e-books private at `library/<tenant>/ebooks/` |
 | HTTP | `HTTP_HOST`, `HTTP_PORT`, `HTTP_ALLOWED_ORIGINS` | `0.0.0.0:4010` |
 | Backups | `BACKUP_DIR`, `BACKUP_SCHEDULE_ENABLED`, `BACKUP_RETENTION_DAYS` | PVC fallback |
 

@@ -45,7 +45,8 @@ type Deps struct {
 	AuthMiddleware   *authclient.AuthMiddleware
 	RBAC             *rbac.Service
 	AllowedOrigins   []string
-	MediaRoot        string
+	// MediaFiles is objectstore's /media handler (nil when there is nothing to serve).
+	MediaFiles http.Handler
 	// Limiter is the shared request limiter (nil disables limiting, e.g. in tests).
 	Limiter *ratelimit.Limiter
 }
@@ -91,12 +92,11 @@ func New(d Deps) http.Handler {
 	r.Get("/", func(w http.ResponseWriter, req *http.Request) {
 		http.Redirect(w, req, "/v1/docs/", http.StatusMovedPermanently)
 	})
-	if d.MediaRoot != "" {
-		// Covers are overwritten in place on re-upload under the same name, so nothing here is
-		// immutable: 1 day + stale-while-revalidate. No directory listings.
-		r.Handle("/media/*", http.StripPrefix("/media", httpware.StaticMedia(d.MediaRoot, httpware.MediaOptions{
-			Immutable: func(string) bool { return false },
-		})))
+	// Covers live on the public bucket; /media serves the local MEDIA_ROOT in development and
+	// redirects public keys to their R2 link. E-book files are only streamed by /ebooks/{id}/read
+	// and /download after the loan or purchase check.
+	if d.MediaFiles != nil {
+		r.Handle("/media/*", http.StripPrefix("/media", d.MediaFiles))
 	}
 
 	// Public PIN/terminal auth (no SSO) — desk/kiosk quick login.
@@ -314,6 +314,7 @@ func New(d Deps) http.Handler {
 			lib.Group(func(e chi.Router) {
 				e.Use(libmw.RequireFeature("library_ebooks"))
 				e.With(view("ebooks")).Get("/ebooks", d.Ebook.List)
+				e.With(act("ebooks", "add")).Post("/ebooks/files", d.Ebook.UploadFile)
 				e.With(act("ebooks", "add")).Post("/ebooks", d.Ebook.Create)
 				e.With(act("ebooks", "lend")).Post("/ebooks/{id}/lend", d.Ebook.Lend)
 				e.With(view("ebooks")).Get("/ebooks/{id}/read", d.Ebook.Read)

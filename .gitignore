@@ -10,9 +10,8 @@
 *.pem
 *.key
 
-# Local media / e-book uploads (runtime, PVC-backed in prod)
-/media/images/
-/media/ebooks/
+# Local media / e-book uploads (development only; production uses object storage)
+/media/
 /data/
 
 # Editor/OS

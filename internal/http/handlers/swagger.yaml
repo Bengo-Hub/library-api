@@ -39,7 +39,7 @@ definitions:
         description: CollectionID holds the value of the "collection_id" field.
         type: string
       cover_image_url:
-        description: Relative media path, resolved at read
+        description: Public cover link (media store or Open Library)
         type: string
       created_at:
         description: CreatedAt holds the value of the "created_at" field.
@@ -213,6 +213,27 @@ paths:
   /{tenant}/library/catalog/bibs/{id}/copies:
     get:
       responses: {}
+  /{tenant}/library/catalog/bibs/{id}/cover:
+    post:
+      consumes:
+      - multipart/form-data
+      description: multipart/form-data field "file" (JPEG, PNG, WebP or GIF, up to 8 MB); query ?side=front|back (default front)
+      parameters:
+      - description: Bib record id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: front|back
+        in: query
+        name: side
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      summary: Upload a bib cover image (front or back) to the media store
+      tags:
+      - Catalog
   /{tenant}/library/catalog/bibs/{id}/marc.json:
     get:
       responses: {}
@@ -377,6 +398,20 @@ paths:
       - Ebooks
     post:
       responses: {}
+      summary: Register an e-book; file_url is the key answered by POST /ebooks/files
+      tags:
+      - Ebooks
+  /{tenant}/library/ebooks/files:
+    post:
+      consumes:
+      - multipart/form-data
+      description: multipart/form-data field "file". Answers the stored key; send it as file_url when creating the e-book.
+      produces:
+      - application/json
+      responses: {}
+      summary: Upload an e-book file (PDF, EPUB or MP3, up to 100 MB) to the private media store
+      tags:
+      - Ebooks
   /{tenant}/library/ebooks/{id}/download:
     get:
       responses: {}
