@@ -47,6 +47,9 @@ type Deps struct {
 	AllowedOrigins   []string
 	// MediaFiles is objectstore's /media handler (nil when there is nothing to serve).
 	MediaFiles http.Handler
+	// TenantExport streams one tenant's rows for auth-api's SSO tenant backups; it checks
+	// INTERNAL_SERVICE_KEY itself (nil when no key is set).
+	TenantExport http.Handler
 	// Limiter is the shared request limiter (nil disables limiting, e.g. in tests).
 	Limiter *ratelimit.Limiter
 }
@@ -84,6 +87,9 @@ func New(d Deps) http.Handler {
 	r.Get("/healthz", d.Health.Liveness)
 	r.Get("/readyz", d.Health.Readiness)
 	r.Get("/metrics", d.Health.Metrics)
+	if d.TenantExport != nil {
+		r.Get("/api/v1/s2s/tenant-export", d.TenantExport.ServeHTTP)
+	}
 
 	// API docs (Swagger UI + OpenAPI spec). Base URL redirects to the docs page.
 	r.Get("/v1/docs", handlers.SwaggerUI)

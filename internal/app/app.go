@@ -20,6 +20,7 @@ import (
 
 	sharedcache "github.com/Bengo-Hub/cache"
 	"github.com/Bengo-Hub/httpware/objectstore"
+	"github.com/Bengo-Hub/httpware/tenantexport"
 	authclient "github.com/Bengo-Hub/shared-auth-client"
 	eventslib "github.com/Bengo-Hub/shared-events"
 
@@ -70,6 +71,15 @@ func terminalJWTSecret(cfg *config.Config) string {
 		return cfg.Auth.TerminalJWTSecret
 	}
 	return cfg.Auth.APIKey
+}
+
+// tenantExportHandler serves auth-api's SSO tenant backups (httpware/tenantexport). Nil without an
+// INTERNAL_SERVICE_KEY, so the export is never reachable unauthenticated.
+func tenantExportHandler(db *sql.DB, internalKey string) http.Handler {
+	if internalKey == "" {
+		return nil
+	}
+	return tenantexport.Handler(db, tenantexport.Options{Service: "library", InternalKey: internalKey})
 }
 
 func New(ctx context.Context) (*App, error) {
@@ -246,6 +256,7 @@ func New(ctx context.Context) (*App, error) {
 		RBAC:             rbacService,
 		AllowedOrigins:   cfg.HTTP.AllowedOrigins,
 		MediaFiles:       mediaStore.MediaHandler(),
+		TenantExport:     tenantExportHandler(sqlDB, cfg.Auth.APIKey),
 	}
 
 	// auth-service JWT validator (JWKS) + optional S2S API key.
