@@ -169,6 +169,10 @@ func (c *AuthEventsConsumer) handlePinSet(ctx context.Context, evt *sharedevents
 	if service != "" && service != "library" {
 		return nil // PIN provisioned for a different service (pos/inventory/…)
 	}
+	// A tenant outside the library plan gets no user row, even for a PIN event.
+	if c.ProductActive != nil && !c.ProductActive(ctx, evt.TenantID.String()) {
+		return nil
+	}
 
 	// Ensure the local user exists first (pin_set may arrive before user.created is processed).
 	if err := c.syncUser(ctx, evt); err != nil {

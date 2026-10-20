@@ -167,6 +167,9 @@ func New(ctx context.Context) (*App, error) {
 
 	// RBAC (seed global roles once).
 	rbacService := rbac.NewService(ormClient, log, cfg.Auth.ServiceURL)
+	// One plan check for JIT provisioning and the auth event consumer (shared EntitlementClient).
+	entitlements := authclient.NewEntitlementClient(cfg.Subscriptions.ServiceURL, cfg.Subscriptions.APIKey)
+	rbacService.SetEntitlement(entitlements)
 	if err := rbacService.SeedGlobalRoles(ctx); err != nil {
 		log.Warn("seed global roles failed", zap.Error(err))
 	}
@@ -287,7 +290,8 @@ func New(ctx context.Context) (*App, error) {
 
 	authConsumer := consumers.NewAuthEventsConsumer(log, rbacService, ormClient)
 	authConsumer.ProductActive = func(ctx context.Context, tenantID string) bool {
-		return subsClient.ConsumerHasActiveProduct(ctx, tenantID, "library")
+		return entitlements.UsesService(ctx, tenantID, "library") &&
+			subsClient.ConsumerHasActiveProduct(ctx, tenantID, "library")
 	}
 
 	return &App{

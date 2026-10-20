@@ -35,7 +35,12 @@ type Service struct {
 	log            *zap.Logger
 	authServiceURL string
 	httpClient     *http.Client
+	entitle        *authclient.EntitlementClient
 }
+
+// SetEntitlement attaches the plan check that stops JIT provisioning (tenant projection and user
+// rows) for a tenant whose plan does not include the library service. Nil leaves it off.
+func (s *Service) SetEntitlement(c *authclient.EntitlementClient) { s.entitle = c }
 
 // NewService creates the RBAC service. authServiceURL (auth-api's public base URL) is used
 // best-effort to backfill the local tenant projection's display name — never on the request's
@@ -146,6 +151,9 @@ func (s *Service) EnsureUserFromToken(ctx context.Context, claims *authclient.Cl
 	tenantID, err := uuid.Parse(claims.TenantID)
 	if err != nil {
 		return nil
+	}
+	if s.entitle.Require(ctx, claims.TenantID, "library") != nil {
+		return nil // not in the library plan: nothing is provisioned (the module gate answers 403)
 	}
 	// Cache the tenant slug→id mapping locally so the PUBLIC PIN-login routes (which have no
 	// JWT) can resolve the org slug. Best-effort, get-or-create by the auth tenant UUID.
