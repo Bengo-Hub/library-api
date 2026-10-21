@@ -7,7 +7,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
 	"go.uber.org/zap"
 
 	httpware "github.com/Bengo-Hub/httpware"
@@ -67,14 +66,7 @@ func New(d Deps) http.Handler {
 	// Timeout would cancel long-lived streams; skip it for WebSocket/SSE.
 	r.Use(httpware.BypassForStreaming(middleware.Timeout(30 * time.Second)))
 	r.Use(middleware.RequestSize(50 << 20)) // 50 MB (e-book uploads)
-	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   d.AllowedOrigins,
-		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "Origin", "X-Request-ID", "X-Tenant-ID", "X-Tenant-Slug", "X-API-Key", "Idempotency-Key", "X-Outlet-ID"},
-		ExposedHeaders:   []string{"Link", "Retry-After"},
-		AllowCredentials: true,
-		MaxAge:           300,
-	}))
+	r.Use(httpware.CORS(httpware.StandardCORS(d.AllowedOrigins)))
 	// Per-IP abuse limit (library had none). After CORS so 429s carry CORS headers; streams
 	// and health probes are exempt.
 	pinLimit := func(next http.Handler) http.Handler { return next }
