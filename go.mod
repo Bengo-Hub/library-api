@@ -15,7 +15,6 @@ require (
 	github.com/Bengo-Hub/shared-events v0.7.4
 	github.com/Bengo-Hub/shared-ratelimit v0.2.1
 	github.com/boombuler/barcode v1.1.0
-	github.com/disintegration/imaging v1.6.2
 	github.com/go-chi/chi/v5 v5.3.2
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -82,7 +81,6 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/arch v0.20.0 // indirect
-	golang.org/x/image v0.12.0 // indirect
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect

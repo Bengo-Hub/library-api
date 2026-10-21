@@ -70,17 +70,8 @@ func (h *CatalogHandler) UploadCover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Best-effort thumbnail for grid/list views; the full-resolution original stays available for
-	// the cover preview modal and detail page. The UI falls back to the original without one.
-	thumbURL := ""
-	if thumb, err := coverThumbnail(up.Data, up.Ext); err == nil {
-		if err := h.media.Put(r.Context(), thumbRef(key), thumb, up.ContentType); err == nil {
-			thumbURL = h.media.URL(thumbRef(key))
-		}
-	} else {
-		h.log.Debug("cover thumbnail skipped", zap.Error(err), zap.String("bib_id", bib.ID.String()))
-	}
-
+	// No thumbnail copy: grid and list views get resized covers from Cloudflare Image
+	// Transformations (shared-ui-lib MediaImage), so only the original is stored.
 	url := h.media.URL(key)
 	old := bib.CoverImageURL
 	upd := h.db.BibRecord.UpdateOneID(bib.ID)
@@ -92,18 +83,15 @@ func (h *CatalogHandler) UploadCover(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err := upd.Save(r.Context()); err != nil {
 		_ = h.media.Delete(r.Context(), key)
-		_ = h.media.Delete(r.Context(), thumbRef(key))
 		respondError(w, http.StatusInternalServerError, err.Error(), "update_failed")
 		return
 	}
-	// The replaced cover and its thumbnail are deleted (only this service's own files; an Open
-	// Library link is just replaced).
+	// The replaced cover is deleted (only this service's own files; an Open Library link is just
+	// replaced).
 	if h.media.Owned(old) {
-		for _, ref := range []string{old, thumbRef(h.media.Normalize(old))} {
-			if err := h.media.Delete(r.Context(), ref); err != nil {
-				h.log.Warn("replaced cover not deleted from storage", zap.String("ref", ref), zap.Error(err))
-			}
+		if err := h.media.Delete(r.Context(), old); err != nil {
+			h.log.Warn("replaced cover not deleted from storage", zap.String("ref", old), zap.Error(err))
 		}
 	}
-	respondJSON(w, http.StatusOK, map[string]any{"cover_url": url, "cover_thumb_url": thumbURL, "side": side})
+	respondJSON(w, http.StatusOK, map[string]any{"cover_url": url, "side": side})
 }
