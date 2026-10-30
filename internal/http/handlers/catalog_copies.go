@@ -1,10 +1,12 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	"entgo.io/ent/dialect/sql"
 	sharedpagination "github.com/Bengo-Hub/pagination"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -19,6 +21,39 @@ import (
 	"github.com/bengobox/library-service/internal/ent/loan"
 	"github.com/bengobox/library-service/internal/modules/sequence"
 )
+
+// copyOrder turns a list's ?sort= into an ORDER BY. "accession" (the default) and "-accession"
+// order copies by their accession / barcode number as a number, so 305-2026 comes before
+// 1278-2026 and ACC000099 before ACC000100: the first run of digits is the sort key, the full text
+// breaks ties, and a number with no digits sorts last. "acquired" / "-acquired" order by
+// acquisition date and "-created" by entry time (newest first).
+func copyOrder(sort string) []bookcopy.OrderOption {
+	desc := strings.HasPrefix(sort, "-")
+	field := strings.TrimPrefix(sort, "-")
+	dir := sql.OrderAsc()
+	if desc {
+		dir = sql.OrderDesc()
+	}
+	switch field {
+	case "acquired":
+		return []bookcopy.OrderOption{bookcopy.ByAcquisitionDate(dir), accessionOrder(desc)}
+	case "created":
+		return []bookcopy.OrderOption{bookcopy.ByCreatedAt(dir)}
+	default:
+		return []bookcopy.OrderOption{accessionOrder(desc)}
+	}
+}
+
+func accessionOrder(desc bool) bookcopy.OrderOption {
+	dir := "ASC"
+	if desc {
+		dir = "DESC"
+	}
+	return func(s *sql.Selector) {
+		col := s.C(bookcopy.FieldBarcode)
+		s.OrderExpr(sql.Expr(fmt.Sprintf("substring(%s from '[0-9]+')::numeric %s NULLS LAST, %s %s", col, dir, col, dir)))
+	}
+}
 
 // copyRequest is the create/update payload for a physical copy/holding. Field names mirror the
 // library-ui Copy type (note: `price` maps to the acquisition_cost column).
@@ -205,7 +240,7 @@ func (h *CatalogHandler) ListAllCopies(w http.ResponseWriter, r *http.Request) {
 
 	params := sharedpagination.Parse(r)
 	total, _ := q.Clone().Count(r.Context())
-	rows, err := q.Order(ent.Desc(bookcopy.FieldCreatedAt)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
+	rows, err := q.Order(copyOrder(qp.Get("sort"))...).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return
@@ -321,7 +356,7 @@ func (h *CatalogHandler) ListCopies(w http.ResponseWriter, r *http.Request) {
 	q := h.db.BookCopy.Query().Where(bookcopy.TenantID(tenantID), bookcopy.BibRecordID(bibID))
 	params := sharedpagination.Parse(r)
 	total, _ := q.Clone().Count(r.Context())
-	rows, err := q.Order(ent.Asc(bookcopy.FieldBarcode)).Limit(params.Limit).Offset(params.Offset).All(r.Context())
+	rows, err := q.Order(copyOrder(r.URL.Query().Get("sort"))...).Limit(params.Limit).Offset(params.Offset).All(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "list_failed")
 		return

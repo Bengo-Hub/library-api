@@ -53,10 +53,14 @@ All routes pass through `RequireAuth` → JIT heal → mutations-only subscripti
 | GET | `/catalog/bibs/{id}` | Get one bib | → `ent.BibRecord` |
 | PUT | `/catalog/bibs/{id}` | Update a bib | same body as create |
 | DELETE | `/catalog/bibs/{id}` | Delete a bib | — |
-| GET | `/catalog/bibs/{id}/copies` | List copies of a bib | → `listEnvelope` |
+| GET | `/catalog/bibs/{id}/copies` | List copies of a bib | `sort` (see below) → `listEnvelope` |
+| GET | `/catalog/copies` | List copies across all titles | `status`, `branch_id`, `q` (barcode, accession no. or title), `sort`, `page`, `limit` → `listEnvelope` |
 | POST | `/catalog/copies` | Create a copy (holding) | `bib_record_id`*, `branch_id`*, `barcode`*, `accession_no`, `call_number` (omit to inherit the bib's default `lc_call_number`/`ddc_classification`), `shelf_location`, `is_reference_only`, `acquisition_cost`, `loan_policy_id` |
 | PUT | `/catalog/copies/{id}` | Update a copy | copy fields incl. `status` |
 | GET | `/catalog/copies/by-barcode/{barcode}` | Resolve a copy by scanned barcode | → `ent.BookCopy` |
+
+Copy lists take `sort`: `accession` (default) or `-accession` order by the accession / barcode number as a number (the first run of digits, so `305-2026` comes before `1278-2026`, then the full text; a number with no digits sorts last), `acquired` / `-acquired` by acquisition date, `-created` newest entry first.
+
 | GET | `/catalog/copies/{id}/label.pdf` | Copy spine-label PDF | → `application/pdf` (Blob) |
 
 ---

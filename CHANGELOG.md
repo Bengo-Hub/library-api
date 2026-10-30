@@ -6,6 +6,9 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) an
 
 ## [Unreleased]
 
+### Changed (2026-10-30 - accession number order)
+- Copy lists (`GET /catalog/copies` and `GET /catalog/bibs/{id}/copies`) take `sort=accession|-accession|acquired|-acquired|-created` and default to accession number order, compared as numbers. The per-title list used to sort barcodes as text (`1000-2026` before `305-2026`) and the all-copies list by entry time.
+
 ### Added
 - **Borrowing fee collected at checkout:** the circulation rule's `rental_charge` (per book) is raised as a fee when a book is checked out, and the librarian can mark it paid during checkout (`payment` on `POST /circulation/checkout`). `GET /circulation/checkout-quote` previews the fee, late rate and due date.
 - **Late fee tied to the borrowing fee:** new rule field `late_fee_uses_rental_charge` charges each late day at the borrowing fee.
