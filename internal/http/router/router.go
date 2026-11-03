@@ -117,7 +117,8 @@ func New(d Deps) http.Handler {
 		if d.RBAC != nil {
 			lib.Use(func(next http.Handler) http.Handler {
 				return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-					if claims, ok := authclient.ClaimsFromContext(req.Context()); ok && claims != nil {
+					// Only members whose token lets the library keep them (user_services claim).
+					if claims, ok := authclient.ClaimsFromContext(req.Context()); ok && claims != nil && claims.AllowsUserService("library") {
 						if err := d.RBAC.EnsureUserFromToken(req.Context(), claims); err != nil {
 							d.Log.Warn("jit provisioning failed", zap.Error(err))
 						}

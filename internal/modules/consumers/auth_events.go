@@ -130,17 +130,44 @@ func (c *AuthEventsConsumer) relevant(ctx context.Context, evt *sharedevents.Eve
 	if c.ProductActive != nil && !c.ProductActive(ctx, evt.TenantID.String()) {
 		return false
 	}
-	r := sharedevents.UserRelevance{
+	return c.relevance().Relevant(ctx, evt.TenantID, evt.Payload)
+}
+
+// relevance is the library's reading of an auth.user event: auth-api's services list when the
+// event has one, else admin roles, an SSO outlet linked to a branch, or a library role.
+func (c *AuthEventsConsumer) relevance() sharedevents.UserRelevance {
+	return sharedevents.UserRelevance{
+		Service:      "library",
 		ServiceRoles: libraryServiceRoles,
 		OutletKnown: func(ctx context.Context, tid, outletID uuid.UUID) bool {
 			ok, err := c.orm.Branch.Query().Where(entbranch.TenantID(tid), entbranch.OutletID(outletID)).Exist(ctx)
 			return err == nil && ok
 		},
 	}
-	return r.Relevant(ctx, evt.TenantID, evt.Payload)
+}
+
+// revoked removes this tenant's library user when auth-api says the member is not meant to use
+// the library (the event's services list leaves it out). Reports whether the event was handled
+// that way; events without the list never are.
+func (c *AuthEventsConsumer) revoked(ctx context.Context, evt *sharedevents.Event) (bool, error) {
+	if !c.relevance().Revoked(evt.Payload) {
+		return false, nil
+	}
+	userID, _ := evt.Payload["user_id"].(string)
+	if userID == "" || evt.TenantID == uuid.Nil {
+		return true, nil
+	}
+	if _, err := c.orm.LibraryUser.Delete().
+		Where(entlibraryuser.TenantID(evt.TenantID), entlibraryuser.UserID(userID)).Exec(ctx); err != nil {
+		return true, fmt.Errorf("remove user outside library: %w", err)
+	}
+	return true, nil
 }
 
 func (c *AuthEventsConsumer) handleUserCreated(ctx context.Context, evt *sharedevents.Event) error {
+	if handled, err := c.revoked(ctx, evt); handled {
+		return err
+	}
 	if !c.relevant(ctx, evt) {
 		return nil
 	}
@@ -151,6 +178,9 @@ func (c *AuthEventsConsumer) handleUserCreated(ctx context.Context, evt *sharede
 }
 
 func (c *AuthEventsConsumer) handleUserUpdated(ctx context.Context, evt *sharedevents.Event) error {
+	if handled, err := c.revoked(ctx, evt); handled {
+		return err
+	}
 	if !c.relevant(ctx, evt) {
 		return nil
 	}
@@ -168,6 +198,9 @@ func (c *AuthEventsConsumer) handlePinSet(ctx context.Context, evt *sharedevents
 	service, _ := evt.Payload["service"].(string)
 	if service != "" && service != "library" {
 		return nil // PIN provisioned for a different service (pos/inventory/…)
+	}
+	if handled, err := c.revoked(ctx, evt); handled {
+		return err
 	}
 	// A tenant outside the library plan gets no user row, even for a PIN event.
 	if c.ProductActive != nil && !c.ProductActive(ctx, evt.TenantID.String()) {
