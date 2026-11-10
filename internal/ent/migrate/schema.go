@@ -994,6 +994,7 @@ var (
 		{Name: "joined_at", Type: field.TypeTime, Nullable: true},
 		{Name: "expires_at", Type: field.TypeTime, Nullable: true},
 		{Name: "birth_date", Type: field.TypeTime, Nullable: true},
+		{Name: "metadata", Type: field.TypeJSON, Nullable: true},
 	}
 	// MembersTable holds the schema information for the "members" table.
 	MembersTable = &schema.Table{

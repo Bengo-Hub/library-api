@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	sharedcache "github.com/Bengo-Hub/cache"
 	"github.com/redis/go-redis/v9"
 	"net/http"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/bengobox/library-service/internal/ent/member"
 	"github.com/bengobox/library-service/internal/ent/membertier"
+	membercrm "github.com/bengobox/library-service/internal/modules/members"
 	"github.com/bengobox/library-service/internal/modules/sequence"
 )
 
@@ -168,6 +170,8 @@ func (h *MemberHandler) ImportMembers(w http.ResponseWriter, r *http.Request) {
 		defaultTier, _ := h.db.MemberTier.Query().
 			Where(membertier.TenantID(tenantID)).
 			First(ctx)
+		// Each row links to the CRM with its phone and email before it is saved.
+		linker := h.crm.NewImportLinker()
 
 		for i, record := range records[1:] {
 			rowNum := i + 2
@@ -194,6 +198,13 @@ func (h *MemberHandler) ImportMembers(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 
+			ident, lerr := linker.Link(ctx, tenantID, displayName, col(record, "phone"), col(record, "email"))
+			var rej *membercrm.RejectedError
+			if errors.As(lerr, &rej) {
+				addErr(importError{Row: rowNum, Field: "phone/email", Message: rej.Message})
+				continue
+			}
+
 			tx, err := h.db.Tx(ctx)
 			if err != nil {
 				log.Warn("tx failed", zap.Int("row", rowNum), zap.Error(err))
@@ -212,10 +223,13 @@ func (h *MemberHandler) ImportMembers(w http.ResponseWriter, r *http.Request) {
 				SetTenantID(tenantID).
 				SetMembershipNo(memberNo).
 				SetTierID(tierID).
-				SetDisplayName(displayName).
-				SetContactEmail(col(record, "email")).
-				SetContactPhone(col(record, "phone")).
+				SetDisplayName(firstNonEmpty(ident.Name, displayName)).
+				SetContactEmail(ident.Email).
+				SetContactPhone(ident.Phone).
 				SetJoinedAt(time.Now())
+			if ident.CrmContactID != nil {
+				c.SetCrmContactID(*ident.CrmContactID)
+			}
 			if st := strings.ToUpper(col(record, "status")); st != "" {
 				c.SetStatus(member.Status(st))
 			}

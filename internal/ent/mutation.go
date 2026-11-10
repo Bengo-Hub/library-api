@@ -25911,6 +25911,7 @@ type MemberMutation struct {
 	joined_at      *time.Time
 	expires_at     *time.Time
 	birth_date     *time.Time
+	metadata       *map[string]interface{}
 	clearedFields  map[string]struct{}
 	done           bool
 	oldValue       func(context.Context) (*Member, error)
@@ -26812,6 +26813,55 @@ func (m *MemberMutation) ResetBirthDate() {
 	delete(m.clearedFields, member.FieldBirthDate)
 }
 
+// SetMetadata sets the "metadata" field.
+func (m *MemberMutation) SetMetadata(value map[string]interface{}) {
+	m.metadata = &value
+}
+
+// Metadata returns the value of the "metadata" field in the mutation.
+func (m *MemberMutation) Metadata() (r map[string]interface{}, exists bool) {
+	v := m.metadata
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMetadata returns the old "metadata" field's value of the Member entity.
+// If the Member object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *MemberMutation) OldMetadata(ctx context.Context) (v map[string]interface{}, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMetadata is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMetadata requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMetadata: %w", err)
+	}
+	return oldValue.Metadata, nil
+}
+
+// ClearMetadata clears the value of the "metadata" field.
+func (m *MemberMutation) ClearMetadata() {
+	m.metadata = nil
+	m.clearedFields[member.FieldMetadata] = struct{}{}
+}
+
+// MetadataCleared returns if the "metadata" field was cleared in this mutation.
+func (m *MemberMutation) MetadataCleared() bool {
+	_, ok := m.clearedFields[member.FieldMetadata]
+	return ok
+}
+
+// ResetMetadata resets all changes to the "metadata" field.
+func (m *MemberMutation) ResetMetadata() {
+	m.metadata = nil
+	delete(m.clearedFields, member.FieldMetadata)
+}
+
 // Where appends a list predicates to the MemberMutation builder.
 func (m *MemberMutation) Where(ps ...predicate.Member) {
 	m.predicates = append(m.predicates, ps...)
@@ -26846,7 +26896,7 @@ func (m *MemberMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *MemberMutation) Fields() []string {
-	fields := make([]string, 0, 18)
+	fields := make([]string, 0, 19)
 	if m.created_at != nil {
 		fields = append(fields, member.FieldCreatedAt)
 	}
@@ -26901,6 +26951,9 @@ func (m *MemberMutation) Fields() []string {
 	if m.birth_date != nil {
 		fields = append(fields, member.FieldBirthDate)
 	}
+	if m.metadata != nil {
+		fields = append(fields, member.FieldMetadata)
+	}
 	return fields
 }
 
@@ -26945,6 +26998,8 @@ func (m *MemberMutation) Field(name string) (ent.Value, bool) {
 		return m.ExpiresAt()
 	case member.FieldBirthDate:
 		return m.BirthDate()
+	case member.FieldMetadata:
+		return m.Metadata()
 	}
 	return nil, false
 }
@@ -26990,6 +27045,8 @@ func (m *MemberMutation) OldField(ctx context.Context, name string) (ent.Value, 
 		return m.OldExpiresAt(ctx)
 	case member.FieldBirthDate:
 		return m.OldBirthDate(ctx)
+	case member.FieldMetadata:
+		return m.OldMetadata(ctx)
 	}
 	return nil, fmt.Errorf("unknown Member field %s", name)
 }
@@ -27125,6 +27182,13 @@ func (m *MemberMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetBirthDate(v)
 		return nil
+	case member.FieldMetadata:
+		v, ok := value.(map[string]interface{})
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMetadata(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Member field %s", name)
 }
@@ -27188,6 +27252,9 @@ func (m *MemberMutation) ClearedFields() []string {
 	if m.FieldCleared(member.FieldBirthDate) {
 		fields = append(fields, member.FieldBirthDate)
 	}
+	if m.FieldCleared(member.FieldMetadata) {
+		fields = append(fields, member.FieldMetadata)
+	}
 	return fields
 }
 
@@ -27234,6 +27301,9 @@ func (m *MemberMutation) ClearField(name string) error {
 		return nil
 	case member.FieldBirthDate:
 		m.ClearBirthDate()
+		return nil
+	case member.FieldMetadata:
+		m.ClearMetadata()
 		return nil
 	}
 	return fmt.Errorf("unknown Member nullable field %s", name)
@@ -27296,6 +27366,9 @@ func (m *MemberMutation) ResetField(name string) error {
 		return nil
 	case member.FieldBirthDate:
 		m.ResetBirthDate()
+		return nil
+	case member.FieldMetadata:
+		m.ResetMetadata()
 		return nil
 	}
 	return fmt.Errorf("unknown Member field %s", name)

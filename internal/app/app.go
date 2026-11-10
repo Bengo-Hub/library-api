@@ -23,6 +23,7 @@ import (
 	"github.com/Bengo-Hub/httpware/tenantexport"
 	authclient "github.com/Bengo-Hub/shared-auth-client"
 	eventslib "github.com/Bengo-Hub/shared-events"
+	"github.com/Bengo-Hub/shared-service-client/crm"
 
 	"github.com/bengobox/library-service/internal/config"
 	"github.com/bengobox/library-service/internal/ent"
@@ -32,12 +33,12 @@ import (
 	"github.com/bengobox/library-service/internal/modules/calendar"
 	"github.com/bengobox/library-service/internal/modules/circulation"
 	"github.com/bengobox/library-service/internal/modules/consumers"
+	membercrm "github.com/bengobox/library-service/internal/modules/members"
 	"github.com/bengobox/library-service/internal/modules/membership"
 	"github.com/bengobox/library-service/internal/modules/rbac"
 	"github.com/bengobox/library-service/internal/modules/refdata"
 	"github.com/bengobox/library-service/internal/platform/database"
 	"github.com/bengobox/library-service/internal/platform/events"
-	"github.com/bengobox/library-service/internal/platform/marketflow"
 	"github.com/bengobox/library-service/internal/platform/secrets"
 	"github.com/bengobox/library-service/internal/platform/subscriptions"
 	"github.com/bengobox/library-service/internal/platform/treasury"
@@ -60,6 +61,7 @@ type App struct {
 	serialIssueScheduler    *handlers.SerialIssueScheduler
 	paymentConsumer         *consumers.PaymentConsumer
 	authConsumer            *consumers.AuthEventsConsumer
+	memberCRM               *membercrm.Syncer
 }
 
 // New constructs and wires the application.
@@ -223,7 +225,13 @@ func New(ctx context.Context) (*App, error) {
 	if cfg.Services.TreasuryEnabled {
 		treasuryClient = treasury.NewClient(cfg.Services.TreasuryURL, cfg.Auth.APIKey, 0)
 	}
-	marketflowClient := marketflow.NewClient(cfg.Services.MarketflowURL, cfg.Auth.APIKey, log)
+	// Members link to the MarketFlow CRM (owner of customer identity) and follow its updates.
+	memberCRM := membercrm.NewSyncer(ormClient, sqlDB, crm.New(cfg.Services.MarketflowURL, cfg.Auth.APIKey, log), log)
+	if natsConn != nil {
+		if err := memberCRM.Subscribe(natsConn); err != nil {
+			log.Warn("crm contact-updated subscriber not started", zap.Error(err))
+		}
+	}
 	subsClient := subscriptions.NewClient(subscriptions.Config{
 		ServiceURL:     cfg.Subscriptions.ServiceURL,
 		APIKey:         cfg.Subscriptions.APIKey,
@@ -250,7 +258,7 @@ func New(ctx context.Context) (*App, error) {
 		Auth:             handlers.NewAuthHandler(rbacService, log),
 		Catalog:          handlers.NewCatalogHandler(ormClient, secretStore, mediaStore, cacheAside, log),
 		Branch:           handlers.NewBranchHandler(ormClient, log),
-		Member:           handlers.NewMemberHandler(ormClient, marketflowClient, log),
+		Member:           handlers.NewMemberHandler(ormClient, memberCRM, log),
 		Circulation:      handlers.NewCirculationHandler(ormClient, circulationSvc, log),
 		Hold:             handlers.NewHoldHandler(ormClient, log),
 		Fine:             handlers.NewFineHandler(ormClient, treasuryClient, log),
@@ -268,6 +276,7 @@ func New(ctx context.Context) (*App, error) {
 		Serial:           handlers.NewSerialHandler(ormClient, log),
 		PatronPortal:     handlers.NewPatronPortalHandler(ormClient, circulationSvc, treasuryClient, log),
 		RBAC:             rbacService,
+		DB:               ormClient,
 		AllowedOrigins:   cfg.HTTP.AllowedOrigins,
 		MediaFiles:       mediaStore.MediaHandler(),
 		TenantExport:     tenantExportHandler(sqlDB, cfg.Auth.APIKey),
@@ -320,6 +329,7 @@ func New(ctx context.Context) (*App, error) {
 		serialIssueScheduler:    handlers.NewSerialIssueScheduler(ormClient, log),
 		paymentConsumer:         newPaymentConsumer(cfg.Services.TreasuryEnabled, ormClient, log),
 		authConsumer:            authConsumer,
+		memberCRM:               memberCRM,
 	}, nil
 }
 
@@ -339,6 +349,11 @@ func (a *App) Run(ctx context.Context) error {
 
 	// Serial issue late-detection scheduler (daily; marks EXPECTED issues past due as LATE).
 	a.serialIssueScheduler.Start(ctx, 24*time.Hour)
+
+	// Links members that are still without a CRM contact (every 10 min, one pod at a time).
+	if a.memberCRM != nil {
+		go a.memberCRM.RunReconciler(ctx, membercrm.ReconcileEvery)
+	}
 
 	// Treasury payment reconcile consumer.
 	if a.events != nil && a.paymentConsumer != nil {

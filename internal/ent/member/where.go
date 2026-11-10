@@ -1070,6 +1070,16 @@ func BirthDateNotNil() predicate.Member {
 	return predicate.Member(sql.FieldNotNull(FieldBirthDate))
 }
 
+// MetadataIsNil applies the IsNil predicate on the "metadata" field.
+func MetadataIsNil() predicate.Member {
+	return predicate.Member(sql.FieldIsNull(FieldMetadata))
+}
+
+// MetadataNotNil applies the NotNil predicate on the "metadata" field.
+func MetadataNotNil() predicate.Member {
+	return predicate.Member(sql.FieldNotNull(FieldMetadata))
+}
+
 // And groups predicates with the AND operator between them.
 func And(predicates ...predicate.Member) predicate.Member {
 	return predicate.Member(sql.AndPredicates(predicates...))

@@ -325,6 +325,18 @@ func (_u *MemberUpdate) ClearBirthDate() *MemberUpdate {
 	return _u
 }
 
+// SetMetadata sets the "metadata" field.
+func (_u *MemberUpdate) SetMetadata(v map[string]interface{}) *MemberUpdate {
+	_u.mutation.SetMetadata(v)
+	return _u
+}
+
+// ClearMetadata clears the value of the "metadata" field.
+func (_u *MemberUpdate) ClearMetadata() *MemberUpdate {
+	_u.mutation.ClearMetadata()
+	return _u
+}
+
 // Mutation returns the MemberMutation object of the builder.
 func (_u *MemberUpdate) Mutation() *MemberMutation {
 	return _u.mutation
@@ -476,6 +488,12 @@ func (_u *MemberUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.BirthDateCleared() {
 		_spec.ClearField(member.FieldBirthDate, field.TypeTime)
+	}
+	if value, ok := _u.mutation.Metadata(); ok {
+		_spec.SetField(member.FieldMetadata, field.TypeJSON, value)
+	}
+	if _u.mutation.MetadataCleared() {
+		_spec.ClearField(member.FieldMetadata, field.TypeJSON)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -793,6 +811,18 @@ func (_u *MemberUpdateOne) ClearBirthDate() *MemberUpdateOne {
 	return _u
 }
 
+// SetMetadata sets the "metadata" field.
+func (_u *MemberUpdateOne) SetMetadata(v map[string]interface{}) *MemberUpdateOne {
+	_u.mutation.SetMetadata(v)
+	return _u
+}
+
+// ClearMetadata clears the value of the "metadata" field.
+func (_u *MemberUpdateOne) ClearMetadata() *MemberUpdateOne {
+	_u.mutation.ClearMetadata()
+	return _u
+}
+
 // Mutation returns the MemberMutation object of the builder.
 func (_u *MemberUpdateOne) Mutation() *MemberMutation {
 	return _u.mutation
@@ -974,6 +1004,12 @@ func (_u *MemberUpdateOne) sqlSave(ctx context.Context) (_node *Member, err erro
 	}
 	if _u.mutation.BirthDateCleared() {
 		_spec.ClearField(member.FieldBirthDate, field.TypeTime)
+	}
+	if value, ok := _u.mutation.Metadata(); ok {
+		_spec.SetField(member.FieldMetadata, field.TypeJSON, value)
+	}
+	if _u.mutation.MetadataCleared() {
+		_spec.ClearField(member.FieldMetadata, field.TypeJSON)
 	}
 	_node = &Member{config: _u.config}
 	_spec.Assign = _node.assignValues

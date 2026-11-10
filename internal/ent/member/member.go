@@ -51,6 +51,8 @@ const (
 	FieldExpiresAt = "expires_at"
 	// FieldBirthDate holds the string denoting the birth_date field in the database.
 	FieldBirthDate = "birth_date"
+	// FieldMetadata holds the string denoting the metadata field in the database.
+	FieldMetadata = "metadata"
 	// Table holds the table name of the member in the database.
 	Table = "members"
 )
@@ -76,6 +78,7 @@ var Columns = []string{
 	FieldJoinedAt,
 	FieldExpiresAt,
 	FieldBirthDate,
+	FieldMetadata,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).

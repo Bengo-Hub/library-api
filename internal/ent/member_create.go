@@ -252,6 +252,12 @@ func (_c *MemberCreate) SetNillableBirthDate(v *time.Time) *MemberCreate {
 	return _c
 }
 
+// SetMetadata sets the "metadata" field.
+func (_c *MemberCreate) SetMetadata(v map[string]interface{}) *MemberCreate {
+	_c.mutation.SetMetadata(v)
+	return _c
+}
+
 // SetID sets the "id" field.
 func (_c *MemberCreate) SetID(v uuid.UUID) *MemberCreate {
 	_c.mutation.SetID(v)
@@ -463,6 +469,10 @@ func (_c *MemberCreate) createSpec() (*Member, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.BirthDate(); ok {
 		_spec.SetField(member.FieldBirthDate, field.TypeTime, value)
 		_node.BirthDate = &value
+	}
+	if value, ok := _c.mutation.Metadata(); ok {
+		_spec.SetField(member.FieldMetadata, field.TypeJSON, value)
+		_node.Metadata = value
 	}
 	return _node, _spec
 }
@@ -783,6 +793,24 @@ func (u *MemberUpsert) UpdateBirthDate() *MemberUpsert {
 // ClearBirthDate clears the value of the "birth_date" field.
 func (u *MemberUpsert) ClearBirthDate() *MemberUpsert {
 	u.SetNull(member.FieldBirthDate)
+	return u
+}
+
+// SetMetadata sets the "metadata" field.
+func (u *MemberUpsert) SetMetadata(v map[string]interface{}) *MemberUpsert {
+	u.Set(member.FieldMetadata, v)
+	return u
+}
+
+// UpdateMetadata sets the "metadata" field to the value that was provided on create.
+func (u *MemberUpsert) UpdateMetadata() *MemberUpsert {
+	u.SetExcluded(member.FieldMetadata)
+	return u
+}
+
+// ClearMetadata clears the value of the "metadata" field.
+func (u *MemberUpsert) ClearMetadata() *MemberUpsert {
+	u.SetNull(member.FieldMetadata)
 	return u
 }
 
@@ -1149,6 +1177,27 @@ func (u *MemberUpsertOne) UpdateBirthDate() *MemberUpsertOne {
 func (u *MemberUpsertOne) ClearBirthDate() *MemberUpsertOne {
 	return u.Update(func(s *MemberUpsert) {
 		s.ClearBirthDate()
+	})
+}
+
+// SetMetadata sets the "metadata" field.
+func (u *MemberUpsertOne) SetMetadata(v map[string]interface{}) *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.SetMetadata(v)
+	})
+}
+
+// UpdateMetadata sets the "metadata" field to the value that was provided on create.
+func (u *MemberUpsertOne) UpdateMetadata() *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.UpdateMetadata()
+	})
+}
+
+// ClearMetadata clears the value of the "metadata" field.
+func (u *MemberUpsertOne) ClearMetadata() *MemberUpsertOne {
+	return u.Update(func(s *MemberUpsert) {
+		s.ClearMetadata()
 	})
 }
 
@@ -1682,6 +1731,27 @@ func (u *MemberUpsertBulk) UpdateBirthDate() *MemberUpsertBulk {
 func (u *MemberUpsertBulk) ClearBirthDate() *MemberUpsertBulk {
 	return u.Update(func(s *MemberUpsert) {
 		s.ClearBirthDate()
+	})
+}
+
+// SetMetadata sets the "metadata" field.
+func (u *MemberUpsertBulk) SetMetadata(v map[string]interface{}) *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.SetMetadata(v)
+	})
+}
+
+// UpdateMetadata sets the "metadata" field to the value that was provided on create.
+func (u *MemberUpsertBulk) UpdateMetadata() *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.UpdateMetadata()
+	})
+}
+
+// ClearMetadata clears the value of the "metadata" field.
+func (u *MemberUpsertBulk) ClearMetadata() *MemberUpsertBulk {
+	return u.Update(func(s *MemberUpsert) {
+		s.ClearMetadata()
 	})
 }
 

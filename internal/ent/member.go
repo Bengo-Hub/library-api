@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -53,7 +54,9 @@ type Member struct {
 	// ExpiresAt holds the value of the "expires_at" field.
 	ExpiresAt *time.Time `json:"expires_at,omitempty"`
 	// Used for patron age-based tier auto-transitions
-	BirthDate    *time.Time `json:"birth_date,omitempty"`
+	BirthDate *time.Time `json:"birth_date,omitempty"`
+	// Small flags, e.g. crm_unlinked_at when the CRM deleted the linked contact
+	Metadata     map[string]interface{} `json:"metadata,omitempty"`
 	selectValues sql.SelectValues
 }
 
@@ -64,6 +67,8 @@ func (*Member) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case member.FieldUserID, member.FieldCrmContactID, member.FieldHomeBranchID:
 			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
+		case member.FieldMetadata:
+			values[i] = new([]byte)
 		case member.FieldIsWalkIn:
 			values[i] = new(sql.NullBool)
 		case member.FieldMembershipNo, member.FieldDisplayName, member.FieldContactPhone, member.FieldContactEmail, member.FieldAddress, member.FieldNotes, member.FieldStatus:
@@ -207,6 +212,14 @@ func (_m *Member) assignValues(columns []string, values []any) error {
 				_m.BirthDate = new(time.Time)
 				*_m.BirthDate = value.Time
 			}
+		case member.FieldMetadata:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field metadata", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.Metadata); err != nil {
+					return fmt.Errorf("unmarshal field metadata: %w", err)
+				}
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -308,6 +321,9 @@ func (_m *Member) String() string {
 		builder.WriteString("birth_date=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
+	builder.WriteString(", ")
+	builder.WriteString("metadata=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Metadata))
 	builder.WriteByte(')')
 	return builder.String()
 }

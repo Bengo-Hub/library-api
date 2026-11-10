@@ -35,6 +35,8 @@ func (Member) Fields() []ent.Field {
 		field.Time("joined_at").Optional().Nillable(),
 		field.Time("expires_at").Optional().Nillable(),
 		field.Time("birth_date").Optional().Nillable().Comment("Used for patron age-based tier auto-transitions"),
+		field.JSON("metadata", map[string]any{}).Optional().
+			Comment("Small flags, e.g. crm_unlinked_at when the CRM deleted the linked contact"),
 	}
 }
 

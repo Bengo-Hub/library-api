@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -22,19 +23,30 @@ import (
 	"github.com/bengobox/library-service/internal/modules/fines"
 	"github.com/bengobox/library-service/internal/modules/refdata"
 	"github.com/bengobox/library-service/internal/modules/sequence"
-	"github.com/bengobox/library-service/internal/platform/marketflow"
+	membercrm "github.com/bengobox/library-service/internal/modules/members"
 )
 
 // MemberHandler serves member + tier + loan-policy endpoints.
 type MemberHandler struct {
-	db         *ent.Client
-	marketflow *marketflow.Client
-	log        *zap.Logger
+	db  *ent.Client
+	crm *membercrm.Syncer
+	log *zap.Logger
 }
 
-// NewMemberHandler builds the member handler.
-func NewMemberHandler(db *ent.Client, mf *marketflow.Client, log *zap.Logger) *MemberHandler {
-	return &MemberHandler{db: db, marketflow: mf, log: log}
+// NewMemberHandler builds the member handler. crm may be nil (members are then saved unlinked).
+func NewMemberHandler(db *ent.Client, crm *membercrm.Syncer, log *zap.Logger) *MemberHandler {
+	return &MemberHandler{db: db, crm: crm, log: log}
+}
+
+// respondCRMError answers 400 with the CRM's message when it refused the contact and reports
+// whether it did.
+func respondCRMError(w http.ResponseWriter, err error) bool {
+	var rej *membercrm.RejectedError
+	if errors.As(err, &rej) {
+		respondError(w, http.StatusBadRequest, rej.Message, "crm_rejected")
+		return true
+	}
+	return false
 }
 
 // memberRequest accepts the library-ui MemberInput contract (first_name/last_name/email/phone/…)
@@ -223,6 +235,20 @@ func (h *MemberHandler) CreateMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Link to the CRM first, sending phone and email, so the name, phone and email saved here
+	// are the CRM's. A refusal is the form's fault (400); an outage saves the member unlinked.
+	var ident membercrm.Identity
+	if cid, perr := uuid.Parse(req.crm()); perr == nil {
+		ident.Name = req.name()
+		ident.Phone, ident.Email = membercrm.Normalise(req.phone(), req.email())
+		ident.CrmContactID = &cid
+	} else {
+		ident, err = h.crm.Link(r.Context(), tenantID, req.name(), req.phone(), req.email())
+		if respondCRMError(w, err) {
+			return
+		}
+	}
+
 	tx, err := h.db.Tx(r.Context())
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "tx_failed")
@@ -241,8 +267,8 @@ func (h *MemberHandler) CreateMember(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	c := tx.Member.Create().
 		SetTenantID(tenantID).SetMembershipNo(memberNo).SetTierID(tierID).
-		SetDisplayName(req.name()).SetContactPhone(req.phone()).
-		SetContactEmail(req.email()).SetAddress(req.Address).SetNotes(req.Notes).SetIsWalkIn(req.IsWalkIn).
+		SetDisplayName(ident.Name).SetContactPhone(ident.Phone).
+		SetContactEmail(ident.Email).SetAddress(req.Address).SetNotes(req.Notes).SetIsWalkIn(req.IsWalkIn).
 		SetJoinedAt(now)
 	if st := strings.TrimSpace(req.Status); st != "" {
 		c.SetStatus(member.Status(strings.ToUpper(st)))
@@ -250,8 +276,8 @@ func (h *MemberHandler) CreateMember(w http.ResponseWriter, r *http.Request) {
 	if uid, perr := uuid.Parse(req.ssoUser()); perr == nil {
 		c.SetUserID(uid)
 	}
-	if cid, perr := uuid.Parse(req.crm()); perr == nil {
-		c.SetCrmContactID(cid)
+	if ident.CrmContactID != nil {
+		c.SetCrmContactID(*ident.CrmContactID)
 	}
 	if bid, perr := uuid.Parse(req.branch()); perr == nil {
 		c.SetHomeBranchID(bid)
@@ -278,10 +304,6 @@ func (h *MemberHandler) CreateMember(w http.ResponseWriter, r *http.Request) {
 	if err := tx.Commit(); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "commit_failed")
 		return
-	}
-	// Best-effort CRM sync — never blocks the response.
-	if cid := h.marketflow.UpsertContactByPhone(r.Context(), tenantID, row.ContactPhone, row.DisplayName); cid != uuid.Nil {
-		_, _ = h.db.Member.UpdateOneID(row.ID).SetCrmContactID(cid).Save(r.Context())
 	}
 	respondJSON(w, http.StatusCreated, h.singleMemberResponse(r, tenantID, row))
 }
@@ -315,9 +337,12 @@ func (h *MemberHandler) UpdateMember(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, "bad id", "invalid_request")
 		return
 	}
-	exists, _ := h.db.Member.Query().Where(member.IDEQ(id), member.TenantID(tenantID)).Exist(r.Context())
-	if !exists {
+	current, err := h.db.Member.Query().Where(member.IDEQ(id), member.TenantID(tenantID)).Only(r.Context())
+	if ent.IsNotFound(err) {
 		respondError(w, http.StatusNotFound, "not found", "not_found")
+		return
+	} else if err != nil {
+		respondError(w, http.StatusInternalServerError, err.Error(), "get_failed")
 		return
 	}
 	var req memberRequest
@@ -326,14 +351,41 @@ func (h *MemberHandler) UpdateMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u := h.db.Member.UpdateOneID(id)
-	if n := req.name(); n != "" {
-		u.SetDisplayName(n)
+	// Name, phone and email belong to the CRM: an edit goes to the CRM first (or links an
+	// unlinked member) and the member keeps what the CRM answers.
+	crmID := current.CrmContactID
+	explicitCRM := false
+	if cid, perr := uuid.Parse(req.crm()); perr == nil {
+		crmID = &cid
+		explicitCRM = true
 	}
-	if p := req.phone(); p != "" {
-		u.SetContactPhone(p)
+	name := firstNonEmpty(req.name(), current.DisplayName)
+	phone, email := membercrm.Normalise(firstNonEmpty(req.phone(), current.ContactPhone), firstNonEmpty(req.email(), current.ContactEmail))
+	curPhone, curEmail := membercrm.Normalise(current.ContactPhone, current.ContactEmail)
+	// Only a real change of name, phone or email (or an explicit contact id) goes to the CRM,
+	// so a status toggle that resends the name does not call it.
+	identityChanged := strings.TrimSpace(name) != strings.TrimSpace(current.DisplayName) || phone != curPhone || email != curEmail
+	if identityChanged || explicitCRM {
+		// A staff edit lifts the "contact deleted in the CRM" flag so the member can link again.
+		if md, changed := membercrm.ClearUnlinked(current.Metadata); changed {
+			u.SetMetadata(md)
+		}
 	}
-	if e := req.email(); e != "" {
-		u.SetContactEmail(e)
+	if identityChanged {
+		ident, serr := h.crm.Save(r.Context(), tenantID, id, crmID, name, phone, email)
+		if respondCRMError(w, serr) {
+			return
+		}
+		if ident.Name != "" {
+			u.SetDisplayName(ident.Name)
+		}
+		u.SetContactPhone(ident.Phone).SetContactEmail(ident.Email)
+		if ident.CrmContactID != nil {
+			crmID = ident.CrmContactID
+		}
+	}
+	if crmID != nil {
+		u.SetCrmContactID(*crmID)
 	}
 	u.SetAddress(req.Address).SetNotes(req.Notes)
 	if st := strings.TrimSpace(req.Status); st != "" {
@@ -345,9 +397,6 @@ func (h *MemberHandler) UpdateMember(w http.ResponseWriter, r *http.Request) {
 	if uid, perr := uuid.Parse(req.ssoUser()); perr == nil {
 		u.SetUserID(uid)
 	}
-	if cid, perr := uuid.Parse(req.crm()); perr == nil {
-		u.SetCrmContactID(cid)
-	}
 	if bid, perr := uuid.Parse(req.branch()); perr == nil {
 		u.SetHomeBranchID(bid)
 	}
@@ -358,12 +407,6 @@ func (h *MemberHandler) UpdateMember(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "update_failed")
 		return
-	}
-	// Best-effort CRM sync when name or phone was touched.
-	if req.name() != "" || req.phone() != "" {
-		if cid := h.marketflow.UpsertContactByPhone(r.Context(), tenantID, row.ContactPhone, row.DisplayName); cid != uuid.Nil {
-			_, _ = h.db.Member.UpdateOneID(row.ID).SetCrmContactID(cid).Save(r.Context())
-		}
 	}
 	respondJSON(w, http.StatusOK, h.singleMemberResponse(r, tenantID, row))
 }

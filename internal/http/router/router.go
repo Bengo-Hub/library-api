@@ -12,6 +12,7 @@ import (
 	httpware "github.com/Bengo-Hub/httpware"
 	authclient "github.com/Bengo-Hub/shared-auth-client"
 
+	"github.com/bengobox/library-service/internal/ent"
 	handlers "github.com/bengobox/library-service/internal/http/handlers"
 	libmw "github.com/bengobox/library-service/internal/http/middleware"
 	"github.com/bengobox/library-service/internal/modules/rbac"
@@ -43,6 +44,8 @@ type Deps struct {
 	PatronPortal     *handlers.PatronPortalHandler
 	AuthMiddleware   *authclient.AuthMiddleware
 	RBAC             *rbac.Service
+	// DB resolves a platform owner's URL tenant slug to its UUID (see handlers.TenantScope).
+	DB *ent.Client
 	AllowedOrigins   []string
 	// MediaFiles is objectstore's /media handler (nil when there is nothing to serve).
 	MediaFiles http.Handler
@@ -113,6 +116,9 @@ func New(d Deps) http.Handler {
 		} else if d.AuthMiddleware != nil {
 			lib.Use(d.AuthMiddleware.RequireAuth)
 		}
+		// {tenant} must match the caller's tenant (403 otherwise); a platform owner acts for the
+		// tenant the URL names, which TenantUUID then returns.
+		lib.Use(handlers.TenantScope(d.DB))
 		// JIT user provisioning (heals existing users on every request).
 		if d.RBAC != nil {
 			lib.Use(func(next http.Handler) http.Handler {

@@ -1,12 +1,19 @@
 package handlers
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
+	"strings"
 
+	httpware "github.com/Bengo-Hub/httpware"
 	sharedpagination "github.com/Bengo-Hub/pagination"
 	authclient "github.com/Bengo-Hub/shared-auth-client"
+	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+
+	"github.com/bengobox/library-service/internal/ent"
+	"github.com/bengobox/library-service/internal/ent/tenant"
 )
 
 // ClaimsFrom returns the validated JWT claims from the request context.
@@ -14,8 +21,87 @@ func ClaimsFrom(r *http.Request) (*authclient.Claims, bool) {
 	return authclient.ClaimsFromContext(r.Context())
 }
 
-// TenantUUID resolves the tenant UUID for the current request from JWT claims.
+// scopedTenant is the tenant TenantScope resolved for a platform owner from the URL.
+type scopedTenant struct {
+	id   uuid.UUID
+	slug string
+}
+
+type scopedTenantKey struct{}
+
+// TenantScope checks the {tenant} URL segment against the caller. It runs httpware.TenantV2,
+// so a tenant user naming another tenant gets 403. A platform owner may act for any tenant:
+// the URL tenant (a UUID or a slug looked up in the local Tenant table) becomes the request's
+// tenant, and an unknown slug gets 404. db may be nil when no platform owner is expected.
+func TenantScope(db *ent.Client) func(http.Handler) http.Handler {
+	v2 := httpware.TenantV2(httpware.TenantConfig{
+		ClaimsExtractor: func(ctx context.Context) (string, string, bool, bool) {
+			claims, found := authclient.ClaimsFromContext(ctx)
+			if !found || claims == nil {
+				return "", "", false, false
+			}
+			return claims.TenantID, claims.GetTenantSlug(), claims.IsPlatformOwner, true
+		},
+		URLParamFunc: chi.URLParam,
+		URLParamName: "tenant",
+	})
+	return func(next http.Handler) http.Handler {
+		resolve := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !httpware.IsPlatformOwner(r.Context()) {
+				next.ServeHTTP(w, r)
+				return
+			}
+			st, found, err := platformOwnerTenant(r, db)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "tenant lookup failed", "tenant_lookup_failed")
+				return
+			}
+			if !found {
+				respondError(w, http.StatusNotFound, "tenant not found", "tenant_not_found")
+				return
+			}
+			next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), scopedTenantKey{}, st)))
+		})
+		return v2(resolve)
+	}
+}
+
+// platformOwnerTenant turns the tenant TenantV2 kept for a platform owner into a UUID. TenantV2
+// keeps a URL UUID as the id, and for a URL slug clears the id and keeps only the slug.
+func platformOwnerTenant(r *http.Request, db *ent.Client) (scopedTenant, bool, error) {
+	ctx := r.Context()
+	slug := httpware.GetTenantSlug(ctx)
+	if id, err := uuid.Parse(httpware.GetTenantID(ctx)); err == nil && id != uuid.Nil {
+		return scopedTenant{id: id, slug: slug}, true, nil
+	}
+	if slug == "" {
+		return scopedTenant{}, false, nil
+	}
+	claims, _ := ClaimsFrom(r)
+	if db != nil {
+		t, err := db.Tenant.Query().Where(tenant.Slug(slug)).Only(ctx)
+		if err == nil {
+			return scopedTenant{id: t.ID, slug: t.Slug}, true, nil
+		}
+		if !ent.IsNotFound(err) {
+			return scopedTenant{}, false, err
+		}
+	}
+	// The owner's own tenant may be missing from the local table; the claims still name it.
+	if claims != nil && strings.EqualFold(claims.GetTenantSlug(), slug) {
+		if id, err := uuid.Parse(claims.TenantID); err == nil {
+			return scopedTenant{id: id, slug: slug}, true, nil
+		}
+	}
+	return scopedTenant{}, false, nil
+}
+
+// TenantUUID returns the request's tenant: the URL tenant for a platform owner (set by
+// TenantScope), else the tenant in the JWT claims.
 func TenantUUID(r *http.Request) (uuid.UUID, bool) {
+	if st, ok := r.Context().Value(scopedTenantKey{}).(scopedTenant); ok && st.id != uuid.Nil {
+		return st.id, true
+	}
 	claims, ok := ClaimsFrom(r)
 	if !ok || claims == nil || claims.TenantID == "" {
 		return uuid.Nil, false
@@ -30,6 +116,9 @@ func TenantUUID(r *http.Request) (uuid.UUID, bool) {
 // TenantSlug resolves the tenant slug from JWT claims (best-effort; "" when absent).
 // Used to build service-identifiable payment references (see internal/payref).
 func TenantSlug(r *http.Request) string {
+	if st, ok := r.Context().Value(scopedTenantKey{}).(scopedTenant); ok && st.slug != "" {
+		return st.slug
+	}
 	if claims, ok := ClaimsFrom(r); ok && claims != nil {
 		return claims.GetTenantSlug()
 	}
