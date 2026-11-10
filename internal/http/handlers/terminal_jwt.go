@@ -33,6 +33,9 @@ type terminalClaims struct {
 	SubscriptionStatus   string         `json:"sub_status,omitempty"`
 	SubscriptionFeatures []string       `json:"subscription_features,omitempty"`
 	SubscriptionLimits   map[string]int `json:"sub_limits,omitempty"`
+	// SubscriptionExempt mirrors the SSO sub_exempt claim. It only bypasses subscription
+	// gating and grants no permissions.
+	SubscriptionExempt bool `json:"sub_exempt,omitempty"`
 	// ActiveServiceTags mirrors the SSO JWT claim of the same name — feeds shared-auth-client's
 	// RequireServiceAccess module gate. Missing here was the exact 2026-09-11 gap: SSO logins
 	// carried it, PIN/terminal logins silently didn't.
@@ -93,6 +96,7 @@ func terminalToAuthClaims(tc *terminalClaims) *authclient.Claims {
 		SubscriptionStatus:   tc.SubscriptionStatus,
 		SubscriptionFeatures: tc.SubscriptionFeatures,
 		SubscriptionLimits:   tc.SubscriptionLimits,
+		SubscriptionExempt:   tc.SubscriptionExempt,
 		ActiveServiceTags:    tc.ActiveServiceTags,
 		SupportFeeStatus:     tc.SupportFeeStatus,
 		SupportFeeDueAt:      tc.SupportFeeDueAt,

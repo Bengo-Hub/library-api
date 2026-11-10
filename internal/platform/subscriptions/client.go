@@ -27,6 +27,9 @@ type Entitlements struct {
 	Status       string   `json:"status"`
 	BillingMode  string   `json:"billing_mode"`
 	IsDemoBypass bool     `json:"is_demo_bypass"`
+	// Exempt is true for the platform and demo tenants and any tenant the platform flagged
+	// subscription-exempt. It is minted as the gating-only sub_exempt claim.
+	Exempt bool `json:"exempt"`
 	// ActiveServiceTags feeds shared-auth-client's RequireServiceAccess module gate — without
 	// decoding it here, EVERY PIN/terminal session fleet-wide carries zero service tags
 	// regardless of the tenant's real plan (2026-09-11 incident: SSO logins worked, PIN logins
