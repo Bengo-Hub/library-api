@@ -121,7 +121,9 @@ type AuthConfig struct {
 	EnableAPIKeyAuth    bool          `envconfig:"AUTH_ENABLE_API_KEY_AUTH" default:"true"`
 	APIKey              string        `envconfig:"INTERNAL_SERVICE_KEY" default:""`
 	// TerminalJWTSecret signs short-lived terminal JWTs issued after a desk/kiosk PIN login
-	// (supplements SSO). Leave empty to disable PIN auth.
+	// (supplements SSO). Required outside local/dev and must differ from INTERNAL_SERVICE_KEY
+	// (see app.resolveTerminalJWTSecret). In local/dev it falls back to INTERNAL_SERVICE_KEY, and
+	// PIN auth is off when both are empty.
 	TerminalJWTSecret string `envconfig:"TERMINAL_JWT_SECRET" default:""`
 }
 

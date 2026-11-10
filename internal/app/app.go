@@ -7,6 +7,7 @@ import (
 	"fmt"
 	ratelimit "github.com/Bengo-Hub/shared-ratelimit"
 	"net/http"
+	"strings"
 	"time"
 
 	"entgo.io/ent/dialect"
@@ -64,15 +65,40 @@ type App struct {
 	memberCRM               *membercrm.Syncer
 }
 
-// New constructs and wires the application.
-// terminalJWTSecret returns the PIN/terminal JWT signing secret, falling back to the shared
-// INTERNAL_SERVICE_KEY when TERMINAL_JWT_SECRET isn't set (mirrors pos-api) so desk/kiosk PIN
-// login works without provisioning a dedicated secret.
-func terminalJWTSecret(cfg *config.Config) string {
-	if cfg.Auth.TerminalJWTSecret != "" {
-		return cfg.Auth.TerminalJWTSecret
+// localEnvs are the APP_ENV values where the terminal JWT secret may fall back to the internal
+// service key. Every other value, including an unknown one, is treated as production.
+var localEnvs = map[string]bool{
+	"development": true, "dev": true, "local": true, "test": true,
+}
+
+// resolveTerminalJWTSecret returns the PIN/terminal JWT signing secret. Every service in the
+// fleet holds INTERNAL_SERVICE_KEY, so a terminal token signed with it can be forged by any of
+// them, with any roles. Outside local/dev TERMINAL_JWT_SECRET must be set and must not equal the
+// internal key, or the service refuses to start. In local/dev it falls back to the internal key
+// with a loud warning; an empty result there leaves PIN auth off.
+func resolveTerminalJWTSecret(log *zap.Logger, env, secret, internalKey string) (string, error) {
+	secret = strings.TrimSpace(secret)
+	internalKey = strings.TrimSpace(internalKey)
+	shared := secret != "" && secret == internalKey
+	if !localEnvs[strings.ToLower(strings.TrimSpace(env))] {
+		if secret == "" {
+			return "", errors.New("TERMINAL_JWT_SECRET is required outside local/dev")
+		}
+		if shared {
+			return "", errors.New("TERMINAL_JWT_SECRET must not equal INTERNAL_SERVICE_KEY")
+		}
+		return secret, nil
 	}
-	return cfg.Auth.APIKey
+	if secret != "" {
+		if shared && log != nil {
+			log.Warn("TERMINAL_JWT_SECRET equals INTERNAL_SERVICE_KEY; any service can forge PIN tokens. Allowed only in local/dev.")
+		}
+		return secret, nil
+	}
+	if internalKey != "" && log != nil {
+		log.Warn("TERMINAL_JWT_SECRET is not set; signing PIN tokens with INTERNAL_SERVICE_KEY. Allowed only in local/dev, never in production.")
+	}
+	return internalKey, nil
 }
 
 // tenantExportHandler serves auth-api's SSO tenant backups (httpware/tenantexport). Nil without an
@@ -84,6 +110,7 @@ func tenantExportHandler(db *sql.DB, internalKey string) http.Handler {
 	return tenantexport.Handler(db, tenantexport.Options{Service: "library", InternalKey: internalKey})
 }
 
+// New constructs and wires the application.
 func New(ctx context.Context) (*App, error) {
 	cfg, err := config.Load()
 	if err != nil {
@@ -92,6 +119,10 @@ func New(ctx context.Context) (*App, error) {
 	log, err := logger.New(cfg.App.Env)
 	if err != nil {
 		return nil, fmt.Errorf("logger init: %w", err)
+	}
+	pinSecret, err := resolveTerminalJWTSecret(log, cfg.App.Env, cfg.Auth.TerminalJWTSecret, cfg.Auth.APIKey)
+	if err != nil {
+		return nil, err
 	}
 
 	dbPool, err := database.NewPool(ctx, cfg.Postgres)
@@ -267,7 +298,7 @@ func New(ctx context.Context) (*App, error) {
 		RBACHandler:      handlers.NewRBACHandler(rbacService, log),
 		Membership:       handlers.NewMembershipHandler(ormClient, membershipSvc, treasuryClient, log),
 		Sequence:         handlers.NewSequenceHandler(ormClient, log),
-		PINAuth:          handlers.NewPINAuthHandler(ormClient, rbacService, subsClient, terminalJWTSecret(cfg), log),
+		PINAuth:          handlers.NewPINAuthHandler(ormClient, rbacService, subsClient, pinSecret, log),
 		PlatformConfig:   handlers.NewPlatformConfigHandler(secretStore, log),
 		CirculationRules: handlers.NewCirculationRuleHandler(ormClient, circulationSvc, log),
 		Holiday:          handlers.NewHolidayHandler(ormClient, calendarCalc, log),

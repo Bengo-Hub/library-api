@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
 	sharedpagination "github.com/Bengo-Hub/pagination"
@@ -59,6 +60,11 @@ func (h *RBACHandler) CreateRole(w http.ResponseWriter, r *http.Request) {
 	}
 	row, err := h.rbac.CreateRole(r.Context(), req.Name, req.Description, req.Permissions)
 	if err != nil {
+		var notAssignable rbac.ErrRoleNotAssignable
+		if errors.As(err, &notAssignable) {
+			respondError(w, http.StatusBadRequest, "this role name is reserved", "role_name_reserved")
+			return
+		}
 		respondError(w, http.StatusInternalServerError, err.Error(), "create_failed")
 		return
 	}
@@ -174,6 +180,11 @@ func (h *RBACHandler) AssignRoles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.rbac.AssignRoles(r.Context(), tenantID, userID, body.Roles); err != nil {
+		var notAssignable rbac.ErrRoleNotAssignable
+		if errors.As(err, &notAssignable) {
+			respondError(w, http.StatusBadRequest, err.Error(), "role_not_assignable")
+			return
+		}
 		respondError(w, http.StatusInternalServerError, err.Error(), "assign_failed")
 		return
 	}

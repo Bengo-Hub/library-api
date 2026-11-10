@@ -408,8 +408,12 @@ func (s *Service) ListRoles(ctx context.Context) ([]*ent.LibraryRole, error) {
 	return s.db.LibraryRole.Query().All(ctx)
 }
 
-// CreateRole creates a custom (non-system) role.
+// CreateRole creates a custom (non-system) role. A reserved platform role name is refused, so a
+// custom role can never make a reserved name assignable.
 func (s *Service) CreateRole(ctx context.Context, name, description string, permissions []string) (*ent.LibraryRole, error) {
+	if IsReservedRole(name) {
+		return nil, ErrRoleNotAssignable{Role: name}
+	}
 	return s.db.LibraryRole.Create().
 		SetName(name).SetDescription(description).SetPermissions(permissions).SetIsSystem(false).
 		Save(ctx)
@@ -447,13 +451,83 @@ func (s *Service) ListUsers(ctx context.Context, tenantID uuid.UUID) ([]*ent.Lib
 	return s.db.LibraryUser.Query().Where(libraryuser.TenantID(tenantID)).All(ctx)
 }
 
-// AssignRoles sets a user's roles (replacing the current set).
+// reservedRoleNames are platform or auth-level role names. They are never a library role, so
+// they can never be assigned to a library user, created as a custom role or carried on a PIN
+// token. A "superuser" stored on a LibraryUser used to ride into the PIN token, where
+// claims.IsSuperuser() bypassed every permission check and passed RequirePlatformOwner.
+var reservedRoleNames = map[string]bool{
+	"superuser": true, "superusers": true, "super_admin": true, "superadmin": true,
+	"owner": true, "platform_owner": true, "platform_admin": true, "platform": true,
+	"admin": true, "administrator": true, "system_admin": true, "tenant_admin": true, "root": true,
+}
+
+// systemRoleNames are the seeded library roles (see SeedGlobalRoles). Always assignable.
+var systemRoleNames = map[string]bool{RoleAdmin: true, RoleStaff: true, RoleMember: true}
+
+// IsReservedRole reports whether name is a platform or auth-level role that must never be
+// granted through library-api (compared lowercase and trimmed).
+func IsReservedRole(name string) bool {
+	return reservedRoleNames[strings.ToLower(strings.TrimSpace(name))]
+}
+
+// ErrRoleNotAssignable is returned when a role is reserved or not a defined library role.
+type ErrRoleNotAssignable struct{ Role string }
+
+func (e ErrRoleNotAssignable) Error() string {
+	return "role " + strings.TrimSpace(e.Role) + " cannot be assigned"
+}
+
+// AssignableRoles returns the roles from the list that are defined library roles (the seeded
+// system roles or an existing custom LibraryRole) and not reserved, plus the ones it dropped.
+// When the role table cannot be read, only the seeded system roles pass.
+func (s *Service) AssignableRoles(ctx context.Context, roles []string) (allowed, rejected []string) {
+	candidates := []string{}
+	for _, r := range roles {
+		name := strings.TrimSpace(r)
+		if name == "" {
+			continue
+		}
+		if IsReservedRole(name) {
+			rejected = append(rejected, r)
+			continue
+		}
+		candidates = append(candidates, name)
+	}
+	defined := map[string]bool{}
+	if len(candidates) > 0 && s.db != nil {
+		if rows, err := s.db.LibraryRole.Query().Where(libraryrole.NameIn(candidates...)).All(ctx); err == nil {
+			for _, row := range rows {
+				defined[row.Name] = true
+			}
+		}
+	}
+	for _, name := range candidates {
+		if systemRoleNames[name] || defined[name] {
+			allowed = append(allowed, name)
+		} else {
+			rejected = append(rejected, name)
+		}
+	}
+	return mergeUnique(allowed, nil), rejected
+}
+
+// AssignRoles sets a user's roles (replacing the current set). Every role must be a defined
+// library role; reserved platform roles such as superuser are refused before anything is read.
 func (s *Service) AssignRoles(ctx context.Context, tenantID uuid.UUID, userID string, roles []string) error {
+	for _, r := range roles {
+		if IsReservedRole(r) {
+			return ErrRoleNotAssignable{Role: r}
+		}
+	}
+	allowed, rejected := s.AssignableRoles(ctx, roles)
+	if len(rejected) > 0 {
+		return ErrRoleNotAssignable{Role: rejected[0]}
+	}
 	u, err := s.db.LibraryUser.Query().Where(libraryuser.TenantID(tenantID), libraryuser.UserID(userID)).Only(ctx)
 	if err != nil {
 		return err
 	}
-	_, err = s.db.LibraryUser.UpdateOne(u).SetRoles(roles).Save(ctx)
+	_, err = s.db.LibraryUser.UpdateOne(u).SetRoles(allowed).Save(ctx)
 	return err
 }
 
