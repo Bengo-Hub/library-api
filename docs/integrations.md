@@ -100,12 +100,14 @@ Library charges (overdue/lost/damage **fines**, **membership fees**, and **e-boo
 
 ## Marketflow (CRM)
 
-**Integration type:** reference link (optional enrich).
+**Integration type:** reference link plus read-only snapshot (November 2026).
 
-- A `Member` may carry a `crm_contact_id` referencing a marketflow contact. **Marketflow is the customer SoT** (`crm_data_ownership_sync`); library-api stores only the reference plus a cached `display_name`/contact for desk UX.
-- No PII is duplicated: phone/email cached on `Member` are a convenience cache, not the source of truth.
+- A `Member` carries a `crm_contact_id` referencing a marketflow contact. **Marketflow is the customer SoT**; the name, phone and email on `Member` are a read-only snapshot, refreshed from the CRM when `crm.contact.updated` arrives.
+- Creating a member upserts the contact through `github.com/Bengo-Hub/shared-service-client/crm` (v0.5.0). A CRM refusal (400, 404, 409, 422) is shown to the librarian. An outage (401, 403, 429, 5xx, no answer) saves the member unlinked and the background syncer links it later.
+- `crm.contact.deleted` clears the link and sets `metadata.crm_unlinked_at` on the member, and the syncer skips marked members. A staff edit clears the mark and links again.
+- Tenant users act for their token's tenant; the platform-owner tenant switch is the only exception.
 
-**Env:** `MARKETFLOW_SERVICE_URL` (default `marketflowapi.codevertexafrica.com`).
+**Env:** `MARKETFLOW_SERVICE_URL` (default `https://marketflowapi.codevertexafrica.com`) and `INTERNAL_SERVICE_KEY`.
 
 ---
 
@@ -115,7 +117,7 @@ Library charges (overdue/lost/damage **fines**, **membership fees**, and **e-boo
 |------|-------------|-------------------|
 | User identity / login | auth-api | `Member.user_id`, `LibraryUser.user_id` (refs) |
 | Tenant + branding | auth-api | thin `Tenant` projection (slug/name); branding via Redis cache |
-| Customer / contact | marketflow | `Member.crm_contact_id` (ref) + cached display name |
+| Customer / contact | marketflow | `Member.crm_contact_id` (ref) + read-only name, phone, email snapshot |
 | Payments / GL | treasury | `treasury_intent_id` on fine/fee/purchase |
 | Roles/permissions (codes) | **library-api** | `LibraryRole` (global) — library owns its own `library.{module}.{action}` codes |
 | Catalog / circulation / members | **library-api** | full ownership |
