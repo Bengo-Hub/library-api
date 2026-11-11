@@ -45,13 +45,17 @@ type Deps struct {
 	AuthMiddleware   *authclient.AuthMiddleware
 	RBAC             *rbac.Service
 	// DB resolves a platform owner's URL tenant slug to its UUID (see handlers.TenantScope).
-	DB *ent.Client
-	AllowedOrigins   []string
+	DB             *ent.Client
+	AllowedOrigins []string
 	// MediaFiles is objectstore's /media handler (nil when there is nothing to serve).
 	MediaFiles http.Handler
 	// TenantExport streams one tenant's rows for auth-api's SSO tenant backups; it checks
 	// INTERNAL_SERVICE_KEY itself (nil when no key is set).
 	TenantExport http.Handler
+	// CRMLinks answers marketflow's "does the library still link this contact" check, behind
+	// INTERNAL_SERVICE_KEY (InternalKey). The route is left out when either is unset.
+	CRMLinks    *handlers.CRMLinksHandler
+	InternalKey string
 	// Limiter is the shared request limiter (nil disables limiting, e.g. in tests).
 	Limiter *ratelimit.Limiter
 }
@@ -84,6 +88,10 @@ func New(d Deps) http.Handler {
 	r.Get("/metrics", d.Health.Metrics)
 	if d.TenantExport != nil {
 		r.Get("/api/v1/s2s/tenant-export", d.TenantExport.ServeHTTP)
+	}
+	if d.CRMLinks != nil && d.InternalKey != "" {
+		r.With(httpware.RequireServiceKey(d.InternalKey)).
+			Get("/api/v1/s2s/{tenant}/crm-links/{contactID}", d.CRMLinks.Referenced)
 	}
 
 	// API docs (Swagger UI + OpenAPI spec). Base URL redirects to the docs page.

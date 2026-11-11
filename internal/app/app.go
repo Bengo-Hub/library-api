@@ -315,6 +315,8 @@ func New(ctx context.Context) (*App, error) {
 		AllowedOrigins:   cfg.HTTP.AllowedOrigins,
 		MediaFiles:       mediaStore.MediaHandler(),
 		TenantExport:     tenantExportHandler(sqlDB, cfg.Auth.APIKey),
+		CRMLinks:         handlers.NewCRMLinksHandler(ormClient, log),
+		InternalKey:      cfg.Auth.APIKey,
 	}
 
 	// auth-service JWT validator (JWKS) + optional S2S API key.
