@@ -22,6 +22,7 @@ import (
 	"github.com/google/uuid"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
 	"github.com/bengobox/library-service/internal/ent"
 	"github.com/bengobox/library-service/internal/ent/member"
@@ -88,7 +89,7 @@ func memberRouter(h *MemberHandler, db *ent.Client, claims *authclient.Claims) h
 				next.ServeHTTP(w, req.WithContext(authclient.ContextWithClaims(req.Context(), claims)))
 			})
 		})
-		lib.Use(TenantScope(db))
+		lib.Use(TenantScope(db, nil))
 		lib.Post("/members", h.CreateMember)
 		lib.Post("/members/import", h.ImportMembers)
 	})
@@ -144,14 +145,33 @@ func TestPlatformOwnerCreatesInURLTenant(t *testing.T) {
 	}
 }
 
-func TestTenantUserCannotNameOtherTenant(t *testing.T) {
-	h := NewMemberHandler(nil, nil, zap.NewNop())
+// The tenant check is report-only for now: a tenant user naming another tenant is logged and not
+// refused. When ReportOnly is removed from TenantScope, change this back to expect a 403.
+func TestTenantUserNamingOtherTenantIsReported(t *testing.T) {
+	core, logs := observer.New(zap.WarnLevel)
 	claims := &authclient.Claims{TenantID: uuid.NewString(), TenantSlug: "alpha"}
-	rec := postJSON(t, memberRouter(h, nil, claims), "/api/v1/beta/library/members", map[string]any{
-		"first_name": "Mallory", "membership_no": "M-1",
+	reached := false
+
+	r := chi.NewRouter()
+	r.Route("/api/v1/{tenant}/library", func(lib chi.Router) {
+		lib.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				next.ServeHTTP(w, req.WithContext(authclient.ContextWithClaims(req.Context(), claims)))
+			})
+		})
+		lib.Use(TenantScope(nil, zap.New(core)))
+		lib.Post("/members", func(w http.ResponseWriter, _ *http.Request) {
+			reached = true
+			w.WriteHeader(http.StatusNoContent)
+		})
 	})
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("status %d, want 403: %s", rec.Code, rec.Body.String())
+
+	rec := postJSON(t, r, "/api/v1/beta/library/members", map[string]any{"first_name": "Mallory"})
+	if rec.Code == http.StatusForbidden || !reached {
+		t.Fatalf("status %d reached=%v, want the request to pass while report-only", rec.Code, reached)
+	}
+	if n := logs.FilterMessage("tenant mismatch (report-only)").Len(); n != 1 {
+		t.Fatalf("got %d mismatch log lines, want 1", n)
 	}
 }
 

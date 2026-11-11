@@ -206,6 +206,7 @@ E-book lending (`ebooks.go`) takes a `ForUpdate()` row lock on the `ebook` row, 
 - **Global reference data** (`LibraryRole`) has no `tenant_id` — roles/permissions are shared across all tenants.
 - `Tenant` is a thin local projection of the auth-api tenant (SoT): caches `slug` + display name for slug→UUID resolution and JIT provisioning. Branding is **not** stored here (auth-api owns branding).
 - The URL carries `{tenant}` (slug); claims carry the tenant UUID. The frontend `apiClient` also sends `X-Tenant-ID`/`X-Tenant-Slug` (suppressed for platform owners) + `X-Outlet-ID`.
+- `TenantScope` (httpware v0.19.1 `TenantV2`) is report-only for now: a URL or header tenant that differs from a non-platform-owner token is logged as `tenant mismatch (report-only)` and will be refused with 403 once the logs show no legitimate caller.
 
 ---
 

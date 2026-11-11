@@ -118,7 +118,7 @@ func New(d Deps) http.Handler {
 		}
 		// {tenant} must match the caller's tenant (403 otherwise); a platform owner acts for the
 		// tenant the URL names, which TenantUUID then returns.
-		lib.Use(handlers.TenantScope(d.DB))
+		lib.Use(handlers.TenantScope(d.DB, d.Log))
 		// JIT user provisioning (heals existing users on every request).
 		if d.RBAC != nil {
 			lib.Use(func(next http.Handler) http.Handler {

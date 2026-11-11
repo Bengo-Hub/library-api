@@ -11,6 +11,7 @@ import (
 	authclient "github.com/Bengo-Hub/shared-auth-client"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 
 	"github.com/bengobox/library-service/internal/ent"
 	"github.com/bengobox/library-service/internal/ent/tenant"
@@ -33,8 +34,30 @@ type scopedTenantKey struct{}
 // so a tenant user naming another tenant gets 403. A platform owner may act for any tenant:
 // the URL tenant (a UUID or a slug looked up in the local Tenant table) becomes the request's
 // tenant, and an unknown slug gets 404. db may be nil when no platform owner is expected.
-func TenantScope(db *ent.Client) func(http.Handler) http.Handler {
+//
+// The tenant check is report-only for now: a mismatch is logged through log (nil logs nothing) and
+// the request goes on, until the logs show no legitimate caller would be refused.
+func TenantScope(db *ent.Client, log *zap.Logger) func(http.Handler) http.Handler {
+	if log == nil {
+		log = zap.NewNop()
+	}
 	v2 := httpware.TenantV2(httpware.TenantConfig{
+		// Report-only until the logs show no legitimate caller is refused, then remove
+		// ReportOnly so a tenant that differs from the token's gets a 403.
+		ReportOnly: true,
+		OnMismatch: func(r *http.Request, source, supplied, claimed string) {
+			fields := []zap.Field{
+				zap.String("source", source),
+				zap.String("supplied", supplied),
+				zap.String("claimed", claimed),
+				zap.String("method", r.Method),
+				zap.String("path", r.URL.Path),
+			}
+			if c, ok := authclient.ClaimsFromContext(r.Context()); ok && c != nil {
+				fields = append(fields, zap.String("subject", c.Subject))
+			}
+			log.Warn("tenant mismatch (report-only)", fields...)
+		},
 		ClaimsExtractor: func(ctx context.Context) (string, string, bool, bool) {
 			claims, found := authclient.ClaimsFromContext(ctx)
 			if !found || claims == nil {
