@@ -30,7 +30,9 @@ type LibraryRole struct {
 	// Dotted permission codes granted by this role
 	Permissions []string `json:"permissions,omitempty"`
 	// IsSystem holds the value of the "is_system" field.
-	IsSystem     bool `json:"is_system,omitempty"`
+	IsSystem bool `json:"is_system,omitempty"`
+	// Owning tenant of a custom role; NULL for system roles and legacy custom roles
+	TenantID     *uuid.UUID `json:"tenant_id,omitempty"`
 	selectValues sql.SelectValues
 }
 
@@ -39,6 +41,8 @@ func (*LibraryRole) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case libraryrole.FieldTenantID:
+			values[i] = &sql.NullScanner{S: new(uuid.UUID)}
 		case libraryrole.FieldPermissions:
 			values[i] = new([]byte)
 		case libraryrole.FieldIsSystem:
@@ -108,6 +112,13 @@ func (_m *LibraryRole) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.IsSystem = value.Bool
 			}
+		case libraryrole.FieldTenantID:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field tenant_id", values[i])
+			} else if value.Valid {
+				_m.TenantID = new(uuid.UUID)
+				*_m.TenantID = *value.S.(*uuid.UUID)
+			}
 		default:
 			_m.selectValues.Set(columns[i], values[i])
 		}
@@ -161,6 +172,11 @@ func (_m *LibraryRole) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("is_system=")
 	builder.WriteString(fmt.Sprintf("%v", _m.IsSystem))
+	builder.WriteString(", ")
+	if v := _m.TenantID; v != nil {
+		builder.WriteString("tenant_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteByte(')')
 	return builder.String()
 }

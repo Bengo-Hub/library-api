@@ -238,11 +238,12 @@ Secrets are **never** committed — they come from K8s secrets / env. Use placeh
 
 ## Migration Strategy
 
-Atlas versioned migrations are the source of truth (no production auto-migrate):
+The ent schema is the source of truth for the database shape.
 
 1. Edit `internal/ent/schema/*.go`, then `go generate ./internal/ent/...`.
-2. Generate a versioned migration against local PG (`go run internal/ent/migrate/main.go <name>`).
-3. Apply via `go run ./cmd/migrate` (or `POSTGRES_RUN_MIGRATIONS=true` on startup, which applies the embedded versioned dir — never an online additive create).
+2. Generate a versioned migration against local PG (`go run internal/ent/migrate/main.go <name>`). The `.sql` files in `internal/ent/migrate/migrations` record each change and are the reviewable history.
+3. At runtime, `go run ./cmd/migrate` and `POSTGRES_RUN_MIGRATIONS=true` on startup both call ent's `Schema.Create`. That inspects the live database and applies the additive diff against the ent schema. It does **not** execute the versioned `.sql` files, and it never drops an index or a column.
+4. A step `Schema.Create` will not do, such as dropping a retired index, goes in `database.PreMigrate` (`internal/platform/database/premigrate.go`). Both entry points run it right before `Schema.Create`. Every statement there must be idempotent (`IF EXISTS`), and it should also be written into the versioned `.sql` file so the history stays complete.
 
 ---
 

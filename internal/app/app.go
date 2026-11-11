@@ -171,6 +171,10 @@ func New(ctx context.Context) (*App, error) {
 	ormClient := ent.NewClient(ent.Driver(drv))
 
 	if cfg.Postgres.RunMigrations {
+		// Schema.Create never drops indexes, so retired ones are dropped here first.
+		if err := database.PreMigrate(ctx, sqlDB); err != nil {
+			return nil, fmt.Errorf("ent pre-migrate: %w", err)
+		}
 		if err := ormClient.Schema.Create(ctx, schema.WithDir(migrate.Dir)); err != nil {
 			return nil, fmt.Errorf("ent schema create: %w", err)
 		}

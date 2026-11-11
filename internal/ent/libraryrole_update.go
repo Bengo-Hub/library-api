@@ -14,6 +14,7 @@ import (
 	"entgo.io/ent/schema/field"
 	"github.com/bengobox/library-service/internal/ent/libraryrole"
 	"github.com/bengobox/library-service/internal/ent/predicate"
+	"github.com/google/uuid"
 )
 
 // LibraryRoleUpdate is the builder for updating LibraryRole entities.
@@ -98,6 +99,26 @@ func (_u *LibraryRoleUpdate) SetNillableIsSystem(v *bool) *LibraryRoleUpdate {
 	if v != nil {
 		_u.SetIsSystem(*v)
 	}
+	return _u
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (_u *LibraryRoleUpdate) SetTenantID(v uuid.UUID) *LibraryRoleUpdate {
+	_u.mutation.SetTenantID(v)
+	return _u
+}
+
+// SetNillableTenantID sets the "tenant_id" field if the given value is not nil.
+func (_u *LibraryRoleUpdate) SetNillableTenantID(v *uuid.UUID) *LibraryRoleUpdate {
+	if v != nil {
+		_u.SetTenantID(*v)
+	}
+	return _u
+}
+
+// ClearTenantID clears the value of the "tenant_id" field.
+func (_u *LibraryRoleUpdate) ClearTenantID() *LibraryRoleUpdate {
+	_u.mutation.ClearTenantID()
 	return _u
 }
 
@@ -190,6 +211,12 @@ func (_u *LibraryRoleUpdate) sqlSave(ctx context.Context) (_node int, err error)
 	if value, ok := _u.mutation.IsSystem(); ok {
 		_spec.SetField(libraryrole.FieldIsSystem, field.TypeBool, value)
 	}
+	if value, ok := _u.mutation.TenantID(); ok {
+		_spec.SetField(libraryrole.FieldTenantID, field.TypeUUID, value)
+	}
+	if _u.mutation.TenantIDCleared() {
+		_spec.ClearField(libraryrole.FieldTenantID, field.TypeUUID)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{libraryrole.Label}
@@ -279,6 +306,26 @@ func (_u *LibraryRoleUpdateOne) SetNillableIsSystem(v *bool) *LibraryRoleUpdateO
 	if v != nil {
 		_u.SetIsSystem(*v)
 	}
+	return _u
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (_u *LibraryRoleUpdateOne) SetTenantID(v uuid.UUID) *LibraryRoleUpdateOne {
+	_u.mutation.SetTenantID(v)
+	return _u
+}
+
+// SetNillableTenantID sets the "tenant_id" field if the given value is not nil.
+func (_u *LibraryRoleUpdateOne) SetNillableTenantID(v *uuid.UUID) *LibraryRoleUpdateOne {
+	if v != nil {
+		_u.SetTenantID(*v)
+	}
+	return _u
+}
+
+// ClearTenantID clears the value of the "tenant_id" field.
+func (_u *LibraryRoleUpdateOne) ClearTenantID() *LibraryRoleUpdateOne {
+	_u.mutation.ClearTenantID()
 	return _u
 }
 
@@ -400,6 +447,12 @@ func (_u *LibraryRoleUpdateOne) sqlSave(ctx context.Context) (_node *LibraryRole
 	}
 	if value, ok := _u.mutation.IsSystem(); ok {
 		_spec.SetField(libraryrole.FieldIsSystem, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.TenantID(); ok {
+		_spec.SetField(libraryrole.FieldTenantID, field.TypeUUID, value)
+	}
+	if _u.mutation.TenantIDCleared() {
+		_spec.ClearField(libraryrole.FieldTenantID, field.TypeUUID)
 	}
 	_node = &LibraryRole{config: _u.config}
 	_spec.Assign = _node.assignValues

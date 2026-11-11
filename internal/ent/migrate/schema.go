@@ -3,6 +3,7 @@
 package migrate
 
 import (
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/dialect/sql/schema"
 	"entgo.io/ent/schema/field"
 )
@@ -839,6 +840,7 @@ var (
 		{Name: "description", Type: field.TypeString, Nullable: true},
 		{Name: "permissions", Type: field.TypeJSON, Nullable: true},
 		{Name: "is_system", Type: field.TypeBool, Default: false},
+		{Name: "tenant_id", Type: field.TypeUUID, Nullable: true},
 	}
 	// LibraryRolesTable holds the schema information for the "library_roles" table.
 	LibraryRolesTable = &schema.Table{
@@ -847,9 +849,20 @@ var (
 		PrimaryKey: []*schema.Column{LibraryRolesColumns[0]},
 		Indexes: []*schema.Index{
 			{
-				Name:    "libraryrole_name",
+				Name:    "libraryrole_name_global",
 				Unique:  true,
 				Columns: []*schema.Column{LibraryRolesColumns[3]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "tenant_id IS NULL",
+				},
+			},
+			{
+				Name:    "libraryrole_tenant_id_name",
+				Unique:  true,
+				Columns: []*schema.Column{LibraryRolesColumns[7], LibraryRolesColumns[3]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "tenant_id IS NOT NULL",
+				},
 			},
 		},
 	}

@@ -10,10 +10,10 @@ library-api owns its own roles + permissions (the service is the source of truth
 
 | Schema | Table | Description |
 |--------|-------|-------------|
-| `LibraryRole` | `library_roles` | **GLOBAL** role definitions (no `tenant_id`). `permissions` is a JSON array of dotted codes. |
+| `LibraryRole` | `library_roles` | Role definitions. System roles (`is_system`, seeded) have no `tenant_id` and are shared by every tenant. Custom roles carry the creating tenant's `tenant_id`. `permissions` is a JSON array of dotted codes. |
 | `LibraryUser` | `library_users` | Per-tenant projection of an auth user (JIT-provisioned + healed). `roles` is a JSON array of `LibraryRole` names. |
 
-> Per platform convention, **roles/permissions are global reference data, never tenant-scoped.** Only the user→role projection (`LibraryUser`) is per-tenant.
+> System roles are global reference data. Custom roles are tenant scoped: a tenant sees and assigns only system roles, legacy custom roles (no `tenant_id`) and its own custom roles. Role names are unique among rows with no tenant and unique per tenant otherwise.
 
 ---
 
@@ -99,10 +99,18 @@ The permission array is the **union** of `claims.Permissions` and the user's loc
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/{tenant}/library/rbac/roles` | List global library roles |
+| `GET` | `/{tenant}/library/rbac/roles` | List the roles the tenant can see: system roles, legacy custom roles and its own custom roles |
+| `GET` | `/{tenant}/library/rbac/roles/{id}` | One visible role (another tenant's custom role is 404) |
+| `POST` | `/{tenant}/library/rbac/roles` | Create a custom role in the tenant (team.manage and admin level) |
+| `PUT` | `/{tenant}/library/rbac/roles/{id}` | Edit a custom role's permissions (team.manage and admin level) |
+| `DELETE` | `/{tenant}/library/rbac/roles/{id}` | Delete a custom role (team.manage and admin level) |
 | `GET` | `/{tenant}/library/rbac/permissions` | List the permission catalog |
 | `GET` | `/{tenant}/library/team` | List the tenant's provisioned library users |
-| `PUT` | `/{tenant}/library/team/{user_id}/roles` | Assign roles to a team member (replaces the set) |
+| `PUT` | `/{tenant}/library/team/{user_id}/roles` | Assign roles to a team member, replacing the set (team.manage and admin level) |
+
+Admin level means a real platform owner or a user holding `library_admin` in the tenant. `library_staff` holds `library.team.manage` only so it can manage its own PIN; it cannot touch roles.
+System roles are read only through the API (403); only the seed changes them. A caller can never put a permission on a role that it does not hold itself, so `*` needs a caller holding `*`.
+A legacy custom role (no `tenant_id`, created before roles were tenant scoped) stays readable by every tenant, but only a platform owner may edit, delete or newly assign it.
 
 ---
 

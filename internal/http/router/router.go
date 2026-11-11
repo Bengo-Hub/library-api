@@ -328,18 +328,24 @@ func New(d Deps) http.Handler {
 				e.With(view("ebooks")).Get("/ebooks/{id}/download", d.Ebook.Download)
 			})
 
-			// RBAC / team — admin only (team.view / team.manage).
+			// RBAC / team. Role management (create, edit, delete, assign) needs team.manage AND
+			// admin level (library_admin or a real platform owner): library_staff holds
+			// team.manage only for its own PIN, so it can no longer touch roles.
+			roleAdmin := libmw.RequireLibraryAdmin(d.RBAC)
 			lib.With(view("team")).Get("/rbac/roles", d.RBACHandler.ListRoles)
-			lib.With(act("team", "manage")).Post("/rbac/roles", d.RBACHandler.CreateRole)
-			lib.With(act("team", "manage")).Put("/rbac/roles/{id}", d.RBACHandler.UpdateRole)
-			lib.With(act("team", "manage")).Delete("/rbac/roles/{id}", d.RBACHandler.DeleteRole)
+			lib.With(view("team")).Get("/rbac/roles/{id}", d.RBACHandler.GetRole)
+			lib.With(act("team", "manage"), roleAdmin).Post("/rbac/roles", d.RBACHandler.CreateRole)
+			lib.With(act("team", "manage"), roleAdmin).Put("/rbac/roles/{id}", d.RBACHandler.UpdateRole)
+			lib.With(act("team", "manage"), roleAdmin).Delete("/rbac/roles/{id}", d.RBACHandler.DeleteRole)
 			lib.With(view("team")).Get("/rbac/permissions", d.RBACHandler.ListPermissions)
 			lib.With(view("team")).Get("/team", d.RBACHandler.ListTeam)
 			if d.PINAuth != nil {
 				lib.With(view("team")).Get("/team/{user_id}/card.pdf", d.PINAuth.StaffCard)
 			}
-			lib.With(act("team", "manage")).Put("/team/{user_id}/roles", d.RBACHandler.AssignRoles)
-			lib.With(act("team", "manage")).Put("/team/{user_id}/branches", d.RBACHandler.AssignBranches)
+			lib.With(act("team", "manage"), roleAdmin).Put("/team/{user_id}/roles", d.RBACHandler.AssignRoles)
+			// Branch lists decide where a user may PIN in, so staff must not change a peer's (or
+			// their own). The UI only edits them from the admin member dialog on the Team page.
+			lib.With(act("team", "manage"), roleAdmin).Put("/team/{user_id}/branches", d.RBACHandler.AssignBranches)
 
 			// Settings — document-sequence configuration (membership_no, accession_no, …).
 			if d.Sequence != nil {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/bengobox/library-service/internal/ent"
 	"github.com/bengobox/library-service/internal/ent/migrate"
+	"github.com/bengobox/library-service/internal/platform/database"
 )
 
 // migrationLockKey serializes migrations across pods: every replica runs this binary on start
@@ -56,7 +57,11 @@ func main() {
 	defer client.Close()
 
 	ctx := context.Background()
-	migrateErr := client.Schema.Create(ctx, schema.WithDir(migrate.Dir))
+	// Schema.Create never drops indexes, so retired ones are dropped here first, inside the lock.
+	migrateErr := database.PreMigrate(ctx, sqlDB)
+	if migrateErr == nil {
+		migrateErr = client.Schema.Create(ctx, schema.WithDir(migrate.Dir))
+	}
 	if _, err := sqlDB.Exec("SELECT pg_advisory_unlock($1)", migrationLockKey); err != nil {
 		log.Printf("release migration lock: %v", err)
 	}

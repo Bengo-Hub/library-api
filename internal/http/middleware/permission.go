@@ -51,6 +51,38 @@ func RequireServicePermission(rbacSvc PermissionChecker, perms ...string) func(h
 	}
 }
 
+// AdminChecker is the subset of rbac.Service RequireLibraryAdmin needs.
+type AdminChecker interface {
+	IsLibraryAdmin(ctx context.Context, tenantID uuid.UUID, userID string) bool
+}
+
+// RequireLibraryAdmin gates role management to admin level: a real platform owner or a user who
+// holds library_admin in the tenant. A superuser role on the token is not enough, and neither is
+// library.team.manage, which library_staff also holds for its own PIN.
+func RequireLibraryAdmin(checker AdminChecker) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			claims, ok := authclient.ClaimsFromContext(r.Context())
+			if !ok || claims == nil {
+				writeForbidden(w)
+				return
+			}
+			if claims.IsPlatformOwner {
+				next.ServeHTTP(w, r)
+				return
+			}
+			if checker != nil && claims.TenantID != "" {
+				if tenantID, err := uuid.Parse(claims.TenantID); err == nil &&
+					checker.IsLibraryAdmin(r.Context(), tenantID, claims.Subject) {
+					next.ServeHTTP(w, r)
+					return
+				}
+			}
+			writeForbidden(w)
+		})
+	}
+}
+
 // RequirePlatformOwner gates platform-level configuration (encryption key, integration secrets)
 // to the platform owner only. A superuser role is NOT enough: it is a tenant role (SEC-3), and a
 // tenant admin could put "superuser" on a PIN token through the team roles screen, which opened

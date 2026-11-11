@@ -92,6 +92,20 @@ func (_c *LibraryRoleCreate) SetNillableIsSystem(v *bool) *LibraryRoleCreate {
 	return _c
 }
 
+// SetTenantID sets the "tenant_id" field.
+func (_c *LibraryRoleCreate) SetTenantID(v uuid.UUID) *LibraryRoleCreate {
+	_c.mutation.SetTenantID(v)
+	return _c
+}
+
+// SetNillableTenantID sets the "tenant_id" field if the given value is not nil.
+func (_c *LibraryRoleCreate) SetNillableTenantID(v *uuid.UUID) *LibraryRoleCreate {
+	if v != nil {
+		_c.SetTenantID(*v)
+	}
+	return _c
+}
+
 // SetID sets the "id" field.
 func (_c *LibraryRoleCreate) SetID(v uuid.UUID) *LibraryRoleCreate {
 	_c.mutation.SetID(v)
@@ -238,6 +252,10 @@ func (_c *LibraryRoleCreate) createSpec() (*LibraryRole, *sqlgraph.CreateSpec) {
 		_spec.SetField(libraryrole.FieldIsSystem, field.TypeBool, value)
 		_node.IsSystem = value
 	}
+	if value, ok := _c.mutation.TenantID(); ok {
+		_spec.SetField(libraryrole.FieldTenantID, field.TypeUUID, value)
+		_node.TenantID = &value
+	}
 	return _node, _spec
 }
 
@@ -359,6 +377,24 @@ func (u *LibraryRoleUpsert) SetIsSystem(v bool) *LibraryRoleUpsert {
 // UpdateIsSystem sets the "is_system" field to the value that was provided on create.
 func (u *LibraryRoleUpsert) UpdateIsSystem() *LibraryRoleUpsert {
 	u.SetExcluded(libraryrole.FieldIsSystem)
+	return u
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (u *LibraryRoleUpsert) SetTenantID(v uuid.UUID) *LibraryRoleUpsert {
+	u.Set(libraryrole.FieldTenantID, v)
+	return u
+}
+
+// UpdateTenantID sets the "tenant_id" field to the value that was provided on create.
+func (u *LibraryRoleUpsert) UpdateTenantID() *LibraryRoleUpsert {
+	u.SetExcluded(libraryrole.FieldTenantID)
+	return u
+}
+
+// ClearTenantID clears the value of the "tenant_id" field.
+func (u *LibraryRoleUpsert) ClearTenantID() *LibraryRoleUpsert {
+	u.SetNull(libraryrole.FieldTenantID)
 	return u
 }
 
@@ -494,6 +530,27 @@ func (u *LibraryRoleUpsertOne) SetIsSystem(v bool) *LibraryRoleUpsertOne {
 func (u *LibraryRoleUpsertOne) UpdateIsSystem() *LibraryRoleUpsertOne {
 	return u.Update(func(s *LibraryRoleUpsert) {
 		s.UpdateIsSystem()
+	})
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (u *LibraryRoleUpsertOne) SetTenantID(v uuid.UUID) *LibraryRoleUpsertOne {
+	return u.Update(func(s *LibraryRoleUpsert) {
+		s.SetTenantID(v)
+	})
+}
+
+// UpdateTenantID sets the "tenant_id" field to the value that was provided on create.
+func (u *LibraryRoleUpsertOne) UpdateTenantID() *LibraryRoleUpsertOne {
+	return u.Update(func(s *LibraryRoleUpsert) {
+		s.UpdateTenantID()
+	})
+}
+
+// ClearTenantID clears the value of the "tenant_id" field.
+func (u *LibraryRoleUpsertOne) ClearTenantID() *LibraryRoleUpsertOne {
+	return u.Update(func(s *LibraryRoleUpsert) {
+		s.ClearTenantID()
 	})
 }
 
@@ -796,6 +853,27 @@ func (u *LibraryRoleUpsertBulk) SetIsSystem(v bool) *LibraryRoleUpsertBulk {
 func (u *LibraryRoleUpsertBulk) UpdateIsSystem() *LibraryRoleUpsertBulk {
 	return u.Update(func(s *LibraryRoleUpsert) {
 		s.UpdateIsSystem()
+	})
+}
+
+// SetTenantID sets the "tenant_id" field.
+func (u *LibraryRoleUpsertBulk) SetTenantID(v uuid.UUID) *LibraryRoleUpsertBulk {
+	return u.Update(func(s *LibraryRoleUpsert) {
+		s.SetTenantID(v)
+	})
+}
+
+// UpdateTenantID sets the "tenant_id" field to the value that was provided on create.
+func (u *LibraryRoleUpsertBulk) UpdateTenantID() *LibraryRoleUpsertBulk {
+	return u.Update(func(s *LibraryRoleUpsert) {
+		s.UpdateTenantID()
+	})
+}
+
+// ClearTenantID clears the value of the "tenant_id" field.
+func (u *LibraryRoleUpsertBulk) ClearTenantID() *LibraryRoleUpsertBulk {
+	return u.Update(func(s *LibraryRoleUpsert) {
+		s.ClearTenantID()
 	})
 }
 

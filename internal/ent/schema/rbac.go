@@ -2,13 +2,16 @@ package schema
 
 import (
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 )
 
-// LibraryRole is a GLOBAL role definition (per MEMORY: roles/permissions are shared
-// reference data, never tenant-scoped). Permissions are dotted codes enforced by
+// LibraryRole is a role definition. Permissions are dotted codes enforced by
 // RequireServicePermission, e.g. "library.circulation.checkout".
+// System roles (is_system, seeded) have no tenant_id and are shared by every tenant.
+// Custom roles created through the API carry the creating tenant's tenant_id.
+// A custom role with no tenant_id is a legacy row created before roles were tenant scoped.
 type LibraryRole struct {
 	ent.Schema
 }
@@ -24,12 +27,21 @@ func (LibraryRole) Fields() []ent.Field {
 		field.JSON("permissions", []string{}).Optional().
 			Comment("Dotted permission codes granted by this role"),
 		field.Bool("is_system").Default(false),
+		field.UUID("tenant_id", uuidType()).Optional().Nillable().
+			Comment("Owning tenant of a custom role; NULL for system roles and legacy custom roles"),
 	}
 }
 
 func (LibraryRole) Indexes() []ent.Index {
 	return []ent.Index{
-		index.Fields("name").Unique(),
+		// System and legacy roles: names unique among rows with no tenant.
+		index.Fields("name").Unique().
+			Annotations(entsql.IndexWhere("tenant_id IS NULL")).
+			StorageKey("libraryrole_name_global"),
+		// Tenant custom roles: names unique within the tenant, so two tenants may share a name.
+		index.Fields("tenant_id", "name").Unique().
+			Annotations(entsql.IndexWhere("tenant_id IS NOT NULL")).
+			StorageKey("libraryrole_tenant_id_name"),
 	}
 }
 

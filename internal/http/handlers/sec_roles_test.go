@@ -23,6 +23,8 @@ import (
 // defined library roles, so a tenant admin can no longer store "superuser" (or any platform role)
 // on a staff member, and a PIN token never carries one.
 func TestAssignRolesRejectsSuperuser(t *testing.T) {
+	// callerID is the acting user; role assignment needs it to hold library_admin in the tenant.
+	callerID := uuid.NewString()
 	assign := func(t *testing.T, db *ent.Client, tid uuid.UUID, userID string, roles []string) *httptest.ResponseRecorder {
 		t.Helper()
 		h := NewRBACHandler(rbac.NewService(db, zap.NewNop(), ""), zap.NewNop())
@@ -32,7 +34,7 @@ func TestAssignRolesRejectsSuperuser(t *testing.T) {
 		rctx.URLParams.Add("user_id", userID)
 		ctx := context.WithValue(req.Context(), chi.RouteCtxKey, rctx)
 		ctx = authclient.ContextWithClaims(ctx, &authclient.Claims{
-			RegisteredClaims: jwt.RegisteredClaims{Subject: uuid.NewString(), Issuer: terminalIssuer},
+			RegisteredClaims: jwt.RegisteredClaims{Subject: callerID, Issuer: terminalIssuer},
 			TenantID:         tid.String(),
 			Roles:            []string{rbac.RoleAdmin},
 		})
@@ -57,7 +59,7 @@ func TestAssignRolesRejectsSuperuser(t *testing.T) {
 				t.Fatalf("roles %v: status = %d, body = %s; want 400", roles, rec.Code, rec.Body.String())
 			}
 		}
-		if _, err := rbac.NewService(db, zap.NewNop(), "").CreateRole(context.Background(), "superuser", "", []string{"*"}); err == nil {
+		if _, err := rbac.NewService(db, zap.NewNop(), "").CreateRole(context.Background(), rbac.Actor{TenantID: uuid.New()}, "superuser", "", []string{"*"}); err == nil {
 			t.Fatal("a custom role may not take a reserved name")
 		}
 	})
@@ -97,6 +99,9 @@ func TestAssignRolesRejectsSuperuser(t *testing.T) {
 		userID := uuid.NewString()
 		if _, err := db.LibraryUser.Create().SetTenantID(tid).SetUserID(userID).SetRoles([]string{rbac.RoleMember}).Save(ctx); err != nil {
 			t.Fatalf("create user: %v", err)
+		}
+		if _, err := db.LibraryUser.Create().SetTenantID(tid).SetUserID(callerID).SetRoles([]string{rbac.RoleAdmin}).Save(ctx); err != nil {
+			t.Fatalf("create admin caller: %v", err)
 		}
 
 		if rec := assign(t, db, tid, userID, []string{"made_up_role"}); rec.Code != http.StatusBadRequest {

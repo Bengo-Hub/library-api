@@ -125,7 +125,7 @@ func (h *PINAuthHandler) PINBranches(w http.ResponseWriter, r *http.Request) {
 func (h *PINAuthHandler) terminalClaimsFor(ctx context.Context, t *ent.Tenant, u *ent.LibraryUser) terminalClaims {
 	// Only defined library roles ride into the token. A stored "superuser" or other reserved
 	// name would otherwise make claims.IsSuperuser() true and bypass every permission check.
-	roles, dropped := h.rbac.AssignableRoles(ctx, u.Roles)
+	roles, dropped := h.rbac.AssignableRoles(ctx, t.ID, u.Roles)
 	if len(dropped) > 0 && h.log != nil {
 		h.log.Warn("pin token: dropped roles that are not assignable library roles",
 			zap.String("tenant_id", t.ID.String()), zap.String("user_id", u.UserID), zap.Strings("roles", dropped))

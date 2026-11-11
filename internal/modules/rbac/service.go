@@ -19,6 +19,7 @@ import (
 	"github.com/bengobox/library-service/internal/ent/branch"
 	"github.com/bengobox/library-service/internal/ent/libraryrole"
 	"github.com/bengobox/library-service/internal/ent/libraryuser"
+	"github.com/bengobox/library-service/internal/ent/predicate"
 	"github.com/bengobox/library-service/internal/ent/tenant"
 )
 
@@ -100,7 +101,7 @@ func (s *Service) SeedGlobalRoles(ctx context.Context) error {
 		}},
 	}
 	for _, d := range defaults {
-		existing, err := s.db.LibraryRole.Query().Where(libraryrole.Name(d.name)).Only(ctx)
+		existing, err := s.db.LibraryRole.Query().Where(libraryrole.Name(d.name), libraryrole.TenantIDIsNil()).Only(ctx)
 		if ent.IsNotFound(err) {
 			if _, cerr := s.db.LibraryRole.Create().
 				SetName(d.name).SetDescription(d.desc).SetPermissions(d.perms).SetIsSystem(true).
@@ -111,8 +112,9 @@ func (s *Service) SeedGlobalRoles(ctx context.Context) error {
 		} else if err != nil {
 			return err
 		}
-		// Heal permission drift on existing system roles.
-		if _, err := s.db.LibraryRole.UpdateOne(existing).SetPermissions(d.perms).SetDescription(d.desc).Save(ctx); err != nil {
+		// Heal permission drift on existing system roles. The seed is the only writer of
+		// system roles; the API refuses to change them.
+		if _, err := s.db.LibraryRole.UpdateOne(existing).SetPermissions(d.perms).SetDescription(d.desc).SetIsSystem(true).Save(ctx); err != nil {
 			return err
 		}
 	}
@@ -356,7 +358,7 @@ func (s *Service) HasAnyPermission(ctx context.Context, tenantID uuid.UUID, user
 	if err != nil || len(u.Roles) == 0 {
 		return false
 	}
-	roleDefs, err := s.db.LibraryRole.Query().Where(libraryrole.NameIn(u.Roles...)).All(ctx)
+	roleDefs, err := s.db.LibraryRole.Query().Where(libraryrole.NameIn(u.Roles...), visibleTo(tenantID)).All(ctx)
 	if err != nil {
 		return false
 	}
@@ -386,7 +388,7 @@ func (s *Service) ListPermissions(ctx context.Context, tenantID uuid.UUID, userI
 	if err != nil || len(u.Roles) == 0 {
 		return nil
 	}
-	roleDefs, err := s.db.LibraryRole.Query().Where(libraryrole.NameIn(u.Roles...)).All(ctx)
+	roleDefs, err := s.db.LibraryRole.Query().Where(libraryrole.NameIn(u.Roles...), visibleTo(tenantID)).All(ctx)
 	if err != nil {
 		return nil
 	}
@@ -403,48 +405,206 @@ func (s *Service) ListPermissions(ctx context.Context, tenantID uuid.UUID, userI
 	return out
 }
 
-// ListRoles returns all global library roles.
-func (s *Service) ListRoles(ctx context.Context) ([]*ent.LibraryRole, error) {
-	return s.db.LibraryRole.Query().All(ctx)
+// visibleTo limits a role query to the roles a tenant can see: system roles and legacy custom
+// roles (no tenant) plus the tenant's own custom roles. Another tenant's custom role never
+// matches, so it can neither be read nor resolve permissions here.
+func visibleTo(tenantID uuid.UUID) predicate.LibraryRole {
+	return libraryrole.Or(libraryrole.TenantIDIsNil(), libraryrole.TenantIDEQ(tenantID))
 }
 
-// CreateRole creates a custom (non-system) role. A reserved platform role name is refused, so a
-// custom role can never make a reserved name assignable.
-func (s *Service) CreateRole(ctx context.Context, name, description string, permissions []string) (*ent.LibraryRole, error) {
-	if IsReservedRole(name) {
-		return nil, ErrRoleNotAssignable{Role: name}
-	}
-	return s.db.LibraryRole.Create().
-		SetName(name).SetDescription(description).SetPermissions(permissions).SetIsSystem(false).
-		Save(ctx)
+// IsLegacyRole reports whether a role is a custom role created before roles were tenant scoped.
+// Its tenant is unknown, so only a platform owner may edit or assign it.
+func IsLegacyRole(r *ent.LibraryRole) bool {
+	return r != nil && !r.IsSystem && r.TenantID == nil
 }
 
-// UpdateRolePermissions replaces a role's permission set (and optionally its description).
-func (s *Service) UpdateRolePermissions(ctx context.Context, id uuid.UUID, permissions []string, description string) (*ent.LibraryRole, error) {
-	u := s.db.LibraryRole.UpdateOneID(id).SetPermissions(permissions)
-	if description != "" {
-		u.SetDescription(description)
-	}
-	return u.Save(ctx)
+// Actor is the caller of a role management call.
+type Actor struct {
+	TenantID      uuid.UUID
+	UserID        string
+	PlatformOwner bool
+	// ClaimPermissions are the permission codes carried on the caller's token.
+	ClaimPermissions []string
 }
 
-// DeleteRole removes a custom role (system roles are protected).
-func (s *Service) DeleteRole(ctx context.Context, id uuid.UUID) error {
-	role, err := s.db.LibraryRole.Get(ctx, id)
-	if err != nil {
-		return err
-	}
-	if role.IsSystem {
-		return errSystemRoleLocked
-	}
-	return s.db.LibraryRole.DeleteOneID(id).Exec(ctx)
-}
+// Role management errors. The handler maps each one to its HTTP status.
+var (
+	ErrRoleNotFound       = stringError("role not found")
+	ErrSystemRoleReadOnly = stringError("system roles are read only")
+	ErrLegacyRoleLocked   = stringError("this role predates tenant scoping and only a platform owner may change it")
+	ErrRoleNameTaken      = stringError("A role with this name already exists in your organisation.")
+	ErrAdminRequired      = stringError("only a library admin or platform owner may manage or assign roles")
+)
 
-var errSystemRoleLocked = stringError("system roles cannot be deleted")
+// ErrPermissionNotHeld is returned when a caller tries to put a permission on a role that the
+// caller does not hold.
+type ErrPermissionNotHeld struct{ Permission string }
+
+func (e ErrPermissionNotHeld) Error() string {
+	return "you cannot grant a permission you do not hold: " + e.Permission
+}
 
 type stringError string
 
 func (e stringError) Error() string { return string(e) }
+
+// IsLibraryAdmin reports whether the user holds library_admin in the tenant.
+func (s *Service) IsLibraryAdmin(ctx context.Context, tenantID uuid.UUID, userID string) bool {
+	if s == nil || s.db == nil || userID == "" {
+		return false
+	}
+	u, err := s.db.LibraryUser.Query().
+		Where(libraryuser.TenantID(tenantID), libraryuser.UserID(userID)).
+		Only(ctx)
+	if err != nil {
+		return false
+	}
+	for _, r := range u.Roles {
+		if r == RoleAdmin {
+			return true
+		}
+	}
+	return false
+}
+
+// isAdminActor reports whether the actor may manage roles: a real platform owner or a
+// library_admin of the tenant.
+func (s *Service) isAdminActor(ctx context.Context, a Actor) bool {
+	return a.PlatformOwner || s.IsLibraryAdmin(ctx, a.TenantID, a.UserID)
+}
+
+// checkGrantable refuses any permission the actor does not hold. "*" is only grantable by a
+// caller holding "*"; a platform owner holds everything.
+func (s *Service) checkGrantable(ctx context.Context, a Actor, permissions []string) error {
+	if a.PlatformOwner {
+		return nil
+	}
+	held := map[string]bool{}
+	for _, p := range a.ClaimPermissions {
+		held[p] = true
+	}
+	for _, p := range s.ListPermissions(ctx, a.TenantID, a.UserID) {
+		held[p] = true
+	}
+	if held["*"] {
+		return nil
+	}
+	for _, p := range permissions {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if !held[p] {
+			return ErrPermissionNotHeld{Permission: p}
+		}
+	}
+	return nil
+}
+
+// ListRoles returns the roles the tenant can see: system roles, legacy custom roles and the
+// tenant's own custom roles.
+func (s *Service) ListRoles(ctx context.Context, tenantID uuid.UUID) ([]*ent.LibraryRole, error) {
+	return s.db.LibraryRole.Query().Where(visibleTo(tenantID)).All(ctx)
+}
+
+// GetRole returns a role the tenant can see. Another tenant's custom role is ErrRoleNotFound.
+func (s *Service) GetRole(ctx context.Context, tenantID, id uuid.UUID) (*ent.LibraryRole, error) {
+	role, err := s.db.LibraryRole.Query().Where(libraryrole.IDEQ(id), visibleTo(tenantID)).Only(ctx)
+	if ent.IsNotFound(err) {
+		return nil, ErrRoleNotFound
+	}
+	return role, err
+}
+
+// CreateRole creates a custom role owned by the actor's tenant. A reserved platform role name is
+// refused, a seeded system role name is read only, and a name the tenant can already see is
+// taken. Every permission must be one the actor holds, and the actor must be admin level.
+func (s *Service) CreateRole(ctx context.Context, a Actor, name, description string, permissions []string) (*ent.LibraryRole, error) {
+	name = strings.TrimSpace(name)
+	if IsReservedRole(name) {
+		return nil, ErrRoleNotAssignable{Role: name}
+	}
+	if IsSystemRoleName(name) {
+		return nil, ErrSystemRoleReadOnly
+	}
+	if a.TenantID == uuid.Nil {
+		return nil, ErrRoleNotFound
+	}
+	if err := s.checkGrantable(ctx, a, permissions); err != nil {
+		return nil, err
+	}
+	if !s.isAdminActor(ctx, a) {
+		return nil, ErrAdminRequired
+	}
+	taken, err := s.db.LibraryRole.Query().Where(libraryrole.Name(name), visibleTo(a.TenantID)).Exist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if taken {
+		return nil, ErrRoleNameTaken
+	}
+	row, err := s.db.LibraryRole.Create().
+		SetName(name).SetDescription(description).SetPermissions(permissions).
+		SetIsSystem(false).SetTenantID(a.TenantID).
+		Save(ctx)
+	if ent.IsConstraintError(err) {
+		// A concurrent create of the same name in the tenant. Never echo the database text.
+		return nil, ErrRoleNameTaken
+	}
+	return row, err
+}
+
+// editableRole loads a role for a change by the actor. System roles are read only, legacy roles
+// are for a platform owner only, and another tenant's role is not found.
+func (s *Service) editableRole(ctx context.Context, a Actor, id uuid.UUID) (*ent.LibraryRole, error) {
+	role, err := s.GetRole(ctx, a.TenantID, id)
+	if err != nil {
+		return nil, err
+	}
+	if role.IsSystem || (role.TenantID == nil && systemRoleNames[role.Name]) {
+		return nil, ErrSystemRoleReadOnly
+	}
+	if IsLegacyRole(role) && !a.PlatformOwner {
+		return nil, ErrLegacyRoleLocked
+	}
+	return role, nil
+}
+
+// UpdateRolePermissions replaces a custom role's permission set (and optionally its
+// description). Every permission must be one the actor holds, and the actor must be admin level.
+func (s *Service) UpdateRolePermissions(ctx context.Context, a Actor, id uuid.UUID, permissions []string, description string) (*ent.LibraryRole, error) {
+	role, err := s.editableRole(ctx, a, id)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.checkGrantable(ctx, a, permissions); err != nil {
+		return nil, err
+	}
+	if !s.isAdminActor(ctx, a) {
+		return nil, ErrAdminRequired
+	}
+	u := s.db.LibraryRole.UpdateOne(role).SetPermissions(permissions)
+	if description != "" {
+		u.SetDescription(description)
+	}
+	row, err := u.Save(ctx)
+	if ent.IsConstraintError(err) {
+		return nil, ErrRoleNameTaken
+	}
+	return row, err
+}
+
+// DeleteRole removes a custom role of the actor's tenant (or a legacy role, platform owner only).
+func (s *Service) DeleteRole(ctx context.Context, a Actor, id uuid.UUID) error {
+	role, err := s.editableRole(ctx, a, id)
+	if err != nil {
+		return err
+	}
+	if !s.isAdminActor(ctx, a) {
+		return ErrAdminRequired
+	}
+	return s.db.LibraryRole.DeleteOne(role).Exec(ctx)
+}
 
 // ListUsers returns the tenant's provisioned library users (the team).
 func (s *Service) ListUsers(ctx context.Context, tenantID uuid.UUID) ([]*ent.LibraryUser, error) {
@@ -464,6 +624,12 @@ var reservedRoleNames = map[string]bool{
 // systemRoleNames are the seeded library roles (see SeedGlobalRoles). Always assignable.
 var systemRoleNames = map[string]bool{RoleAdmin: true, RoleStaff: true, RoleMember: true}
 
+// IsSystemRoleName reports whether name is a seeded system role name (compared lowercase and
+// trimmed), so a custom role cannot be "Library_Admin" either.
+func IsSystemRoleName(name string) bool {
+	return systemRoleNames[strings.ToLower(strings.TrimSpace(name))]
+}
+
 // IsReservedRole reports whether name is a platform or auth-level role that must never be
 // granted through library-api (compared lowercase and trimmed).
 func IsReservedRole(name string) bool {
@@ -477,10 +643,11 @@ func (e ErrRoleNotAssignable) Error() string {
 	return "role " + strings.TrimSpace(e.Role) + " cannot be assigned"
 }
 
-// AssignableRoles returns the roles from the list that are defined library roles (the seeded
-// system roles or an existing custom LibraryRole) and not reserved, plus the ones it dropped.
-// When the role table cannot be read, only the seeded system roles pass.
-func (s *Service) AssignableRoles(ctx context.Context, roles []string) (allowed, rejected []string) {
+// AssignableRoles returns the roles from the list that are defined library roles the tenant can
+// see (the seeded system roles, a legacy custom role or the tenant's own custom role) and not
+// reserved, plus the ones it dropped. Another tenant's custom role is dropped. When the role
+// table cannot be read, only the seeded system roles pass.
+func (s *Service) AssignableRoles(ctx context.Context, tenantID uuid.UUID, roles []string) (allowed, rejected []string) {
 	candidates := []string{}
 	for _, r := range roles {
 		name := strings.TrimSpace(r)
@@ -495,7 +662,7 @@ func (s *Service) AssignableRoles(ctx context.Context, roles []string) (allowed,
 	}
 	defined := map[string]bool{}
 	if len(candidates) > 0 && s.db != nil {
-		if rows, err := s.db.LibraryRole.Query().Where(libraryrole.NameIn(candidates...)).All(ctx); err == nil {
+		if rows, err := s.db.LibraryRole.Query().Where(libraryrole.NameIn(candidates...), visibleTo(tenantID)).All(ctx); err == nil {
 			for _, row := range rows {
 				defined[row.Name] = true
 			}
@@ -511,21 +678,50 @@ func (s *Service) AssignableRoles(ctx context.Context, roles []string) (allowed,
 	return mergeUnique(allowed, nil), rejected
 }
 
-// AssignRoles sets a user's roles (replacing the current set). Every role must be a defined
-// library role; reserved platform roles such as superuser are refused before anything is read.
-func (s *Service) AssignRoles(ctx context.Context, tenantID uuid.UUID, userID string, roles []string) error {
+// AssignRoles sets a user's roles in the actor's tenant (replacing the current set). Every role
+// must be a library role the tenant can see; reserved platform roles such as superuser are
+// refused before anything is read. Only a library admin or platform owner may assign roles,
+// library_admin needs an admin caller, and a legacy custom role the user does not already hold
+// can only be added by a platform owner.
+func (s *Service) AssignRoles(ctx context.Context, a Actor, userID string, roles []string) error {
 	for _, r := range roles {
 		if IsReservedRole(r) {
 			return ErrRoleNotAssignable{Role: r}
 		}
 	}
-	allowed, rejected := s.AssignableRoles(ctx, roles)
+	allowed, rejected := s.AssignableRoles(ctx, a.TenantID, roles)
 	if len(rejected) > 0 {
 		return ErrRoleNotAssignable{Role: rejected[0]}
 	}
-	u, err := s.db.LibraryUser.Query().Where(libraryuser.TenantID(tenantID), libraryuser.UserID(userID)).Only(ctx)
+	if !s.isAdminActor(ctx, a) {
+		return ErrAdminRequired
+	}
+	u, err := s.db.LibraryUser.Query().Where(libraryuser.TenantID(a.TenantID), libraryuser.UserID(userID)).Only(ctx)
 	if err != nil {
 		return err
+	}
+	if !a.PlatformOwner {
+		held := map[string]bool{}
+		for _, r := range u.Roles {
+			held[r] = true
+		}
+		var added []string
+		for _, r := range allowed {
+			if !held[r] && !systemRoleNames[r] {
+				added = append(added, r)
+			}
+		}
+		if len(added) > 0 {
+			rows, err := s.db.LibraryRole.Query().Where(libraryrole.NameIn(added...), libraryrole.TenantIDIsNil()).All(ctx)
+			if err != nil {
+				return err
+			}
+			for _, row := range rows {
+				if IsLegacyRole(row) {
+					return ErrLegacyRoleLocked
+				}
+			}
+		}
 	}
 	_, err = s.db.LibraryUser.UpdateOne(u).SetRoles(allowed).Save(ctx)
 	return err

@@ -26,6 +26,8 @@ const (
 	FieldPermissions = "permissions"
 	// FieldIsSystem holds the string denoting the is_system field in the database.
 	FieldIsSystem = "is_system"
+	// FieldTenantID holds the string denoting the tenant_id field in the database.
+	FieldTenantID = "tenant_id"
 	// Table holds the table name of the libraryrole in the database.
 	Table = "library_roles"
 )
@@ -39,6 +41,7 @@ var Columns = []string{
 	FieldDescription,
 	FieldPermissions,
 	FieldIsSystem,
+	FieldTenantID,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -97,4 +100,9 @@ func ByDescription(opts ...sql.OrderTermOption) OrderOption {
 // ByIsSystem orders the results by the is_system field.
 func ByIsSystem(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldIsSystem, opts...).ToFunc()
+}
+
+// ByTenantID orders the results by the tenant_id field.
+func ByTenantID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTenantID, opts...).ToFunc()
 }

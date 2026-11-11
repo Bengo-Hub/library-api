@@ -151,7 +151,7 @@ On renew:     due_at += loan_period_days (blocked by max_renewals or a WAITING h
 
 | Table | Key Columns | Description |
 |-------|-------------|-------------|
-| `library_roles` | `id`, `name` (UNIQUE, **no tenant_id**), `description`, `permissions` (JSON dotted codes), `is_system` | **Global** role definitions. Seeded once: `library_admin` (`*`), `library_staff`, `library_member`. |
+| `library_roles` | `id`, `name`, `description`, `permissions` (JSON dotted codes), `is_system`, `tenant_id` (nullable) | System roles (no `tenant_id`) seeded once: `library_admin` (`*`), `library_staff`, `library_member`. Custom roles carry their tenant. `name` unique where `tenant_id IS NULL`; (`tenant_id`, `name`) unique where `tenant_id IS NOT NULL`. |
 | `library_users` | `id`, `tenant_id`, `user_id` (auth UUID/sub), `email`, `display_name`, `roles` (JSON role names), `is_active` | Per-tenant projection of an auth user, JIT-provisioned + healed on every request. Index `(tenant_id, user_id)` unique. |
 
 ---

@@ -21858,6 +21858,7 @@ type LibraryRoleMutation struct {
 	permissions       *[]string
 	appendpermissions []string
 	is_system         *bool
+	tenant_id         *uuid.UUID
 	clearedFields     map[string]struct{}
 	done              bool
 	oldValue          func(context.Context) (*LibraryRole, error)
@@ -22226,6 +22227,55 @@ func (m *LibraryRoleMutation) ResetIsSystem() {
 	m.is_system = nil
 }
 
+// SetTenantID sets the "tenant_id" field.
+func (m *LibraryRoleMutation) SetTenantID(u uuid.UUID) {
+	m.tenant_id = &u
+}
+
+// TenantID returns the value of the "tenant_id" field in the mutation.
+func (m *LibraryRoleMutation) TenantID() (r uuid.UUID, exists bool) {
+	v := m.tenant_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTenantID returns the old "tenant_id" field's value of the LibraryRole entity.
+// If the LibraryRole object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *LibraryRoleMutation) OldTenantID(ctx context.Context) (v *uuid.UUID, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTenantID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTenantID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTenantID: %w", err)
+	}
+	return oldValue.TenantID, nil
+}
+
+// ClearTenantID clears the value of the "tenant_id" field.
+func (m *LibraryRoleMutation) ClearTenantID() {
+	m.tenant_id = nil
+	m.clearedFields[libraryrole.FieldTenantID] = struct{}{}
+}
+
+// TenantIDCleared returns if the "tenant_id" field was cleared in this mutation.
+func (m *LibraryRoleMutation) TenantIDCleared() bool {
+	_, ok := m.clearedFields[libraryrole.FieldTenantID]
+	return ok
+}
+
+// ResetTenantID resets all changes to the "tenant_id" field.
+func (m *LibraryRoleMutation) ResetTenantID() {
+	m.tenant_id = nil
+	delete(m.clearedFields, libraryrole.FieldTenantID)
+}
+
 // Where appends a list predicates to the LibraryRoleMutation builder.
 func (m *LibraryRoleMutation) Where(ps ...predicate.LibraryRole) {
 	m.predicates = append(m.predicates, ps...)
@@ -22260,7 +22310,7 @@ func (m *LibraryRoleMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *LibraryRoleMutation) Fields() []string {
-	fields := make([]string, 0, 6)
+	fields := make([]string, 0, 7)
 	if m.created_at != nil {
 		fields = append(fields, libraryrole.FieldCreatedAt)
 	}
@@ -22278,6 +22328,9 @@ func (m *LibraryRoleMutation) Fields() []string {
 	}
 	if m.is_system != nil {
 		fields = append(fields, libraryrole.FieldIsSystem)
+	}
+	if m.tenant_id != nil {
+		fields = append(fields, libraryrole.FieldTenantID)
 	}
 	return fields
 }
@@ -22299,6 +22352,8 @@ func (m *LibraryRoleMutation) Field(name string) (ent.Value, bool) {
 		return m.Permissions()
 	case libraryrole.FieldIsSystem:
 		return m.IsSystem()
+	case libraryrole.FieldTenantID:
+		return m.TenantID()
 	}
 	return nil, false
 }
@@ -22320,6 +22375,8 @@ func (m *LibraryRoleMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldPermissions(ctx)
 	case libraryrole.FieldIsSystem:
 		return m.OldIsSystem(ctx)
+	case libraryrole.FieldTenantID:
+		return m.OldTenantID(ctx)
 	}
 	return nil, fmt.Errorf("unknown LibraryRole field %s", name)
 }
@@ -22371,6 +22428,13 @@ func (m *LibraryRoleMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetIsSystem(v)
 		return nil
+	case libraryrole.FieldTenantID:
+		v, ok := value.(uuid.UUID)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTenantID(v)
+		return nil
 	}
 	return fmt.Errorf("unknown LibraryRole field %s", name)
 }
@@ -22407,6 +22471,9 @@ func (m *LibraryRoleMutation) ClearedFields() []string {
 	if m.FieldCleared(libraryrole.FieldPermissions) {
 		fields = append(fields, libraryrole.FieldPermissions)
 	}
+	if m.FieldCleared(libraryrole.FieldTenantID) {
+		fields = append(fields, libraryrole.FieldTenantID)
+	}
 	return fields
 }
 
@@ -22426,6 +22493,9 @@ func (m *LibraryRoleMutation) ClearField(name string) error {
 		return nil
 	case libraryrole.FieldPermissions:
 		m.ClearPermissions()
+		return nil
+	case libraryrole.FieldTenantID:
+		m.ClearTenantID()
 		return nil
 	}
 	return fmt.Errorf("unknown LibraryRole nullable field %s", name)
@@ -22452,6 +22522,9 @@ func (m *LibraryRoleMutation) ResetField(name string) error {
 		return nil
 	case libraryrole.FieldIsSystem:
 		m.ResetIsSystem()
+		return nil
+	case libraryrole.FieldTenantID:
+		m.ResetTenantID()
 		return nil
 	}
 	return fmt.Errorf("unknown LibraryRole field %s", name)
