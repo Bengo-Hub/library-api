@@ -87,7 +87,7 @@ func (s *Service) sweepOverdueBatch(ctx context.Context, now time.Time) (int, er
 	}
 	contacts := map[uuid.UUID]*ent.Member{}
 	if ms, merr := s.db.Member.Query().Where(member.IDIn(memberIDs...)).
-		Select(member.FieldID, member.FieldContactEmail, member.FieldDisplayName).All(ctx); merr == nil {
+		Select(member.FieldID, member.FieldContactEmail, member.FieldDisplayName, member.FieldCrmContactID).All(ctx); merr == nil {
 		for _, m := range ms {
 			contacts[m.ID] = m
 		}
@@ -104,9 +104,7 @@ func (s *Service) sweepOverdueBatch(ctx context.Context, now time.Time) (int, er
 	}
 	for _, l := range due {
 		payload := map[string]any{"loan_id": l.ID, "member_id": l.MemberID, "due_at": l.DueAt}
-		if m := contacts[l.MemberID]; m != nil {
-			payload["email"], payload["name"] = m.ContactEmail, m.DisplayName
-		}
+		events.WithMember(payload, contacts[l.MemberID]) // ids only for a CRM-linked member
 		if err := events.Publish(ctx, tx.OutboxEvent, l.TenantID, l.ID.String(), events.EventLoanOverdue, payload); err != nil {
 			_ = tx.Rollback()
 			return 0, err

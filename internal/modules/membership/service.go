@@ -55,10 +55,12 @@ func (s *Service) IssueFee(ctx context.Context, tenantID, memberID uuid.UUID) (*
 	if err != nil {
 		return nil, err
 	}
-	_ = events.Publish(ctx, s.db.OutboxEvent, tenantID, fee.ID.String(), events.EventMembershipFeeDue, map[string]any{
-		"membership_fee_id": fee.ID, "member_id": memberID, "amount": amount.String(),
-		"email": m.ContactEmail, "name": m.DisplayName,
-	})
+	due := map[string]any{"membership_fee_id": fee.ID, "member_id": memberID, "amount": amount.String()}
+	// The renewal email shows when the membership expires.
+	if m.ExpiresAt != nil {
+		due["expires_at"] = m.ExpiresAt.UTC().Format(time.RFC3339)
+	}
+	_ = events.Publish(ctx, s.db.OutboxEvent, tenantID, fee.ID.String(), events.EventMembershipFeeDue, events.WithMember(due, m))
 	return fee, nil
 }
 

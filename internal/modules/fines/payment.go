@@ -158,7 +158,7 @@ func publishPaid(ctx context.Context, tx *ent.Tx, f *ent.Fine, pay *ent.FinePaym
 	if err != nil || m.ContactEmail == "" {
 		return nil
 	}
-	return events.Publish(ctx, tx.OutboxEvent, f.TenantID, f.ID.String(), events.EventFinePaid, map[string]any{
+	return events.Publish(ctx, tx.OutboxEvent, f.TenantID, f.ID.String(), events.EventFinePaid, events.WithMember(map[string]any{
 		"fine_id":     f.ID,
 		"member_id":   f.MemberID,
 		"amount":      f.Amount.StringFixed(2),
@@ -166,9 +166,7 @@ func publishPaid(ctx context.Context, tx *ent.Tx, f *ent.Fine, pay *ent.FinePaym
 		"reference":   pay.Reference,
 		"reason":      string(f.Reason),
 		"description": f.Description,
-		"email":       m.ContactEmail,
-		"name":        m.DisplayName,
-	})
+	}, m))
 }
 
 // outstandingExpr is sum(amount - amount_paid) aliased as "outstanding". It is written out

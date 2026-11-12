@@ -426,11 +426,9 @@ func (s *Service) Return(ctx context.Context, tenantID, copyID uuid.UUID, staffI
 		promoted, _ := tx.Hold.UpdateOneID(next.ID).SetStatus(hold.StatusREADY).SetCopyID(copyID).SetReadyAt(now).SetExpiresAt(expires).Save(ctx)
 		_, _ = tx.BookCopy.UpdateOneID(copyID).SetStatus(bookcopy.StatusRESERVED).Save(ctx)
 		res.PromotedHld = promoted
-		hEmail, hName := s.MemberContact(ctx, next.MemberID)
-		_ = events.Publish(ctx, tx.OutboxEvent, tenantID, next.ID.String(), events.EventHoldReady, map[string]any{
+		_ = events.Publish(ctx, tx.OutboxEvent, tenantID, next.ID.String(), events.EventHoldReady, s.WithMemberRecipient(ctx, next.MemberID, map[string]any{
 			"hold_id": next.ID, "member_id": next.MemberID, "bib_record_id": c.BibRecordID, "expires_at": expires,
-			"email": hEmail, "name": hName,
-		})
+		}))
 	} else {
 		_, _ = tx.BookCopy.UpdateOneID(copyID).SetStatus(bookcopy.StatusAVAILABLE).Save(ctx)
 	}
@@ -541,11 +539,9 @@ func (s *Service) Recall(ctx context.Context, tenantID, loanID uuid.UUID, reques
 		_ = tx.Rollback()
 		return err
 	}
-	borrowerEmail, borrowerName := s.MemberContact(ctx, l.MemberID)
-	_ = events.Publish(ctx, tx.OutboxEvent, tenantID, rr.ID.String(), events.EventLoanRecalled, map[string]any{
+	_ = events.Publish(ctx, tx.OutboxEvent, tenantID, rr.ID.String(), events.EventLoanRecalled, s.WithMemberRecipient(ctx, l.MemberID, map[string]any{
 		"recall_id": rr.ID, "loan_id": loanID, "member_id": l.MemberID, "new_due_at": newDue,
-		"email": borrowerEmail, "name": borrowerName,
-	})
+	}))
 	return tx.Commit()
 }
 
@@ -591,10 +587,9 @@ func (s *Service) assessOverdueFine(ctx context.Context, tx *ent.Tx, tenantID uu
 	if err != nil {
 		return nil, err
 	}
-	_ = events.Publish(ctx, tx.OutboxEvent, tenantID, f.ID.String(), events.EventFineAssessed, map[string]any{
+	_ = events.Publish(ctx, tx.OutboxEvent, tenantID, f.ID.String(), events.EventFineAssessed, events.WithMember(map[string]any{
 		"fine_id": f.ID, "member_id": l.MemberID, "amount": amount.String(), "reason": "OVERDUE",
-		"email": m.ContactEmail, "name": m.DisplayName,
-	})
+	}, m))
 	return f, nil
 }
 
@@ -631,12 +626,13 @@ func (s *Service) copyHeldForOther(ctx context.Context, tenantID, copyID, member
 	return h.MemberID != memberID
 }
 
-// MemberContact returns a member's contact email + display name for notification routing
-// (so patron-facing notices reach the member, not just the librarian).
-func (s *Service) MemberContact(ctx context.Context, memberID uuid.UUID) (email, name string) {
+// WithMemberRecipient adds who a patron-facing notice goes to (so it reaches the member, not
+// just the librarian): the member's crm_contact_id when linked to the CRM, else their email and
+// name (see events.WithMember). An unknown member leaves the payload as it is.
+func (s *Service) WithMemberRecipient(ctx context.Context, memberID uuid.UUID, payload map[string]any) map[string]any {
 	m, err := s.db.Member.Query().Where(member.IDEQ(memberID)).Only(ctx)
 	if err != nil {
-		return "", ""
+		return payload
 	}
-	return m.ContactEmail, m.DisplayName
+	return events.WithMember(payload, m)
 }

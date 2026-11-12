@@ -71,9 +71,9 @@ func (s *PatronCategoryScheduler) expireMembers(ctx context.Context, now time.Ti
 			s.log.Warn("patron expiry update failed", zap.String("member", m.ID.String()), zap.Error(err))
 			continue
 		}
-		_ = events.Publish(ctx, s.db.OutboxEvent, m.TenantID, m.ID.String(), events.EventMemberExpired, map[string]any{
-			"member_id": m.ID, "email": m.ContactEmail, "name": m.DisplayName, "expires_at": m.ExpiresAt,
-		})
+		_ = events.Publish(ctx, s.db.OutboxEvent, m.TenantID, m.ID.String(), events.EventMemberExpired, events.WithMember(map[string]any{
+			"member_id": m.ID, "expires_at": m.ExpiresAt,
+		}, m))
 	}
 	if len(expired) > 0 {
 		s.log.Info("patron expiry sweep", zap.Int("expired", len(expired)))
@@ -120,10 +120,9 @@ func (s *PatronCategoryScheduler) graduateMembers(ctx context.Context, now time.
 				s.log.Warn("graduation update failed", zap.String("member", m.ID.String()), zap.Error(err))
 				continue
 			}
-			_ = events.Publish(ctx, s.db.OutboxEvent, m.TenantID, m.ID.String(), events.EventMemberGraduated, map[string]any{
+			_ = events.Publish(ctx, s.db.OutboxEvent, m.TenantID, m.ID.String(), events.EventMemberGraduated, events.WithMember(map[string]any{
 				"member_id": m.ID, "old_tier_id": tier.ID, "new_tier_id": newTierID,
-				"email": m.ContactEmail, "name": m.DisplayName,
-			})
+			}, m))
 		}
 	}
 }

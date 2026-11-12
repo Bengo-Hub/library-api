@@ -297,10 +297,7 @@ func (h *MemberHandler) CreateMember(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusInternalServerError, err.Error(), "create_failed")
 		return
 	}
-	_ = events.Publish(r.Context(), tx.OutboxEvent, tenantID, row.ID.String(), events.EventMemberRegistered, map[string]any{
-		"member_id": row.ID, "membership_no": row.MembershipNo, "display_name": row.DisplayName,
-		"email": row.ContactEmail, "name": row.DisplayName,
-	})
+	_ = events.Publish(r.Context(), tx.OutboxEvent, tenantID, row.ID.String(), events.EventMemberRegistered, memberRegisteredPayload(row))
 	if err := tx.Commit(); err != nil {
 		respondError(w, http.StatusInternalServerError, err.Error(), "commit_failed")
 		return
@@ -540,4 +537,14 @@ func (h *MemberHandler) resolveTier(r *http.Request, tenantID uuid.UUID, explici
 		return uuid.Nil, err
 	}
 	return t.ID, nil
+}
+
+// memberRegisteredPayload is the library.member.registered payload: ids, plus the member's
+// name and email only when the member has no CRM link (see events.WithMember).
+func memberRegisteredPayload(m *ent.Member) map[string]any {
+	p := map[string]any{"member_id": m.ID, "membership_no": m.MembershipNo}
+	if m.CrmContactID == nil || *m.CrmContactID == uuid.Nil {
+		p["display_name"] = m.DisplayName
+	}
+	return events.WithMember(p, m)
 }

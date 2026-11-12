@@ -417,6 +417,7 @@ func (h *SerialHandler) ClaimIssue(w http.ResponseWriter, r *http.Request) {
 	// Publish serial.issue_late event so notifications-service can alert the librarian.
 	_ = events.Publish(r.Context(), h.db.OutboxEvent, tenantID, id.String(), events.EventSerialIssueLate, map[string]any{
 		"issue_id":        id.String(),
+		"issue_no":        iss.IssueNo,
 		"subscription_id": iss.SubscriptionID.String(),
 		"expected_date":   iss.ExpectedDate.Format("2006-01-02"),
 	})
@@ -562,6 +563,7 @@ func (s *SerialIssueScheduler) sweep(ctx context.Context) {
 		}
 		_ = events.Publish(ctx, s.db.OutboxEvent, iss.TenantID, iss.ID.String(), events.EventSerialIssueLate, map[string]any{
 			"issue_id":        iss.ID.String(),
+			"issue_no":        iss.IssueNo,
 			"subscription_id": iss.SubscriptionID.String(),
 			"expected_date":   iss.ExpectedDate.Format("2006-01-02"),
 		})

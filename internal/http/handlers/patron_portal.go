@@ -16,7 +16,6 @@ import (
 	"github.com/bengobox/library-service/internal/ent/hold"
 	"github.com/bengobox/library-service/internal/ent/loan"
 	"github.com/bengobox/library-service/internal/ent/member"
-	"github.com/bengobox/library-service/internal/events"
 	"github.com/bengobox/library-service/internal/modules/circulation"
 	"github.com/bengobox/library-service/internal/payref"
 	"github.com/bengobox/library-service/internal/platform/treasury"
@@ -271,8 +270,6 @@ func (h *PatronPortalHandler) MyPayFine(w http.ResponseWriter, r *http.Request) 
 	}
 	intentID := resp.ResolvedID()
 	_, _ = h.db.Fine.UpdateOneID(f.ID).SetTreasuryIntentID(intentID).Save(r.Context())
-	_ = events.Publish(r.Context(), h.db.OutboxEvent, tenantID, f.ID.String(), events.EventFineAssessed, map[string]any{
-		"fine_id": f.ID, "intent_id": intentID, "amount": outstanding.String(),
-	})
+	// No fine.assessed here: the fine was announced when it was assessed (see fines.go Pay).
 	respondJSON(w, http.StatusOK, payResponse{IntentID: intentID, InitiateURL: resp.InitiateURL, Amount: resp.Amount})
 }

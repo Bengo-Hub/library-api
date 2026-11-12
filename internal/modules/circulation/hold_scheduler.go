@@ -78,11 +78,9 @@ func (s *Service) expireHold(ctx context.Context, h *ent.Hold, now time.Time) {
 			expires := now.Add(48 * time.Hour)
 			_, _ = tx.Hold.UpdateOneID(next.ID).SetStatus(hold.StatusREADY).SetCopyID(*h.CopyID).SetReadyAt(now).SetExpiresAt(expires).Save(ctx)
 			_, _ = tx.BookCopy.UpdateOneID(*h.CopyID).SetStatus(bookcopy.StatusRESERVED).Save(ctx)
-			nEmail, nName := s.MemberContact(ctx, next.MemberID)
-			_ = events.Publish(ctx, tx.OutboxEvent, next.TenantID, next.ID.String(), events.EventHoldReady, map[string]any{
-				"hold_id": next.ID, "member_id": next.MemberID, "bib_record_id": h.BibRecordID,
-				"email": nEmail, "name": nName, "expires_at": expires,
-			})
+			_ = events.Publish(ctx, tx.OutboxEvent, next.TenantID, next.ID.String(), events.EventHoldReady, s.WithMemberRecipient(ctx, next.MemberID, map[string]any{
+				"hold_id": next.ID, "member_id": next.MemberID, "bib_record_id": h.BibRecordID, "expires_at": expires,
+			}))
 		} else {
 			_, _ = tx.BookCopy.UpdateOneID(*h.CopyID).SetStatus(bookcopy.StatusAVAILABLE).Save(ctx)
 		}
@@ -93,11 +91,9 @@ func (s *Service) expireHold(ctx context.Context, h *ent.Hold, now time.Time) {
 	if bib, berr := s.db.BibRecord.Query().Where(bibrecord.IDEQ(h.BibRecordID)).Only(ctx); berr == nil {
 		bibTitle = bib.Title
 	}
-	mEmail, mName := s.MemberContact(ctx, h.MemberID)
-	_ = events.Publish(ctx, tx.OutboxEvent, h.TenantID, h.ID.String(), events.EventHoldExpired, map[string]any{
+	_ = events.Publish(ctx, tx.OutboxEvent, h.TenantID, h.ID.String(), events.EventHoldExpired, s.WithMemberRecipient(ctx, h.MemberID, map[string]any{
 		"hold_id": h.ID, "member_id": h.MemberID, "bib_title": bibTitle,
-		"email": mEmail, "name": mName,
-	})
+	}))
 	if err := tx.Commit(); err != nil {
 		s.log.Warn("hold expiry: commit failed", zap.String("hold", h.ID.String()), zap.Error(err))
 	}

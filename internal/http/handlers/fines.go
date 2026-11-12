@@ -393,8 +393,7 @@ func (h *FineHandler) Pay(w http.ResponseWriter, r *http.Request) {
 	}
 	intentID := resp.ResolvedID()
 	_, _ = h.db.Fine.UpdateOneID(f.ID).SetTreasuryIntentID(intentID).Save(r.Context())
-	_ = events.Publish(r.Context(), h.db.OutboxEvent, tenantID, f.ID.String(), events.EventFineAssessed, map[string]any{
-		"fine_id": f.ID, "intent_id": intentID, "amount": outstanding.String(),
-	})
+	// No fine.assessed here: the fine was announced when it was assessed. Starting a payment used
+	// to republish it, so librarians got a second "A fine has been added" email with no member.
 	respondJSON(w, http.StatusOK, payResponse{IntentID: intentID, InitiateURL: resp.InitiateURL, Amount: resp.Amount})
 }
