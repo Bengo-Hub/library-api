@@ -145,9 +145,9 @@ func TestPlatformOwnerCreatesInURLTenant(t *testing.T) {
 	}
 }
 
-// The tenant check is report-only for now: a tenant user naming another tenant is logged and not
-// refused. When ReportOnly is removed from TenantScope, change this back to expect a 403.
-func TestTenantUserNamingOtherTenantIsReported(t *testing.T) {
+// The tenant check is enforced: a tenant user naming another tenant is refused with 403 before the
+// handler runs, and the mismatch is logged once.
+func TestTenantUserNamingOtherTenantIsRefused(t *testing.T) {
 	core, logs := observer.New(zap.WarnLevel)
 	claims := &authclient.Claims{TenantID: uuid.NewString(), TenantSlug: "alpha"}
 	reached := false
@@ -167,10 +167,10 @@ func TestTenantUserNamingOtherTenantIsReported(t *testing.T) {
 	})
 
 	rec := postJSON(t, r, "/api/v1/beta/library/members", map[string]any{"first_name": "Mallory"})
-	if rec.Code == http.StatusForbidden || !reached {
-		t.Fatalf("status %d reached=%v, want the request to pass while report-only", rec.Code, reached)
+	if rec.Code != http.StatusForbidden || reached {
+		t.Fatalf("status %d reached=%v, want 403 and the handler never reached", rec.Code, reached)
 	}
-	if n := logs.FilterMessage("tenant mismatch (report-only)").Len(); n != 1 {
+	if n := logs.FilterMessage("tenant mismatch refused").Len(); n != 1 {
 		t.Fatalf("got %d mismatch log lines, want 1", n)
 	}
 }

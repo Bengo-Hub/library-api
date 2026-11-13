@@ -35,16 +35,13 @@ type scopedTenantKey struct{}
 // the URL tenant (a UUID or a slug looked up in the local Tenant table) becomes the request's
 // tenant, and an unknown slug gets 404. db may be nil when no platform owner is expected.
 //
-// The tenant check is report-only for now: a mismatch is logged through log (nil logs nothing) and
-// the request goes on, until the logs show no legitimate caller would be refused.
+// The tenant check is enforced (2026-11-13): a tenant that differs from the token's gets a 403
+// and the mismatch is logged through log (nil logs nothing). The report-only run logged none.
 func TenantScope(db *ent.Client, log *zap.Logger) func(http.Handler) http.Handler {
 	if log == nil {
 		log = zap.NewNop()
 	}
 	v2 := httpware.TenantV2(httpware.TenantConfig{
-		// Report-only until the logs show no legitimate caller is refused, then remove
-		// ReportOnly so a tenant that differs from the token's gets a 403.
-		ReportOnly: true,
 		OnMismatch: func(r *http.Request, source, supplied, claimed string) {
 			fields := []zap.Field{
 				zap.String("source", source),
@@ -56,7 +53,7 @@ func TenantScope(db *ent.Client, log *zap.Logger) func(http.Handler) http.Handle
 			if c, ok := authclient.ClaimsFromContext(r.Context()); ok && c != nil {
 				fields = append(fields, zap.String("subject", c.Subject))
 			}
-			log.Warn("tenant mismatch (report-only)", fields...)
+			log.Warn("tenant mismatch refused", fields...)
 		},
 		ClaimsExtractor: func(ctx context.Context) (string, string, bool, bool) {
 			claims, found := authclient.ClaimsFromContext(ctx)
